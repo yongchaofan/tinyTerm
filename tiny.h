@@ -1,0 +1,61 @@
+#include <stdio.h>
+#define TERMLINES 40
+#define TERMCOLS 100
+#define MAXLINES 8190
+#define BUFFERSIZE 8190*128
+#define CONN_IDLE			0
+#define CONN_CONNECTING 	1
+#define CONN_AUTHENTICATING	2
+#define CONN_CONNECTED		4
+
+/****************auto_drop.c*************/
+void drop_Init( HWND hwnd );
+void drop_Destroy( HWND hwnd );
+int autocomplete_Init( HWND hWnd );
+int autocomplete_Add( LPCTSTR cmd );
+int autocomplete_Destroy( void );
+char *autocomplete_Prev( void );
+char *autocomplete_Next( void );
+
+/****************comm.c****************/
+int comm_Init( void );
+void comm_Destory( void );
+void comm_Open( char *port );
+void comm_Close( void );
+void comm_Send( char *buf, int len );
+void comm_Size( int w, int h );
+BOOL comm_Connected( void );
+BOOL comm_Connecting( void );
+int http_Svr( char *intf );
+
+/****************ftpd.c****************/
+char *getFolderName(char *title);
+void ftp_Svr( char *root );
+void tftp_Svr( char *root );
+
+/****************term.c****************/
+void buff_Load( char *fn );
+void buff_Save( char *fn );
+void buff_Logg( char *fn );
+void buff_Srch( char *sstr );
+void term_Clear( void );
+void term_Size( void );
+char *term_Init( void );
+char *term_Exec( char *cmd );
+char *term_Disp( char *buf );
+char *term_Send( char *buf, int len );
+void term_Parse( char *buf, int len );
+int term_Recv( char *tl1text );
+int term_TL1( char *cmd, char **tl1text);
+void cscript_Open( char *fn );
+void script_Open( char *fn );
+void script_Pause( void );
+void script_Stop( void );
+void tiny_Drop_Script( char *cmds );
+
+/****************tiny.c****************/
+void cmd_Disp( char *buf );
+void tiny_Title( char *buf );
+void tiny_Redraw();
+void tiny_Focus();
+void tiny_Connecting();
