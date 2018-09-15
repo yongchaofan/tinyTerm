@@ -1,6 +1,25 @@
+//
+// "$Id: term.c 19878 2018-09-15 21:05:10 $"
+//
+// tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
+//
+// term.c is the minimal xterm implementation, only common ESCAPE 
+// control sequences are supported for apps like top, vi etc.
+//
+// Copyright 2015-2018 by Yongchao Fan.
+//
+// This library is free software distributed under GNU LGPL 3.0,
+// see the license at:
+//
+//     https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//
+// Please report all bugs and problems on the following page:
+//
+//     https://github.com/zoudaokou/tinyTerm/issues/new
+//
 #include <windows.h>
-#include <wincrypt.h>
 #include "tiny.h"
+extern int comm_status;
 
 char buff[BUFFERSIZE+256], attr[BUFFERSIZE+256], c_attr;
 int cursor_x, cursor_y, save_x, save_y;
@@ -10,18 +29,18 @@ int scroll_y;
 int sel_left, sel_right;
 int roll_top, roll_bot;
 int line[MAXLINES+2];
-BOOL bLogging;
-BOOL bEcho;
+BOOL bLogging, bEcho;
+BOOL bCursor, bAppCursor;
+BOOL bEnter=FALSE, bEnter1=FALSE;
 
 static FILE *fpLogFile;
-static BOOL bPrompt=FALSE, bNewline=FALSE;
-static char cPrompt=';', *tl1text = NULL;
-static int iTimeOut=30, tl1len = 0;
+static BOOL bPrompt=FALSE;
+static char sPrompt[16]=";\n> ", *tl1text = NULL;
+static int  iPrompt=4, iTimeOut=30, tl1len = 0;
+static HANDLE hTL1Event;	//for serial reader
 
-BOOL bCursor, bAppCursor;
 static BOOL bAlterScreen, bGraphic, bEscape, bTitle, bInsert;
 unsigned char * vt100_Escape( unsigned char *sz, int cnt );
-char * SHA ( char *msg );
 
 /*******************************Line functions************************/
 void term_Clear( )
@@ -44,6 +63,7 @@ void term_Clear( )
 }
 char *term_Init( )
 {
+	hTL1Event = CreateEvent( NULL, TRUE, FALSE, "TL1" );
 	size_y = TERMLINES;
 	size_x = TERMCOLS;
 	bLogging = FALSE;
@@ -89,26 +109,20 @@ void term_nextLine()
 	if ( scroll_y<0 ) scroll_y--;
 	if ( screen_y<cursor_y-size_y+1 ) screen_y = cursor_y-size_y+1;
 }
-void term_NewLine( )
-{
-	if ( bNewline ) {
-		if ( !bPrompt ) {
-			tl1len = buff+cursor_x - tl1text;
-			if ( buff[cursor_x-2]==cPrompt ) {
-				tl1len++; bPrompt = TRUE;
-			}
-		}
-	}
-	else {
-		bNewline = TRUE; 
-		tl1text = buff+cursor_x;
-	}
-}
 void term_Parse( char *buf, int len )
 {
 	unsigned char c, *p=(unsigned char *)buf;
 	unsigned char *zz = p+len;
 	
+	if ( bEnter1 ) { //capture prompt for scripting after Enter key and pressed
+		if ( len==1 ) {//and the echo is just one letter
+			sPrompt[0] = buff[cursor_x-2];
+			sPrompt[1] = buff[cursor_x-1];
+			iPrompt = 2;
+		}
+		bEnter1 = FALSE;
+	}
+
 	if ( bLogging ) fwrite( buf, 1, len, fpLogFile );
 	if ( bEscape ) p = vt100_Escape( p, zz-p ); 
 	while ( p < (unsigned char *)buf+len ) {
@@ -145,7 +159,6 @@ void term_Parse( char *buf, int len )
 						attr[cursor_x] = c_attr; 
 						buff[cursor_x++] = c;
 						term_nextLine();
-						term_NewLine( );
 					}
 					break;
 		case 0xe2: 	if ( *p==0x94 ) {//utf8 box drawing
@@ -184,12 +197,13 @@ void term_Parse( char *buf, int len )
 		}
 	}
 
-	if ( !bPrompt && bNewline )
-		if ( ( buff[cursor_x-2]==cPrompt && buff[cursor_x-1]==' ')
-			|| buff[cursor_x-1]==cPrompt ) {
-			tl1len = buff+cursor_x - tl1text;
-			bPrompt=TRUE;
+	if ( !bPrompt ) {
+		tl1len = buff+cursor_x - tl1text;
+		if ( strncmp(sPrompt, buff+cursor_x-iPrompt, iPrompt)==0 ) {
+			bPrompt = TRUE;
+			SetEvent( hTL1Event );
 		}
+	}
 	if ( scroll_y>-size_y ) tiny_Redraw();
 }
 char *term_Disp( char *msg )
@@ -213,17 +227,18 @@ int term_Recv( char *tl1text )
 int term_TL1( char *cmd, char **pTl1Text )
 {
 	tl1len = 0; 
-	if ( comm_Connected() ) {				//retrieve from NE
-		term_Send( cmd, strlen(cmd) );
-		bNewline = bPrompt = FALSE; 
-		int i, oldlen = tl1len;
-		for ( i=0; i<iTimeOut*4 && (!bPrompt); i++ ) {
-			Sleep(250); 
+	if ( comm_status==CONN_CONNECTED ) {	//retrieve from NE
+		bPrompt = FALSE; 
+		tl1text = term_Send( cmd, strlen(cmd) );
+		int i=0, oldlen = tl1len;
+		ResetEvent(hTL1Event);
+		while ( WaitForSingleObject( hTL1Event, 100 ) == WAIT_TIMEOUT ) { 
+			if ( ++i==iTimeOut*10 ) break;
 			if ( tl1len>oldlen ) { i=0; oldlen=tl1len; }
 		}
 	}
 	else {									//retrieve from buffer
-		static char *pcursor=buff;		//only when retrieve from buffer
+		static char *pcursor=buff;			//only when retrieve from buffer
 		buff[cursor_x]=0; 
 		char *p = strstr( pcursor, cmd );
 		if ( p==NULL ) { pcursor = buff; p = strstr( pcursor, cmd ); }
@@ -231,7 +246,7 @@ int term_TL1( char *cmd, char **pTl1Text )
 			if ( p!=NULL ) {
 				tl1text = p+2;
 				p = strstr( p, "\nM " );
-				p = strchr( p, cPrompt );
+				p = strstr( p, sPrompt );
 				if ( p!=NULL ) {
 					pcursor = ++p;
 					tl1len = pcursor - tl1text;
@@ -256,11 +271,14 @@ char *term_Exec( char *pCmd )
 	else if ( strncmp(cmd, "Save", 4)==0 ) 		buff_Save( cmd+5 ); 
 	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 		ftp_Svr( cmd+5 );
 	else if ( strncmp(cmd, "Tftpd", 5)==0 ) 	tftp_Svr( cmd+6 );
-	else if ( strncmp(cmd, "Prompt", 6)==0 ) 	cPrompt = cmd[7];
+	else if ( strncmp(cmd, "Prompt", 6)==0 ) {
+		strncpy(sPrompt, cmd+7, 15);
+		sPrompt[15]=0;
+		iPrompt = strlen(sPrompt);
+	}
 	else if ( strncmp(cmd, "Timeout", 7)==0 ) 	iTimeOut = atoi( cmd+8 ); 
 	else if ( strncmp(cmd, "Connect", 7)==0 ) 	comm_Open( cmd+8 );
 	else if ( strncmp(cmd, "Disconnect", 9)==0 )comm_Close(); 
-	else if ( strncmp(cmd, "SHA",3)==0 ) 	p = SHA(cmd+3);
 	return p;
 }
 static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
@@ -304,7 +322,7 @@ DWORD WINAPI cmdScripter( void *cmds )
 				}
 			}
 			else 
-				if ( comm_Connected() ) term_TL1( p0, NULL );
+				if ( comm_status==CONN_CONNECTED ) term_TL1( p0, NULL );
 		}
 		if ( p0!=p1 ) { p0 = p1+1; *p1 = 0x0a; }
 		while ( bScriptPause && bScriptRun ) Sleep(1000);
@@ -692,27 +710,3 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 	}
 	return sz;
 }
-/********************************************/
-char * SHA ( char *msg ) {
-const unsigned int ALGIDs[] = { CALG_SHA1, CALG_SHA_256, CALG_SHA_384, 0, CALG_SHA_512 };
-	static char result[256];
-	BYTE        bHash[64];
-	DWORD       dwDataLen = 0;
-	HCRYPTPROV  hProv = 0;
-	HCRYPTHASH  hHash = 0;
-
-	int algo = *msg - '1';
-	msg = strchr(msg, ' ')+1;
-	CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_AES, CRYPT_VERIFYCONTEXT);
-	CryptCreateHash( hProv, ALGIDs[algo], 0, 0, &hHash);
-	CryptHashData( hHash, (BYTE *)msg, strlen(msg), 0);
-	CryptGetHashParam( hHash, HP_HASHVAL, NULL, &dwDataLen, 0);
-	CryptGetHashParam( hHash, HP_HASHVAL, bHash, &dwDataLen, 0);
-
-	if(hHash) CryptDestroyHash(hHash);    
-	if(hProv) CryptReleaseContext(hProv, 0);
-
-	for ( int i=0; i<dwDataLen; i++ ) sprintf(result+i*2, "%02x", bHash[i]);
-	return result;
-}
-/************************************************/

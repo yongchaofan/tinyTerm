@@ -1,3 +1,21 @@
+//
+// "$Id: ftpd.c 14503 2018-09-15 21:05:10 $"
+//
+// tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
+//
+// ftpd.c implements minimal ftp and tftp server using posix API.
+//
+// Copyright 2015-2018 by Yongchao Fan.
+//
+// This library is free software distributed under GNU LGPL 3.0,
+// see the license at:
+//
+//     https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//
+// Please report all bugs and problems on the following page:
+//
+//     https://github.com/zoudaokou/tinyTerm/issues/new
+//
 #include <direct.h>
 #include <time.h>
 #include <fcntl.h>

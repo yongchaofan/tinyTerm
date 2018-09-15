@@ -2,7 +2,7 @@
 
 HEADERS = tiny.h 
 OBJS =	obj/tiny.o obj/term.o obj/comm.o obj/ftpd.o obj/auto_drop.o obj/resource.o
-LIBS =  /mingw32/lib/libssh2.a /mingw32/lib/libz.a 
+LIBS =  /mingw32/lib/libssh2.a /mingw32/lib/libz.a /mingw32/lib/binutils/libiberty.a
 INCLUDE_DIRS = -I.
 
 WARNS = -Wall
@@ -26,6 +26,6 @@ clean:
 obj/%.o: %.c ${HEADERS}
 	${CC} ${CFLAGS} ${INCLUDE_DIRS} -c $< -o $@
 
-obj/resource.o: res\tinyTerm.rc res\tiny.manifest res\TL1.ico 
+obj/resource.o: res\tinyTerm.rc res\tinyTerm.manifest res\TL1.ico 
 	${RC} -I. -I.\res -i $< -o $@
 

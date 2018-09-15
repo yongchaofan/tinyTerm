@@ -1,3 +1,21 @@
+//
+// "$Id: tiny.c 23731 2018-09-15 21:05:10 $"
+//
+// tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
+//
+// tiny.c is the GUI implementation using WIN32 API.
+//
+// Copyright 2015-2018 by Yongchao Fan.
+//
+// This library is free software distributed under GNU LGPL 3.0,
+// see the license at:
+//
+//     https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//
+// Please report all bugs and problems on the following page:
+//
+//     https://github.com/zoudaokou/tinyTerm/issues/new
+//
 #include <direct.h>
 #include <windows.h>
 #include <windowsx.h>
@@ -9,7 +27,8 @@
 #include <shellapi.h>
 #include "tiny.h"
 
-extern char comm_status;
+extern int comm_type;
+extern int comm_status;
 extern char buff[], attr[], c_attr;
 extern int line[];
 extern int cursor_y, cursor_x;
@@ -17,11 +36,11 @@ extern int size_y, size_x;
 extern int screen_y;
 extern int scroll_y;
 extern int sel_left, sel_right;
-extern BOOL bAppCursor, bCursor;
+extern BOOL bAppCursor, bCursor, bEnter, bEnter1;
 extern BOOL bLogging;
 extern BOOL bEcho;
 
-#define iCmdHeight		16
+#define iCmdHeight		20
 
 #define ID_CONNECT		20
 #define ID_DISCONN		68	//^D
@@ -53,28 +72,29 @@ extern BOOL bEcho;
 
 const char WELCOME[]="\r\n\r\n\r\n\
 \ttinyTerm is a terminal emulator for network engineers,\r\n\r\n\
-\ta single executable in 100K bytes that features:\r\n\r\n\r\n\
-\t* Serial/Telnet/SSH connection\r\n\r\n\
-\t* 8192 lines of scrollback buffer\r\n\r\n\
-\t* Command line autocompletion\r\n\r\n\
-\t* Drag and Drop to run command batches\r\n\r\n\
-\t* FTPd/TFTPd for file transfer\r\n\r\n\
-\t* xmlhttp interface at 127.0.0.1:%d\r\n\r\n\r\n\
-\tBy yongchaofan@gmail.com		09-11-2018\r\n\r\n";
+\ta single executable in 115K bytes that features:\r\n\r\n\r\n\
+\t    * Serial/Telnet/SSH/SCP/SFTP client\r\n\r\n\
+\t    * 8192 lines of scrollback buffer\r\n\r\n\
+\t    * Command line autocompletion\r\n\r\n\
+\t    * Drag and Drop to run command batches\r\n\r\n\
+\t    * FTPd/TFTPd for file transfer\r\n\r\n\
+\t    * xmlhttp interface at 127.0.0.1:%d\r\n\r\n\r\n\
+\tBy yongchaofan@gmail.com		09-15-2018\r\n\r\n";
 
 static HINSTANCE hInst;						// Instance handle
 static HWND hwndMain, hwndCmd;				// window handles
-static HMENU hConnectMenu, hBufferMenu, hScriptMenu, hOptionMenu;
+static HMENU hSysMenu, hScriptMenu, hOptionMenu;
 static RECT termRect, wndRect;
 static int iFontHeight, iFontWidth, iScrollWidth;
-static int nConnectCnt, nScriptCnt, httport;
+static int nScriptCnt, httport;
 static BOOL bTransparent = FALSE;
 static BOOL bScrollbar = FALSE;
 static BOOL bCaret = FALSE;
 
-BOOL host_Paste( void );
 void buff_Copy( char *ptr, int len );
 void dict_Load( char *fn );
+void host_Paste( void );
+void host_Drop( HDROP hDrop );
 
 #define SCRIPTS "scripts\0*.tl1;*.vbs;*.js\0All\0*.*\0\0"
 #define LOGFILES "Log file\0*.log;*.txt\0All\0*.*\0\0"
@@ -134,7 +154,13 @@ static char cmd[256];
 		autocomplete_Add(cmd);
 		switch ( *cmd ) {
 		case '!': comm_Open( cmd ); break;
-		case '#': term_Exec( cmd+1 ); break;
+		case '#': if ( strncmp(cmd+1, "scp ", 4)==0 ) 
+					scp_cmd(cmd+5);
+				  else if ( strncmp(cmd+1, "tun ", 4)==0 ) 
+					tun_cmd(cmd+5);
+				  else
+					term_Exec( cmd+1 ); 
+				  break;
 		case '/': buff_Srch( cmd+1 ); break;
 		case '^': cmd[1]-=64; comm_Send( cmd+1, 1 ); break;
 		default: if ( scroll_y!=0 ) {
@@ -190,7 +216,7 @@ void tiny_Title( char *buf )
 	char Title[256] = "tinyTerm ";
 	strcat(Title, buf); 
 	SetWindowText(hwndMain, Title);
-	ModifyMenu(hConnectMenu, ID_DISCONN, MF_BYCOMMAND, ID_DISCONN, 
+	ModifyMenu(hSysMenu, ID_DISCONN, MF_BYCOMMAND, ID_DISCONN, 
 					( *buf==0 ? "Connect..." : "Disconnect\t^D") );
 	if ( *buf ) 
 		comm_Size(size_x, size_y);
@@ -262,9 +288,10 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 		hwndProto  = GetDlgItem(hwndDlg, IDPROTO);
 		hwndPort   = GetDlgItem(hwndDlg, IDPORT);
 		hwndHost   = GetDlgItem(hwndDlg, IDHOST);
-		ComboBox_AddString(hwndProto,"Serial"); 
-		ComboBox_AddString(hwndProto,"Telnet"); 
-		ComboBox_AddString(hwndProto,"SSH"); 
+		ComboBox_AddString(hwndProto,"serial"); 
+		ComboBox_AddString(hwndProto,"telnet"); 
+		ComboBox_AddString(hwndProto,"ssh"); 
+		ComboBox_AddString(hwndProto,"sftp"); 
 		ComboBox_SetCurSel(hwndProto, 1);
 		ComboBox_AddString(hwndPort,"2024"); 
 		ComboBox_AddString(hwndPort,"23"); 
@@ -303,6 +330,7 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 					ComboBox_AddString(hwndPort,"2024"); 
 					ComboBox_AddString(hwndPort,"23"); 
 					ComboBox_AddString(hwndPort,"22"); 
+					ComboBox_AddString(hwndPort,"22"); 
 					ComboBox_SetCurSel(hwndPort, proto);
 					ComboBox_AddString(hwndHost,"192.168.1.1"); 
 					ComboBox_SetCurSel(hwndHost, 0);
@@ -322,10 +350,8 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 						ComboBox_GetText(hwndHost, conn+strlen(conn), 128);
 					}
 					else {
-						if ( proto==1 )
-							conn[0] = 0;
-						else
-							strcpy(conn, "ssh ");
+						ComboBox_GetText(hwndProto, conn, 128);
+						strcat(conn, " ");
 						ComboBox_GetText(hwndHost, conn+strlen(conn), 128);
 						strcat(conn, ":");
 						ComboBox_GetText(hwndPort, conn+strlen(conn), 128);
@@ -361,7 +387,7 @@ BOOL menu_Command( WPARAM wParam )
 						buff_Logg( fileDialog(LOGFILES,SAVEFLAGS) );
 					  else
 						buff_Logg( NULL ); 
-					 check_Option( hBufferMenu, ID_LOGGING, bLogging ); 
+					 check_Option( hSysMenu, ID_LOGGING, bLogging ); 
 					 break;
 	case ID_ECHO:	 check_Option( hOptionMenu, ID_ECHO, bEcho=!bEcho ); 
 					 break;
@@ -379,16 +405,7 @@ BOOL menu_Command( WPARAM wParam )
 	case ID_SCPAUSE: script_Pause(); break;
 	case ID_SCSTOP:  script_Stop(); break;
 	case ID_SCRIPT:  script_Open( fileDialog(SCRIPTS,OPENFLAGS) ); break;
-	default:	if ( wParam>ID_CONNECT && wParam<=ID_CONNECT+nConnectCnt ) { 
-					 if ( comm_status==CONN_IDLE ) {
-						char pName[256];
-						GetMenuString(hConnectMenu, wParam, pName, 256, 0);
-						comm_Open( pName );
-					}
-					break;
-				}
-
-				if ( wParam>ID_SCRIPT && wParam<=ID_SCRIPT+nScriptCnt ) { 
+	default:	if ( wParam>ID_SCRIPT && wParam<=ID_SCRIPT+nScriptCnt ) { 
 					char fn[256], port[256];
 					GetMenuString(hScriptMenu, wParam, fn, 255, 0);
 					sprintf(port, "%d", httport); 
@@ -419,15 +436,15 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 							GWLP_WNDPROC, (LONG_PTR)CmdEditProc); 
 		HFONT hEditFont = CreateFont( iCmdHeight,0,0,0,FW_MEDIUM,
 							FALSE,FALSE,FALSE,
-							ANSI_CHARSET,OUT_TT_PRECIS,CLIP_DEFAULT_PRECIS,
-							ANTIALIASED_QUALITY, VARIABLE_PITCH,TEXT("Arial"));
+							DEFAULT_CHARSET,OUT_TT_PRECIS,CLIP_DEFAULT_PRECIS,
+							DEFAULT_QUALITY, VARIABLE_PITCH,TEXT("Arial"));
 		SendMessage( hwndCmd, WM_SETFONT, (WPARAM)hEditFont, TRUE );
 		SendMessage( hwndCmd, EM_SETLIMITTEXT, 255, 0);
 		dwBkBrush = (LONG_PTR)CreateSolidBrush( BKCOLOR );
 		for ( i=0; i<3; i++ ) hFont[i] = CreateFont(FONTWEIGHT[i],0,0,0,
 							FW_LIGHT, FALSE,FALSE,FALSE,
-							ANSI_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
-							ANTIALIASED_QUALITY, FIXED_PITCH, TEXT("Consolas"));
+							DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
+							DEFAULT_QUALITY, FIXED_PITCH, TEXT("Consolas"));
 		DragAcceptFiles( hwnd, TRUE );
 		SetLayeredWindowAttributes(hwnd, 0, cAlpha, LWA_ALPHA);
 		GetClientRect( hwnd, &termRect );
@@ -442,11 +459,11 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		break;
 	case WM_SIZE:
 		GetClientRect( hwnd, &termRect );
-		termRect.bottom -= iCmdHeight;
+		termRect.bottom -= iCmdHeight-2;
 		size_x = termRect.right / iFontWidth;
 		size_y = termRect.bottom / iFontHeight;
 		MoveWindow( hwndCmd, 0, termRect.bottom, termRect.right, 
-												iCmdHeight, TRUE );
+												iCmdHeight-2, TRUE );
 		term_Size();
 		comm_Size( size_x, size_y );
 		DeleteDC(hBufferDC);
@@ -531,6 +548,15 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 						SetFocus( hwndCmd ); 
 						bCaret = FALSE;
 					 }
+					 break;
+		default:	if ( wParam==VK_RETURN ) 
+						bEnter = TRUE;
+					else {
+						if ( bEnter ) {
+							bEnter = FALSE;
+							bEnter1 = TRUE;
+						}
+					}
 		}
 		break;
 	case WM_TIMER:
@@ -596,21 +622,14 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		SetFocus( hwnd ); bCaret = TRUE; 
 		break;
 	case WM_RBUTTONUP:
-			host_Paste();
-			break;
-	case WM_DROPFILES: {
-			char fname[MAX_PATH];
-			HDROP hDrop = (HDROP)wParam;
-			DragQueryFile( hDrop, 0, fname, MAX_PATH );
-			DragFinish( hDrop );
-			if ( comm_Connected() ) 
-				script_Open( fname );
-			else
-				buff_Load( fname );
-		}
+		host_Paste();
+		break;
+	case WM_DROPFILES: 
+		host_Drop((HDROP)wParam);
 		break;
 	case WM_ERASEBKGND: return 1;
 	case WM_DESTROY:
+		DragAcceptFiles(hwnd, FALSE); 
 	case WM_CLOSE: 		
 		DeleteDC(hBufferDC);
 		DeleteObject(hBufferMap);
@@ -641,7 +660,7 @@ void tiny_Sysmenu( HWND hwnd )
 		} while ( FindNextFile(hFind, &FindFileData) );
 	}
 
-	HMENU hSysMenu = GetSystemMenu(hwnd, FALSE);
+	hSysMenu = GetSystemMenu(hwnd, FALSE);
 	InsertMenu(hSysMenu, 0, MF_BYPOSITION|MF_SEPARATOR, 0, NULL);
 	InsertMenu(hSysMenu, 0, MF_BYPOSITION, ID_ABOUT, "About");
 	InsertMenu(hSysMenu, 0, MF_BYPOSITION|MF_POPUP, 
@@ -733,9 +752,8 @@ void buff_Copy( char *ptr, int len )
 	}
 }
 
-BOOL host_Paste( void )
+void host_Paste( void )
 {
-	BOOL ret = FALSE;
 	if ( OpenClipboard(hwndMain) ) {
 		HANDLE hglb = GetClipboardData(CF_TEXT);
 		char *lptstr = (char *)GlobalLock(hglb);
@@ -745,9 +763,27 @@ BOOL host_Paste( void )
 			else
 				term_Parse(lptstr, strlen(lptstr));
 			GlobalUnlock(hglb);
-			ret = TRUE;
 		}
 		CloseClipboard();
 	}
-	return ret;
+}
+void host_Drop( HDROP hDrop )
+{
+	char fname[MAX_PATH] = "put ";
+	DragQueryFile( hDrop, 0, fname+4, MAX_PATH-4 );
+	DragFinish( hDrop );
+	if ( comm_status==CONN_CONNECTED ) {
+		switch ( comm_type ) {
+		case SERIAL:
+		case TELNET:script_Open( fname+4 ); 
+					break;
+		case SSH:   strcat(fname, " :");
+					scp_cmd(fname+4);
+					break;
+		case SFTP:  sftp_cmd(fname);
+					break;
+		}
+	}
+	else 
+		if ( comm_status==CONN_IDLE ) buff_Load( fname+4 );
 }
