@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 2344 2018-09-15 21:05:10 $"
+// "$Id: tiny.h 3000 2018-09-30 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -17,42 +17,57 @@
 //     https://github.com/zoudaokou/tinyTerm/issues/new
 //
 #include <stdio.h>
+#include <sys/stat.h>
 #define TERMLINES 40
 #define TERMCOLS 100
-#define MAXLINES 8190
-#define BUFFERSIZE 8190*128
+#define MAXLINES 8192
+#define BUFFERSIZE 8192*64
 
 #define CONN_IDLE			0
 #define CONN_CONNECTING 	1
 #define CONN_AUTHENTICATING	2
 #define CONN_CONNECTED		4
 
-#define STDIO  	0
-#define TELNET 	1
-#define SERIAL 	2
+#define STDIO  	1
+#define TELNET 	2
+#define SERIAL 	3
 #define SSH		4
-#define SFTP	8
+#define SFTP	5
+#define NETCONF	6
 
 /****************auto_drop.c*************/
 void drop_Init( HWND hwnd );
 void drop_Destroy( HWND hwnd );
 int autocomplete_Init( HWND hWnd );
 int autocomplete_Add( LPCTSTR cmd );
-int autocomplete_Destroy( void );
-char *autocomplete_Prev( void );
-char *autocomplete_Next( void );
+int autocomplete_Destroy( );
+char *autocomplete_Prev( );
+char *autocomplete_Next( );
 
-/****************comm.c****************/
-int comm_Init( void );
-void comm_Destory( void );
-void comm_Open( char *port );
-void comm_Size( int w, int h );
-void comm_Close( void );
-void comm_Send( char *buf, int len );
+/****************host.c****************/
+int host_Init( );
+void host_Open( char *port );
+void host_Size( int w, int h );
+void host_Send( char *buf, int len );
+int host_Type();
+int host_Status();
+void host_Close( );
+void host_Destory( );
+int http_Svr( char *intf );
+int tcp( const char *hostname, short port );
+
+/****************ssh2.c****************/
+void ssh2_Init( void );
+void ssh2_Size( int w, int h );
+void ssh2_Send( char *buf, int len );
+void netconf_Send( char *msg, int len );
+void ssh2_Close( );
+void ssh2_Exit( void );
+void scp_pwd(char *pwd);
+int scp_write_one(const char *lpath, const char *rpath);
 int scp_cmd(char *cmd);
 int tun_cmd(char *cmd);
-int sftp_cmd(char *cmd);
-int http_Svr( char *intf );
+int sftp_put(char *src, char *dst);
 
 /****************ftpd.c****************/
 char *getFolderName(char *title);
@@ -60,17 +75,17 @@ void ftp_Svr( char *root );
 void tftp_Svr( char *root );
 
 /****************term.c****************/
-void buff_Load( char *fn );
-void buff_Save( char *fn );
 void buff_Logg( char *fn );
 void buff_Srch( char *sstr );
+void term_Init( void );
 void term_Clear( void );
 void term_Size( void );
-char *term_Init( void );
+void term_Parse( char *buf, int len );
+void term_Parse_XML( char *xml, int len );
+void term_Print( const char *fmt, ... );
 char *term_Exec( char *cmd );
 char *term_Disp( char *buf );
 char *term_Send( char *buf, int len );
-void term_Parse( char *buf, int len );
 int term_Recv( char *tl1text );
 int term_TL1( char *cmd, char **tl1text);
 void script_Open( char *fn );
@@ -80,7 +95,16 @@ void tiny_Drop_Script( char *cmds );
 
 /****************tiny.c****************/
 void cmd_Disp( char *buf );
-void tiny_Title( char *buf );
 void tiny_Redraw();
 void tiny_Focus();
+void tiny_Beep();
 void tiny_Connecting();
+void tiny_Title( char *buf );
+
+#define MODE_A	0
+#define MODE_R	1
+#define MODE_W	2
+#define MODE_RB	3
+#define MODE_WB	4
+FILE *fopen_utf8(const char *fn, int mode);
+int stat_utf8(const char *fn, struct _stat *buffer);

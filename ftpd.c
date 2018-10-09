@@ -39,19 +39,19 @@ void sock_send( char *reply )
 {
 	send( ftp_s1, reply, strlen(reply), 0 );
 }
-DWORD WINAPI ftpd(LPVOID param)
+DWORD WINAPI ftpd(LPVOID p)
 {
 	unsigned long  dwIp;
 	unsigned short wPort;
 	unsigned int c[6], ii[2];
-	char *p=0, *p2=0, szBuf[4096], fn[MAX_PATH], svrRoot[MAX_PATH];
+	char *param=0, szBuf[4096], fn[MAX_PATH], svrRoot[MAX_PATH];
 	BOOL bPassive;
 
 	SOCKET s2=-1, s3=-1; 		// s2 data connection, s3 data listen
 	struct sockaddr_in svraddr, clientaddr;		// for data connection
-	int i, iRootLen, addrsize=sizeof(clientaddr);
+	int iRootLen, addrsize=sizeof(clientaddr);
 
-	strcpy( svrRoot, (char*)param );
+	strcpy( svrRoot, (char*)p );
 	iRootLen = strlen( svrRoot ) - 1;
 	term_Disp( "FTPd started\r\n" );
 
@@ -62,9 +62,8 @@ DWORD WINAPI ftpd(LPVOID param)
 
 		sock_send( "220 Welcome\n");
 		getpeername(ftp_s1, (struct sockaddr *)&clientaddr, &addrsize);
-		sprintf(szBuf, "FTPd: connected from %s\r\n", 
+		term_Print("FTPd: connected from %s\r\n", 
 						inet_ntoa(clientaddr.sin_addr));
-		term_Disp( szBuf );
 
 		FILE *fp;
 		bPassive = FALSE;
@@ -75,25 +74,22 @@ DWORD WINAPI ftpd(LPVOID param)
 				term_Disp( "FTPd: client disconnected\r\n");
 				break;
 			}
+			szBuf[cnt--]=0;
+			term_Disp(szBuf); 
+			while (szBuf[cnt]=='\r' || szBuf[cnt]=='\n' ) szBuf[cnt--]=0;
+			if ( (param=strchr(szBuf, ' '))!=NULL ) 
+				*param++=0; 
+			else
+				param = szBuf+cnt+1;
 
-			term_Disp( szBuf); 
-			szBuf[cnt-2]=0;
-			for ( i=0; i<cnt; i++){
-				if ( szBuf[i]==' ' || szBuf[i]==0 ) {
-					p = szBuf+i;
-					p2 = (*p==' ')? p+1 : p;
-					*p=0;
-					break;
-				}
-			}
 			// *** Process FTP commands ***
 			if (stricmp("user", szBuf) == 0){
 				sock_send( "331 Password required\n");
-				bUser = strncmp( p2, "tiny", 4 )==0 ? TRUE : FALSE;
+				bUser = strncmp( param, "tiny", 4 )==0 ? TRUE : FALSE;
 				continue;
 			}
 			if (stricmp("pass", szBuf) == 0){
-				bPass = bUser && strncmp(p2, "term", 4)==0;
+				bPass = bUser && strncmp(param, "term", 4)==0;
 				sock_send( bPass?"230 Logged in okay\n": 
 									"530 Login incorrect\n");
 				continue;
@@ -103,13 +99,13 @@ DWORD WINAPI ftpd(LPVOID param)
 				 continue;
 			}
 			fn[0]=0;
-			if ( *p2=='/' ) strcpy(fn, svrRoot);
-			strcat(fn, p2);
+			if ( *param=='/' ) strcpy(fn, svrRoot);
+			strcat(fn, param);
 			if (stricmp("syst", szBuf) ==0 ){
 				sock_send( "215 UNIX emulated by tinyTerm\n");
 			}
 			else if(stricmp("port", szBuf) == 0){
-				sscanf(p2, "%d,%d,%d,%d,%d,%d", 
+				sscanf(param, "%d,%d,%d,%d,%d,%d", 
 							&c[0], &c[1], &c[2], &c[3], &c[4], &c[5]);
 				ii[0] = c[1]+(c[0]<<8);
 				ii[1] = c[3]+(c[2]<<8);
@@ -130,8 +126,9 @@ DWORD WINAPI ftpd(LPVOID param)
 			}
 			else if(stricmp("cwd", szBuf) == 0){
 				fn[0]=0;
-				if ( *p2=='/' || *p2=='\\' || *p2==0) strcpy(fn, svrRoot);
-				strcat(fn, p2);
+				if ( *param=='/' || *param=='\\' || *param==0) 
+					strcpy(fn, svrRoot);
+				strcat(fn, param);
 				_getcwd(szBuf, MAX_PATH);
 				if ( _chdir(fn) != 0 )
 					sock_send( "550 No such file or directory\n");
@@ -179,10 +176,10 @@ DWORD WINAPI ftpd(LPVOID param)
 			}
 			else if( stricmp("nlst", szBuf)==0 || stricmp("list", szBuf)==0 ){
 				struct _finddata_t  ffblk;
-				if ( *p2=='/' && *(p2+1)=='/' ) p2++;
-				if ( *(p2+strlen(p2)-1)=='/') strcat(p2, "*.*");
-				if ( *p2==0 ) strcpy(p2, "*.*");
-				int nCode = _findfirst(p2, &ffblk);
+				if ( *param=='/' && *(param+1)=='/' ) param++;
+				if ( *(param+strlen(param)-1)=='/') strcat(param, "*.*");
+				if ( *param==0 ) strcpy(param, "*.*");
+				int nCode = _findfirst(param, &ffblk);
 				if ( nCode==-1 ) {
 					sock_send( "550 No such file or directory\n");
 					continue;
@@ -200,15 +197,18 @@ DWORD WINAPI ftpd(LPVOID param)
 				do {
 					if ( ffblk.name[0]=='.' ) continue;
 					if ( bNlst ) {
-						sprintf(szBuf, "%s\n", ffblk.name);
+						sprintf(szBuf, "%s\r\n", ffblk.name);
 					}
 					else {
 						char buf[256];
 						strcpy(buf, ctime(&ffblk.time_write));
-						buf[16]=0;
-						sprintf(szBuf, "%crwxrwxrwx 1 user group 0 %s %s\n",
-										ffblk.attrib&_A_SUBDIR?'d':'-',
-										buf+4, ffblk.name);
+						buf[24]=0;
+						if ( ffblk.attrib&_A_SUBDIR )
+							sprintf(szBuf, "%s %s %s\r\n", buf+4,
+										"       <DIR>", ffblk.name);
+						else
+							sprintf(szBuf, "%s % 12ld %s\r\n", buf+4, 
+											ffblk.size, ffblk.name);
 					}
 					send(s2, szBuf, strlen(szBuf), 0);
 				} while ( _findnext(nCode,&ffblk)==0 );
@@ -218,8 +218,8 @@ DWORD WINAPI ftpd(LPVOID param)
 			}
 			else if(stricmp("stor", szBuf) == 0){
 				fp = NULL; 
-				if ( strstr(p2, ".." )==NULL ) 
-					fp = fopen(fn, "wb");
+				if ( strstr(param, ".." )==NULL ) 
+					fp = fopen_utf8(fn, MODE_WB);
 				if(fp == NULL){
 					sock_send( "550 Unable to create file\n");
 					continue;
@@ -242,20 +242,19 @@ DWORD WINAPI ftpd(LPVOID param)
 						fwrite(szBuf, nLen, 1, fp);
 					}
 					if ( ++nCnt==256 ) {
-						term_Disp("#");
+						term_Print("\r%lu bytes received", lSize);
 						nCnt = 0;
 					}
 				}while ( nLen!=0);
 				fclose(fp);
+				term_Print("\r%lu bytes received\n", lSize);
 				sock_send( "226 Transfer complete\n");
-				sprintf( szBuf, "FTP %lu bytes received\r\n", lSize);
-				term_Disp(szBuf);
 				closesocket(s2);
 			}
 			else if(stricmp("retr", szBuf) == 0){
 				fp = NULL; 
-				if ( strstr(p2, ".." )==NULL ) 
-					fp = fopen(fn, "rb");
+				if ( strstr(param, ".." )==NULL ) 
+					fp = fopen_utf8(fn, MODE_RB);
 				if(fp == NULL) {
 					sock_send( "550 No such file or directory\n");
 					continue;
@@ -276,15 +275,14 @@ DWORD WINAPI ftpd(LPVOID param)
 					if ( send(s2, szBuf, nLen, 0) == 0) break;
 					lSize += nLen;
 					if ( ++nCnt==256 ) {
-						term_Disp("#");
+						term_Print("\r%lu bytes sent", lSize);
 						nCnt = 0;
 					}
 				}
 				while ( nLen==4096);
 				fclose(fp);
+				term_Print("\r%lu bytes sentd\n", lSize);
 				sock_send( "226 Transfer complete\n");
-				sprintf( szBuf, "FTP %lu bytes sent\n", lSize);
-				term_Disp(szBuf);
 				closesocket(s2);
 			}
 			else if(stricmp("size", szBuf) == 0){
@@ -377,7 +375,7 @@ void tftp_Read( FILE *fp )
 		dataBuf[0]=0; dataBuf[1]=3;
 		dataBuf[2]=(nCnt>>8)&0xff; dataBuf[3]=nCnt&0xff;
 		send(tftp_s1, dataBuf, nLen+4, 0);
-
+		term_Disp("#");
 		if ( sock_select( tftp_s1, 5 ) == 1 ) {
 			if ( recv(tftp_s1, ackBuf, 516, 0)==SOCKET_ERROR ) break;
 			if ( ackBuf[1]==4 && ackBuf[2]==dataBuf[2] && ackBuf[3]==dataBuf[3]) {
@@ -418,31 +416,32 @@ void tftp_Write( FILE *fp )
 	} 
 */
 }
-DWORD WINAPI tftpd(LPVOID param)
+DWORD WINAPI tftpd(LPVOID p)
 {
-	char dataBuf[516], szBuf[256];
+	char dataBuf[516];
 	struct sockaddr_in clientaddr;
 	int addrsize=sizeof(clientaddr);
 
 	char svrRoot[MAX_PATH], fn[MAX_PATH];
-	strcpy( svrRoot, (char *)param );
+	strcpy( svrRoot, (char *)p );
 	term_Disp( "TFTPd started\r\n" );
 
 	int ret;
 	while ( (ret=sock_select( tftp_s0, 300 )) == 1 ) {
-		ret = recvfrom( tftp_s0, dataBuf, 516, 0, (struct sockaddr *)&clientaddr, &addrsize );
+		ret = recvfrom( tftp_s0, dataBuf, 516, 0, 
+						(struct sockaddr *)&clientaddr, &addrsize );
 		if ( ret==SOCKET_ERROR ) break;
 		connect(tftp_s1, (struct sockaddr *)&clientaddr, addrsize);
 		if ( dataBuf[1]==1  || dataBuf[1]==2 ) {
 			BOOL bRead = dataBuf[1]==1; 
-			sprintf( szBuf, "TFTPd: %cRQ from %s\r\n", bRead?'R':'W', 
+			term_Print("TFTPd: %cRQ from %s\r\n", bRead?'R':'W', 
 									inet_ntoa(clientaddr.sin_addr) ); 
-			term_Disp( szBuf );
 			strcpy(fn, svrRoot); 
 			strcat(fn, dataBuf+2);
-			FILE *fp = fopen(fn,  bRead?"rb":"wb");
+			FILE *fp = fopen_utf8(fn,  bRead?MODE_RB:MODE_WB);
 			if ( fp == NULL ) {
-				dataBuf[3]=dataBuf[1]; dataBuf[0]=0; dataBuf[1]=5; dataBuf[2]=0; 
+				dataBuf[3]=dataBuf[1]; dataBuf[0]=0; 
+				dataBuf[1]=5; dataBuf[2]=0; 
 				int len = sprintf( dataBuf+4, "Couldn't open %s", fn );
 				send( tftp_s1, dataBuf, len+4, 0 );
 			}

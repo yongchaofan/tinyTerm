@@ -1,3 +1,22 @@
+//
+// "$Id: auto_drop.c 19939 2018-09-15 21:05:10 $"
+//
+// tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
+//
+// auto_drop.c extends the Windows Edit control with autocompletion
+// plus enabling text drop target function for scripting 
+//
+// Copyright 2015-2018 by Yongchao Fan.
+//
+// This library is free software distributed under GNU LGPL 3.0,
+// see the license at:
+//
+//     https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//
+// Please report all bugs and problems on the following page:
+//
+//     https://github.com/zoudaokou/tinyTerm/issues/new
+//
 #define INITGUID
 #include <basetyps.h>
 #include <windows.h>
@@ -24,7 +43,7 @@ DEFINE_GUID(CLSID_AutoComplete,  0x00bb2763, 0x6a77, 0x11d0, 0xa5, 0x35, 0x00, 0
 **************************************************************************/
 typedef struct CAutoEnumString {
     IEnumStringVtbl *lpVtbl;
-	LPSTR * m_arString;
+	LPOLESTR * m_arString;
 	unsigned int m_Size;
 	unsigned int m_iterCur;
 	unsigned int m_addCur;
@@ -34,7 +53,7 @@ typedef struct CAutoEnumString {
 
 void CAutoEnumString_Construct(CAutoEnumString* this);
 void CAutoEnumString_Destruct(CAutoEnumString* this);
-int CAutoEnumString_AddString(CAutoEnumString* this, LPCSTR lpszStr);
+int CAutoEnumString_AddString(CAutoEnumString* this, LPOLESTR lpszStr);
 
 STDMETHODIMP_(ULONG) CAutoEnumString_AddRef(IEnumString *this)
 {
@@ -72,7 +91,7 @@ STDMETHODIMP CAutoEnumString_Next(IEnumString *this, ULONG celt, LPOLESTR *rgelt
     while( self->m_iterCur<self->m_addCur && celt>0) {
 		(*rgelt) = (LPOLESTR)CoTaskMemAlloc(sizeof(OLECHAR)*STRINGSIZE);
 		if ( *rgelt ) {
-			MultiByteToWideChar( CP_ACP, 0, self->m_arString[self->m_iterCur++], -1, *rgelt, STRINGSIZE);
+			wcscpy(*rgelt, self->m_arString[self->m_iterCur++]);
 			celt--; nFetched++; rgelt++;
 		}
 		else break;
@@ -118,7 +137,7 @@ IEnumStringVtbl CAutoEnumStringVtbl = {
 void CAutoEnumString_Construct(CAutoEnumString* this)
 {
 	this->lpVtbl = &CAutoEnumStringVtbl;
-	this->m_arString = (LPSTR *)malloc(256*sizeof(char *));
+	this->m_arString = (LPOLESTR *)malloc(256*sizeof(LPOLESTR));
 	this->m_Size = 256;
 	this->m_iterCur = 0;
 	this->m_addCur = 0;
@@ -131,18 +150,18 @@ void CAutoEnumString_Destruct(CAutoEnumString* this)
 			free(this->m_arString[i]);
 	if ( this->m_arString ) free(this->m_arString);
 }
-int CAutoEnumString_AddString(CAutoEnumString* this, LPCSTR lpszStr)
+int CAutoEnumString_AddString(CAutoEnumString* this, LPOLESTR lpszStr)
 {
 	for ( int i=0; i<this->m_addCur; i++ ) 
-		if ( strcmp(this->m_arString[i], lpszStr) == 0 ) 
+		if ( wcscmp(this->m_arString[i], lpszStr) == 0 ) 
 			return 0;
 
-	this->m_arString[this->m_addCur] = _strdup(lpszStr);
+	this->m_arString[this->m_addCur] = _wcsdup(lpszStr);
 	this->m_rtrvCur = this->m_addCur;
 
 	if ( ++this->m_addCur==this->m_Size ) {
 		int size = this->m_Size*2;
-		LPSTR * arString = realloc(this->m_arString, size*sizeof(char *));
+		LPOLESTR * arString = realloc(this->m_arString, size*sizeof(LPOLESTR));
 		if ( arString != NULL ) {
 			this->m_arString=arString;
 			this->m_Size=size;
@@ -152,12 +171,12 @@ int CAutoEnumString_AddString(CAutoEnumString* this, LPCSTR lpszStr)
 	}
 	return 1;
 }
-LPSTR CAutoEnumString_prevString(CAutoEnumString* this)
+LPOLESTR CAutoEnumString_prevString(CAutoEnumString* this)
 {
     if ( this->m_rtrvCur>0 ) this->m_rtrvCur--;
     return this->m_arString[this->m_rtrvCur];
 }
-LPSTR CAutoEnumString_nextString(CAutoEnumString* this)
+LPOLESTR CAutoEnumString_nextString(CAutoEnumString* this)
 {
     if ( ++this->m_rtrvCur==this->m_addCur ) this->m_rtrvCur--;
     return this->m_arString[this->m_rtrvCur];
@@ -188,15 +207,15 @@ void autocomplete_Init(HWND hwndCmd)
 		if ( penum ) pauto->lpVtbl->Init(pauto, m_hwnd, (IUnknown *)penum, NULL, NULL);
 	}
 }
-int autocomplete_Add(LPCTSTR cmd)
+int autocomplete_Add(LPOLESTR cmd)
 {
 	return ( pauto && penum ) ? CAutoEnumString_AddString(&cmdHistory, cmd) : 0;
 }
-LPSTR autocomplete_Prev( void )
+LPOLESTR autocomplete_Prev( void )
 {
 	return CAutoEnumString_prevString(&cmdHistory);
 }
-LPSTR autocomplete_Next( void )
+LPOLESTR autocomplete_Next( void )
 {
 	return CAutoEnumString_nextString(&cmdHistory);
 }
@@ -627,7 +646,7 @@ void DropData(HWND hwnd, IDataObject *pDataObject)
 			// we asked for the data as a HGLOBAL, so access it appropriately
 			PVOID data = GlobalLock(stgmed.hGlobal);
 
-			tiny_Drop_Script((char *)data);
+			tiny_Drop_Script(strdup((char *)data));
 
 			GlobalUnlock(stgmed.hGlobal);
 

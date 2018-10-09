@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 19878 2018-09-15 21:05:10 $"
+// "$Id: term.c 20182 2018-09-30 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -19,16 +19,15 @@
 //
 #include <windows.h>
 #include "tiny.h"
-extern int comm_status;
 
-char buff[BUFFERSIZE+256], attr[BUFFERSIZE+256], c_attr;
+char buff[BUFFERSIZE], attr[BUFFERSIZE], c_attr;
+int line[MAXLINES];
 int cursor_x, cursor_y, save_x, save_y;
 int size_x, size_y;
 int screen_y;
 int scroll_y;
 int sel_left, sel_right;
 int roll_top, roll_bot;
-int line[MAXLINES+2];
 BOOL bLogging, bEcho;
 BOOL bCursor, bAppCursor;
 BOOL bEnter=FALSE, bEnter1=FALSE;
@@ -37,17 +36,28 @@ static FILE *fpLogFile;
 static BOOL bPrompt=FALSE;
 static char sPrompt[16]=";\n> ", *tl1text = NULL;
 static int  iPrompt=4, iTimeOut=30, tl1len = 0;
-static HANDLE hTL1Event;	//for serial reader
+static HANDLE hTL1Event;	//for term_TL1 reader
 
 static BOOL bAlterScreen, bGraphic, bEscape, bTitle, bInsert;
+static char title[256];
+static int title_idx = 0;
 unsigned char * vt100_Escape( unsigned char *sz, int cnt );
 
 /*******************************Line functions************************/
+void term_Init( )
+{
+	hTL1Event = CreateEvent( NULL, TRUE, FALSE, TEXT("TL1") );
+	size_y = TERMLINES;
+	size_x = TERMCOLS;
+	bLogging = FALSE;
+	bEcho = FALSE;
+	term_Clear( );
+}
 void term_Clear( )
 {
-	memset( buff, 0, BUFFERSIZE+256 );
-	memset( attr, 0, BUFFERSIZE+256 );
-	memset( line, 0, (MAXLINES+2)*sizeof(int) );
+	memset( buff, 0, BUFFERSIZE );
+	memset( attr, 0, BUFFERSIZE );
+	memset( line, 0, MAXLINES*sizeof(int) );
 	c_attr = 7; 
 	cursor_y = cursor_x = 0;
 	scroll_y = screen_y = 0;
@@ -61,16 +71,6 @@ void term_Clear( )
 	bCursor = TRUE;
 	tiny_Redraw( FALSE );
 }
-char *term_Init( )
-{
-	hTL1Event = CreateEvent( NULL, TRUE, FALSE, "TL1" );
-	size_y = TERMLINES;
-	size_x = TERMCOLS;
-	bLogging = FALSE;
-	bEcho = FALSE;
-	term_Clear( );
-	return buff;
-}
 void term_Size()
 {
 	roll_top = 0;
@@ -82,39 +82,35 @@ void term_Size()
 	}
 	tiny_Redraw();
 }
-void term_Roll()
-{
-	int i=0, step=1024;
-	int len = line[step];
-	memmove( buff, buff+len, cursor_x-len );
-	memmove( attr, attr+len, cursor_x-len );
-	memmove( line, line+step, (cursor_y-step+1)*sizeof(int));
-	while ( i<=cursor_y-step+1 ) line[i++] -= len;
-	while ( i<=cursor_y+1 ) line[i++] = 0;
-	tl1text -= len; 
-	cursor_x -= len;
-	cursor_y -= step;
-	screen_y -= step;
-	scroll_y = 0;
-	line[cursor_y+1] = cursor_x;
-}
 void term_nextLine()
 {
 	line[++cursor_y] = cursor_x;
 	if ( line[cursor_y+1]<cursor_x ) line[cursor_y+1]=cursor_x;
 
-	if ( cursor_x>=BUFFERSIZE ) term_Roll();
-	if ( cursor_y==MAXLINES ) term_Roll();
+	if ( cursor_x>=BUFFERSIZE-1024 || cursor_y==MAXLINES-2 ) {
+		int i, len = line[1024];
+		tl1text -= len; 
+		cursor_x -= len;
+		cursor_y -= 1024;
+		memmove( buff, buff+len, BUFFERSIZE-len );
+		memset(buff+cursor_x, 0, BUFFERSIZE-cursor_x);
+		memmove( attr, attr+len, BUFFERSIZE-len );
+		memset(attr+cursor_x, 0, BUFFERSIZE-cursor_x);
+		for ( i=0; i<cursor_y+2; i++ ) line[i] = line[i+1024]-len;
+		while ( i<MAXLINES ) line[i++] = 0;
+		screen_y -= 1024;
+		scroll_y = 0;
+	}
 
 	if ( scroll_y<0 ) scroll_y--;
 	if ( screen_y<cursor_y-size_y+1 ) screen_y = cursor_y-size_y+1;
 }
 void term_Parse( char *buf, int len )
 {
-	unsigned char c, *p=(unsigned char *)buf;
+	unsigned char *p=(unsigned char *)buf;
 	unsigned char *zz = p+len;
 	
-	if ( bEnter1 ) { //capture prompt for scripting after Enter key and pressed
+	if ( bEnter1 ) { //capture prompt for scripting after Enter key pressed
 		if ( len==1 ) {//and the echo is just one letter
 			sPrompt[0] = buff[cursor_x-2];
 			sPrompt[1] = buff[cursor_x-1];
@@ -122,29 +118,33 @@ void term_Parse( char *buf, int len )
 		}
 		bEnter1 = FALSE;
 	}
-
 	if ( bLogging ) fwrite( buf, 1, len, fpLogFile );
 	if ( bEscape ) p = vt100_Escape( p, zz-p ); 
-	while ( p < (unsigned char *)buf+len ) {
-		switch ( c=*p++ ) {
+	while ( p < zz ) {
+		unsigned char c = *p++;
+		if ( bTitle ) {
+			if ( c==0x07 ) {
+				bTitle = FALSE;
+				title[title_idx]=0;
+				tiny_Title(title);
+			}
+			else
+				title[title_idx++] = c;
+			continue;
+		}
+		switch ( c ) {
 		case 0x00: 	break;
-		case 0x07: 	if ( bTitle ) {
-						buff[cursor_x]=0;
-						cursor_x = line[cursor_y];
-						tiny_Title(buff+cursor_x);
-						bTitle = FALSE;
-					}
-					else
-						printf("\007");
+		case 0x07: 	tiny_Beep();
 					break;
-		case 0x08: 	--cursor_x; break;
+		case 0x08: 	if ( (buff[cursor_x--]&0xc0)==0x80 )//utf8 continuation byte
+						while ( (buff[cursor_x]&0xc0)==0x80 ) cursor_x--;
+					break;
 		case 0x09: 	do { 
+						attr[cursor_x] = c_attr;
 						buff[cursor_x++]=' '; 
 					}
 					while ( (cursor_x-line[cursor_y])%8!=0 );
 					break;
-		case 0x1b: 	p = vt100_Escape( p, zz-p ); break;
-		case 0x0d: 	cursor_x = line[cursor_y]; break; 
 		case 0x0a: 	if ( bAlterScreen ) { // scroll down if reached bottom
 						if ( cursor_y==roll_bot+screen_y ) 
 							vt100_Escape((unsigned char *)"D", 1);
@@ -153,7 +153,7 @@ void term_Parse( char *buf, int len )
 							cursor_x = line[++cursor_y] + x;
 						}
 					}
-					else {
+					else {						//hard line feed
 						cursor_x = line[cursor_y+1];
 						if ( line[cursor_y+2]!=0 ) cursor_x--;
 						attr[cursor_x] = c_attr; 
@@ -161,22 +161,28 @@ void term_Parse( char *buf, int len )
 						term_nextLine();
 					}
 					break;
-		case 0xe2: 	if ( *p==0x94 ) {//utf8 box drawing
-						switch ( (unsigned char )(p[1]) ) {
-						case 0x80:
-						case 0xac:
-						case 0xb4:
-						case 0xbc: c='_'; break;
-						case 0x82:
-						case 0x94:
-						case 0x98:
-						case 0x9c:
-						case 0xa4: c='|'; break;
-						case 0x8c:
-						case 0x90: c=' '; break;
-						default: c='?';
+		case 0x0d: 	if ( cursor_x-line[cursor_y]==size_x+1 && *p!=0x0a ) 
+						term_nextLine();		//soft line feed
+					else
+						cursor_x = line[cursor_y];
+					break; 
+		case 0x1b: 	p = vt100_Escape( p, zz-p ); break;
+		case 0xe2: 	if ( bAlterScreen ) { 
+						c = ' ';			//hack utf8 box drawing
+						if ( *p++==0x94 ){	//to make alterscreen easier
+							switch ( *p ) {
+							case 0x80:
+							case 0xac:
+							case 0xb4:
+							case 0xbc: c='_'; break;
+							case 0x82:
+							case 0x94:
+							case 0x98:
+							case 0x9c:
+							case 0xa4: c='|'; break;
+							}
 						}
-						p+=2;
+						p++;
 					}
 		default:	if ( bGraphic ) switch ( c ) {
 						case 'q': c='_'; break; //c=0xc4; break;
@@ -190,7 +196,17 @@ void term_Parse( char *buf, int len )
 						default: c = ' ';
 					}
 					if ( bInsert ) vt100_Escape((unsigned char *)"[1@", 3);
-					if ( cursor_x-line[cursor_y]==size_x ) term_nextLine();
+					if ( cursor_x-line[cursor_y]>=size_x ) {
+						int char_cnt=0;
+						for ( int i=line[cursor_y]; i<cursor_x; i++ ) 
+							if ( ( buff[i]&0xc0)!=0x80 ) char_cnt++;
+						if ( char_cnt==size_x ) {
+							if ( bAlterScreen ) 
+								cursor_x--; //don't overflow in vi
+							else
+								term_nextLine();
+							}
+					}
 					attr[cursor_x] = c_attr; 
 					buff[cursor_x++] = c;
 					if ( line[cursor_y+1]<cursor_x ) line[cursor_y+1]=cursor_x;
@@ -206,6 +222,16 @@ void term_Parse( char *buf, int len )
 	}
 	if ( scroll_y>-size_y ) tiny_Redraw();
 }
+void term_Print( const char *fmt, ... ) 
+{
+	char buff[4096];
+	va_list args;
+	va_start(args, (char *)fmt);
+	int len = vsnprintf(buff, 4096, (char *)fmt, args);
+	va_end(args);
+	term_Parse(buff, len);
+	term_Parse("\033[37m",5);
+}
 char *term_Disp( char *msg )
 {
 	char *p = buff+cursor_x;
@@ -216,7 +242,7 @@ char *term_Send( char *buf, int len )
 {
 	if ( bEcho ) term_Parse( buf, len );
 	char *p = buff+cursor_x;
-	comm_Send( buf, len );
+	host_Send( buf, len );
 	return p;
 }
 int term_Recv( char *tl1text ) 
@@ -227,9 +253,11 @@ int term_Recv( char *tl1text )
 int term_TL1( char *cmd, char **pTl1Text )
 {
 	tl1len = 0; 
-	if ( comm_status==CONN_CONNECTED ) {	//retrieve from NE
+	if ( host_Status()==CONN_CONNECTED ) {	//retrieve from NE
 		bPrompt = FALSE; 
-		tl1text = term_Send( cmd, strlen(cmd) );
+		int cmdlen = strlen(cmd);
+		tl1text = term_Send(cmd, cmdlen);
+		if ( cmd[cmdlen-1]!='\r' ) term_Send("\r", 1);
 		int i=0, oldlen = tl1len;
 		ResetEvent(hTL1Event);
 		while ( WaitForSingleObject( hTL1Event, 100 ) == WAIT_TIMEOUT ) { 
@@ -266,149 +294,41 @@ char *term_Exec( char *pCmd )
 	char *p = buff+cursor_x;
 	static char cmd[256];
 	strncpy( cmd, pCmd, 255 );
-	if ( strncmp(cmd, "Title", 5)==0 ) 			tiny_Title( cmd+5 ); 
-	else if ( strncmp(cmd, "Log", 3)==0 ) 		buff_Logg( cmd+4 ); 
-	else if ( strncmp(cmd, "Save", 4)==0 ) 		buff_Save( cmd+5 ); 
-	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 		ftp_Svr( cmd+5 );
-	else if ( strncmp(cmd, "Tftpd", 5)==0 ) 	tftp_Svr( cmd+6 );
-	else if ( strncmp(cmd, "Prompt", 6)==0 ) {
-		strncpy(sPrompt, cmd+7, 15);
-		sPrompt[15]=0;
-		iPrompt = strlen(sPrompt);
+	if ( strncmp(cmd, "Title", 5)==0 ) 		tiny_Title( cmd+5 ); 
+	else if ( strncmp(cmd, "Log", 3)==0 ) 	buff_Logg( cmd+4 ); 
+	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 	ftp_Svr( cmd+5 );
+	else if ( strncmp(cmd, "Tftpd", 5)==0 ) tftp_Svr( cmd+6 );
+	else if ( strncmp(cmd, "Timeout", 7)==0 ) iTimeOut = atoi( cmd+8 ); 
+	else if ( strncmp(cmd, "Disconn", 7)==0 ) host_Close(); 
+	else if ( strncmp(cmd, "serial ", 7)==0 ) host_Open( cmd+7 );
+	else if ( strncmp(cmd, "telnet ", 7)==0 ) host_Open( cmd+7 );
+	else if ( strncmp(cmd, "ssh ",    4)==0 ) host_Open( cmd+4 );
+	else if ( strncmp(cmd, "Wait ", 5)==0 ) Sleep(atoi(cmd+5)*1000);
+	else if ( strncmp(cmd, "Waitfor ", 8)==0 ) {
+		for ( int i=iTimeOut; i>0; i-- ) {
+			if ( strstr(tl1text, cmd+8)!=NULL ) break;
+			Sleep(1000);
+		}
 	}
-	else if ( strncmp(cmd, "Timeout", 7)==0 ) 	iTimeOut = atoi( cmd+8 ); 
-	else if ( strncmp(cmd, "Connect", 7)==0 ) 	comm_Open( cmd+8 );
-	else if ( strncmp(cmd, "Disconnect", 9)==0 )comm_Close(); 
-	return p;
-}
-static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
-DWORD WINAPI cmdScripter( void *cmds )
-{
-	char *p0=(char *)cmds, *p1, *p2;
-	int iRepCount = -1;
-	bScriptRun=TRUE; bScriptPause = FALSE; 
-	do {
-		p2=p1=strchr(p0, 0x0a);
-		if ( p1==NULL ) p1 = p0+strlen(p0);
-		*p1 = 0;
-
-		if (p1-p0>1) {
-			int i;
-			cmd_Disp(p0);
-			if ( *p0=='#' ) {
-				if ( strncmp( p0+1, "Loop ", 5)==0 ){
-					if ( iRepCount<0 ) iRepCount = atoi( p0+6 );
-					if ( --iRepCount>0 ) {
-						*p1=0x0a;
-						p0 = p1 = p2 = (char*)cmds;
-					}
-				}
-				else if ( strncmp( p0+1, "Wait ", 5)==0 ) {
-					for ( i=atoi(p0+6); i>0&&bScriptRun; i-- ) 
-						Sleep(1000);
-				}
-				else if ( strncmp( p0+1, "Waitfor ", 8)==0 ) {
-					*(p1-1)=0;
-					for ( i=iTimeOut; i>0&&bScriptRun; i-- ) {
-						if ( strstr(tl1text, p0+9)!=NULL ) break;
-						Sleep(1000);
-					}
-					*(p1-1)=0x0d;
-				}
-				else {
-					*(p1-1)=0;
-					term_Exec( p0+1 );
-					*(p1-1)=0x0d;
-				}
+	else if ( strncmp(cmd, "Prompt ", 7)==0 ) {
+		char *p=cmd+7, *p1 = sPrompt;
+		while ( *p ) {
+			if ( *p=='%' ) {
+				int a;
+				sscanf(p+1, "%02x", &a);
+				*p1++ = a;
+				p+=3;
 			}
 			else 
-				if ( comm_status==CONN_CONNECTED ) term_TL1( p0, NULL );
+				*p1++ = *p++;
 		}
-		if ( p0!=p1 ) { p0 = p1+1; *p1 = 0x0a; }
-		while ( bScriptPause && bScriptRun ) Sleep(1000);
-	} 
-	while ( p2!=NULL && bScriptRun );
-	cmd_Disp( bScriptRun ? "script completed" : "script stopped");
-	bScriptRun = bScriptPause = FALSE;
-	return 0;
-}
-void script_Pause( void )
-{
-	if ( bScriptRun ) bScriptPause = !bScriptPause;
-	if ( bScriptPause ) cmd_Disp( "Script Paused" );
-}
-void script_Stop( void )
-{
-	bScriptRun = FALSE; 
-}
-void tiny_Drop_Script( char *tl1s )
-{
-static char cmds[MAXLINES];
-	DWORD dwPasterId;
-	if ( !bScriptRun ) {
-		strncpy( cmds, tl1s, MAXLINES-1 );
-		cmds[MAXLINES-1] = 0;
-		CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE) cmdScripter, 
-										(void *)cmds, 0, &dwPasterId);
+		*p1 = 0;
+		iPrompt = strlen(sPrompt);
 	}
+	return p;
 }
-void script_Open( char *fn )
-{
-	FILE *fpScript = fopen( fn, "rb" );
-	if ( fpScript != NULL ) {
-		char buf[MAXLINES];
-		int lsize = fread( buf, 1, MAXLINES-1, fpScript );
-		fclose( fpScript );
-		if ( lsize > 0 ) {
-			buf[lsize]=0;
-			tiny_Drop_Script(buf);
-		}
-	}
-}
-/***************************Dictionary functions***********************/
-void dict_Load(char *fn)
-{
-	FILE *fp = fopen(fn, "r");
-	if ( fp!=NULL ) {
-		while ( !feof( fp ) ) {
-			char cmd[256];
-			fgets( cmd, 256, fp );
-			int l = strlen(cmd)-1;
-			while ( l>0 && cmd[l]<0x10 ) cmd[l--]=0;
-			autocomplete_Add( cmd ) ;
-		}
-		fclose( fp );
-	}
-}
+
 /***************************Buffer functions***************************/
-void buff_Load( char *fn )
-{
-	char buf[8192];
-	int lines=0, len;
-	FILE *fp=fopen(fn, "r");
-	if ( fp != NULL ) {
-		while ( (len=fread(buf, 1, 8191, fp)) > 0 ) {
-			term_Parse( buf, len );
-			lines+=len;
-		};
-		fclose( fp );
-		sprintf( buf, "%d bytes loaded from %s", lines, fn);
-		cmd_Disp(buf);
-	}
-}
-
-void buff_Save( char *fn )
-{
-	char buf[256];
-	FILE *fp = fopen(fn, "w+");
-	if ( fp != NULL ) {
-		fwrite( buff, 1, cursor_x, fp );
-		fclose( fp );
-		sprintf( buf, "%d bytes saved to %s", cursor_x, fn);
-		cmd_Disp(buf);
-	}
-}
-
 void buff_Logg( char *fn )
 {
 	char buf[256];
@@ -418,7 +338,7 @@ void buff_Logg( char *fn )
 		cmd_Disp("Log file closed");
 	}
 	else {
-		fpLogFile = fopen( fn, "wb+" );
+		fpLogFile = fopen_utf8( fn, MODE_WB );
 		if ( fpLogFile != NULL ) {
 			bLogging = TRUE;
 			sprintf( buf, "%s opened for logging", fn);
@@ -459,9 +379,9 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 			bEscape = FALSE;
 			int n0=1, n1=1, n2=1;
 			if ( idx>1 ) {
-				char *p = strchr(code,';');
+				char *p = strchr(code, ';');
 				if ( p != NULL ) {
-					n1 = atoi(code+1); n2 = atoi(p+1);
+					n0 = 0; n1 = atoi(code+1); n2 = atoi(p+1);
 				}
 				else
 					if ( isdigit(code[1]) ) n0 = atoi(code+1);
@@ -484,8 +404,16 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 					  cursor_x = line[cursor_y]+x;
 					  break;
 			case 'a': //character position relative
-			case 'C': cursor_x+=n0; break; 
-			case 'D': cursor_x-=n0; break;
+			case 'C': if ( (buff[cursor_x]&0xc0)==0x80 )//utf8 continuation byte
+						while ( (buff[++cursor_x]&0xc0)==0x80 );
+					  else
+						cursor_x+=n0; 
+					  break; 
+			case 'D': if ( (buff[cursor_x]&0xc0)==0x80 )//utf8 continuation byte
+						while ( (buff[--cursor_x]&0xc0)==0x80 );
+					  else 
+						cursor_x -= n0;
+					  break;
 			case 'E': //cursor to begining of next line n0 times
 					  cursor_y += n0;
 					  cursor_x = line[cursor_y];
@@ -495,14 +423,19 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 					  cursor_x = line[cursor_y];
 					  break;
 			case '`': //character position absolute
-			case 'G': cursor_x = line[cursor_y]+n0-1; break;
+			case 'G': n1 = cursor_y-screen_y+1; 
+					  n2 = n0; 
 			case 'f': //horizontal and vertical position forced
 					  if ( n1==0 ) n1=1;
 					  if ( n2==0 ) n2=1;
 			case 'H': if ( n1>size_y ) n1 = size_y;
 					  if ( n2>size_x ) n2 = size_x;
 					  cursor_y = screen_y+n1-1; 
-					  cursor_x = line[cursor_y]+n2-1;
+					  cursor_x = line[cursor_y];
+					  while ( --n2>0 ) {
+						cursor_x++;
+						while ( (buff[cursor_x]&0xc0)==0x80 ) cursor_x++;
+					  }
 					  break;
 			case 'J': 	//[J kill till end, 1J begining, 2J entire screen
 					if ( code[idx-2]=='[' ) {
@@ -531,8 +464,10 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 						i = cursor_x;
 					else 
 						if ( n0==1 ) j = cursor_x;
-					memset( buff+i, ' ', j-i ); 
-					memset( attr+i,   0, j-i ); 
+					if ( j>i ) {
+						memset( buff+i, ' ', j-i ); 
+						memset( attr+i,   0, j-i ); 
+						}
 					}
 					break;
 			case 'L':	//insert lines
@@ -564,8 +499,12 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 						buff[i]=buff[i+n0]; 
 						attr[i]=attr[i+n0];
 					} 
-					if ( !bAlterScreen ) 
+					if ( !bAlterScreen ) {
 						line[cursor_y+1]-=n0;
+						if ( line[cursor_y+2]>0 ) line[cursor_y+2]-=n0;
+						memset(buff+line[cursor_y+1], ' ', n0);
+						memset(attr+line[cursor_y+1],   0, n0);
+					}
 					break;
 			case '@': 
 					for ( int i=line[cursor_y+1]; i>=cursor_x; i-- ) {
@@ -631,7 +570,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 							bAlterScreen = FALSE; 
 							cursor_y = screen_y; 
 							cursor_x = line[cursor_y];
-							for ( int i=1; i<=size_y; i++ )
+							for ( int i=1; i<=size_y+1; i++ )
 								line[cursor_y+i] = 0;
 							screen_y = cursor_y-size_y+1; 
 							if ( screen_y<0 ) screen_y=0;
@@ -639,7 +578,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 					}
 					break;
 			case 'm': 
-					if ( n0==1 && n2!=1 ) n0 = n2; 	//ESC[0;0m	ESC[01;34m
+					if ( n0==0 ) n0 = n2; 	//ESC[0;0m	ESC[01;34m
 					switch ( (int)(n0/10) ) {		//ESC[34m
 					case 0: if ( n0%10==7 ) {c_attr = 0x70; break;}
 					case 1:
@@ -693,7 +632,10 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 				break; 
 		case ']':
 				if ( code[idx-1]==';' ) {
-					if ( code[1]=='0' ) bTitle = TRUE;
+					if ( code[1]=='0' ) {
+						bTitle = TRUE;
+						title_idx = 0;
+					}
 					bEscape = FALSE;
 				}
 				break;
@@ -709,4 +651,61 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 		if ( !bEscape ) { idx=0; memset(code, 0, 20); }
 	}
 	return sz;
+}
+void term_Parse_XML(char *msg, int len)
+{
+	int indent=0;
+	BOOL previousIsOpen=TRUE;
+	char *p=msg, *q;
+	char spaces[256]="\r\n                                               \
+                                                                              ";
+	while ( *p!=0 && *p!='<' ) p++;
+	if ( p>msg ) term_Parse(msg, p-msg);
+	while ( *p!=0 && p<msg+len ) {
+		while (*p==0x0d || *p==0x0a || *p=='\t' || *p==' ' ) p++;
+		if ( *p=='<' ) { //tag
+			if ( p[1]=='/' ) {
+				if ( !previousIsOpen ) {
+					indent -= 2;
+					term_Parse(spaces, indent);
+				}
+				previousIsOpen = FALSE;
+			}
+			else {
+				if ( previousIsOpen ) indent+=2;
+				term_Parse(spaces, indent);
+				previousIsOpen = TRUE;
+			}
+			q = strchr(p, '>');
+			if ( q!=NULL ) {
+				term_Parse("\033[32m",5);
+				char *r = strchr(p, ' ');
+				if ( r!=NULL && r<q ) {
+					term_Parse(p, r-p);
+					term_Parse("\033[35m",5);
+					term_Parse(r, q-r);
+				}
+				else
+					term_Parse(p, q-p);
+				term_Parse("\033[32m>",6);
+				if ( q[-1]=='/' ) previousIsOpen = FALSE;
+				p = q+1;
+			}
+			else
+				break;
+		}
+		else {			//data
+			q = strchr(p, '<');
+			if ( q!=NULL ) {
+				term_Parse("\033[33m",5);
+				term_Parse(p, q-p);
+				p = q;
+			}
+			else { //not xml or incomplete xml
+				term_Parse(p, strlen(p));
+				break;
+			}
+		}
+	}
+	term_Parse("\033[37m",5);
 }
