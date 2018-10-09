@@ -70,7 +70,7 @@ extern BOOL bEcho;
 
 const char WELCOME[]="\r\n\r\n\r\n\
 \ttinyTerm is a terminal emulator for network engineers,\r\n\r\n\
-\ta single executable in 115K bytes that features:\r\n\r\n\r\n\
+\ta single executable in 120K bytes that features:\r\n\r\n\r\n\
 \t    * Serial/Telnet/SSH/SCP/SFTP client\r\n\r\n\
 \t    * 8192 lines of scrollback buffer\r\n\r\n\
 \t    * Command line autocompletion\r\n\r\n\
