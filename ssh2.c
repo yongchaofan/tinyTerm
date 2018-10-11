@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 37930 2018-09-30 21:05:10 $"
+// "$Id: ssh2.c 37928 2018-10-10 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -59,7 +59,6 @@ int ssh2_Gets(char *buf, BOOL bPass)
 	bReturn=FALSE; bPassword=bPass;
 	keys=buf; keys[0]=0;
 	cursor=0; 
-	tiny_Focus();
 	int old_cursor=0;
 	for ( int i=0; i<600&&bReturn==FALSE; i++ ) { 
 		if ( cursor>old_cursor ) { old_cursor=cursor; i=0; }
@@ -87,18 +86,18 @@ void ssh2_Send( char *buf, int len )
 		int total=0, cch=0;
 		while ( total<len ) {
 			if ( WaitForSingleObject(mtx, INFINITE)==WAIT_OBJECT_0 ) {
-				cch=libssh2_channel_write( sshChannel, buf, len); 
+				cch=libssh2_channel_write( sshChannel, buf+total, len-total); 
 				ReleaseMutex(mtx);
 			}
 			else break;
-			if ( cch>=0 )
-				total += cch;
-			else
+			if ( cch<0 ) {
 				if ( cch==LIBSSH2_ERROR_EAGAIN ) {
-					ssh_wait_socket();
-					continue;
+					if ( ssh_wait_socket() ) continue;
 				}
-				else break;
+				break;
+			}
+			else
+				total += cch;
 		}
 	}
 }

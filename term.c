@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 20182 2018-09-30 21:05:10 $"
+// "$Id: term.c 20120 2018-10-10 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -136,8 +136,8 @@ void term_Parse( char *buf, int len )
 		case 0x00: 	break;
 		case 0x07: 	tiny_Beep();
 					break;
-		case 0x08: 	if ( (buff[cursor_x--]&0xc0)==0x80 )//utf8 continuation byte
-						while ( (buff[cursor_x]&0xc0)==0x80 ) cursor_x--;
+		case 0x08: 	if ( isUTF8c(buff[cursor_x--]) )//utf8 continuation byte
+						while ( isUTF8c(buff[cursor_x]) ) cursor_x--;
 					break;
 		case 0x09: 	do { 
 						attr[cursor_x] = c_attr;
@@ -313,7 +313,7 @@ char *term_Exec( char *pCmd )
 	else if ( strncmp(cmd, "Prompt ", 7)==0 ) {
 		char *p=cmd+7, *p1 = sPrompt;
 		while ( *p ) {
-			if ( *p=='%' ) {
+			if ( *p=='%' && isdigit(p[1]) ) {
 				int a;
 				sscanf(p+1, "%02x", &a);
 				*p1++ = a;
@@ -388,55 +388,61 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 			}
 			int x;
 			switch ( code[idx-1] ) {
-			case 'A': x = cursor_x - line[cursor_y];
-					  cursor_y -= n0;
-					  cursor_x = line[cursor_y]+x;
-					  break;
+			case 'A': 
+					x = cursor_x - line[cursor_y];
+					cursor_y -= n0;
+					cursor_x = line[cursor_y]+x;
+					break;
 			case 'd'://line position absolute
 					if ( n0>size_y ) n0 = size_y;
 					x = cursor_x-line[cursor_y];
 					cursor_y = screen_y+n0-1;
 					cursor_x = line[cursor_y]+x;
-				break;
+					break;
 			case 'e': //line position relative
-			case 'B': x = cursor_x - line[cursor_y];
-					  cursor_y += n0;
-					  cursor_x = line[cursor_y]+x;
-					  break;
+			case 'B': 
+					x = cursor_x - line[cursor_y];
+					cursor_y += n0;
+					cursor_x = line[cursor_y]+x;
+					break;
 			case 'a': //character position relative
-			case 'C': if ( (buff[cursor_x]&0xc0)==0x80 )//utf8 continuation byte
-						while ( (buff[++cursor_x]&0xc0)==0x80 );
-					  else
-						cursor_x+=n0; 
-					  break; 
-			case 'D': if ( (buff[cursor_x]&0xc0)==0x80 )//utf8 continuation byte
-						while ( (buff[--cursor_x]&0xc0)==0x80 );
-					  else 
-						cursor_x -= n0;
-					  break;
+			case 'C':
+					while ( n0-- > 0 ) {
+					if ( isUTF8c(buff[++cursor_x]) )
+						while ( isUTF8c(buff[++cursor_x]) );
+					}
+					break; 
+			case 'D': 
+					while ( n0-- > 0 ) {
+						if ( isUTF8c(buff[--cursor_x]) )
+							while ( isUTF8c(buff[--cursor_x]) );
+					}
+					break;
 			case 'E': //cursor to begining of next line n0 times
-					  cursor_y += n0;
-					  cursor_x = line[cursor_y];
-					  break;
+					cursor_y += n0;
+					cursor_x = line[cursor_y];
+					break;
 			case 'F': //cursor to begining of previous line n0 times
-					  cursor_y -= n0;
-					  cursor_x = line[cursor_y];
-					  break;
+					cursor_y -= n0;
+					cursor_x = line[cursor_y];
+					break;
 			case '`': //character position absolute
-			case 'G': n1 = cursor_y-screen_y+1; 
-					  n2 = n0; 
+			case 'G':
+					n1 = cursor_y-screen_y+1; 
+					n2 = n0; 
 			case 'f': //horizontal and vertical position forced
-					  if ( n1==0 ) n1=1;
-					  if ( n2==0 ) n2=1;
-			case 'H': if ( n1>size_y ) n1 = size_y;
-					  if ( n2>size_x ) n2 = size_x;
-					  cursor_y = screen_y+n1-1; 
-					  cursor_x = line[cursor_y];
-					  while ( --n2>0 ) {
+					if ( n1==0 ) n1=1;
+					if ( n2==0 ) n2=1;
+			case 'H': 
+					if ( n1>size_y ) n1 = size_y;
+					if ( n2>size_x ) n2 = size_x;
+					cursor_y = screen_y+n1-1; 
+					cursor_x = line[cursor_y];
+					while ( --n2>0 ) {
 						cursor_x++;
-						while ( (buff[cursor_x]&0xc0)==0x80 ) cursor_x++;
-					  }
-					  break;
+						while ( isUTF8c(buff[cursor_x]) ) cursor_x++;
+					}
+					break;
 			case 'J': 	//[J kill till end, 1J begining, 2J entire screen
 					if ( code[idx-2]=='[' ) {
 						if ( bAlterScreen ) 
@@ -476,7 +482,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 								buff+line[screen_y+i-n0], size_x);
 						memcpy( attr+line[screen_y+i], 
 								attr+line[screen_y+i-n0], size_x);
-					  }
+					}
 					for ( int i=0; i<n0; i++ ) {
 						memset(buff+line[cursor_y+i], ' ', size_x);
 						memset(attr+line[cursor_y+i],   0, size_x);

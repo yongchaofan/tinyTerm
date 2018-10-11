@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 13434 2018-09-30 21:05:10 $"
+// "$Id: host.c 13434 2018-10-10 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -458,7 +458,7 @@ static SOCKET http_s0=INVALID_SOCKET;
 	svraddr.sin_family=AF_INET;
 	svraddr.sin_addr.s_addr=inet_addr( intf );
 	int p;
-	for ( p=2024; p<2040; p++ ) {
+	for ( p=8080; p<8099; p++ ) {
 		svraddr.sin_port=htons(p);
 		if ( bind(http_s0, (struct sockaddr*)&svraddr, addrsize)!=SOCKET_ERROR ) {
 			if ( listen(http_s0, 1)!=SOCKET_ERROR){

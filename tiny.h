@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 3000 2018-09-30 21:05:10 $"
+// "$Id: tiny.h 3051 2018-10-10 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -34,6 +34,15 @@
 #define SSH		4
 #define SFTP	5
 #define NETCONF	6
+
+#define MODE_A	0
+#define MODE_R	1
+#define MODE_W	2
+#define MODE_RB	3
+#define MODE_WB	4
+FILE *fopen_utf8(const char *fn, int mode);
+int stat_utf8(const char *fn, struct _stat *buffer);
+BOOL isUTF8c(char c);	//check if a byte is a UTF8 continuation byte
 
 /****************auto_drop.c*************/
 void drop_Init( HWND hwnd );
@@ -96,15 +105,6 @@ void tiny_Drop_Script( char *cmds );
 /****************tiny.c****************/
 void cmd_Disp( char *buf );
 void tiny_Redraw();
-void tiny_Focus();
 void tiny_Beep();
 void tiny_Connecting();
 void tiny_Title( char *buf );
-
-#define MODE_A	0
-#define MODE_R	1
-#define MODE_W	2
-#define MODE_RB	3
-#define MODE_WB	4
-FILE *fopen_utf8(const char *fn, int mode);
-int stat_utf8(const char *fn, struct _stat *buffer);

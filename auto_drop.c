@@ -1,5 +1,5 @@
 //
-// "$Id: auto_drop.c 19939 2018-09-15 21:05:10 $"
+// "$Id: auto_drop.c 19928 2018-09-15 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
