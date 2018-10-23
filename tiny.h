@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 3051 2018-10-10 21:05:10 $"
+// "$Id: tiny.h 3128 2018-10-10 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -18,10 +18,10 @@
 //
 #include <stdio.h>
 #include <sys/stat.h>
-#define TERMLINES 40
-#define TERMCOLS 100
-#define MAXLINES 8192
-#define BUFFERSIZE 8192*64
+#define TERMLINES	25
+#define TERMCOLS	80
+#define MAXLINES	8192
+#define BUFFERSIZE	8192*64
 
 #define CONN_IDLE			0
 #define CONN_CONNECTING 	1
@@ -76,35 +76,38 @@ void scp_pwd(char *pwd);
 int scp_write_one(const char *lpath, const char *rpath);
 int scp_cmd(char *cmd);
 int tun_cmd(char *cmd);
-int sftp_put(char *src, char *dst);
+int sftp_cmd(char *cmd);
 
 /****************ftpd.c****************/
-char *getFolderName(char *title);
-void ftp_Svr( char *root );
-void tftp_Svr( char *root );
+BOOL ftp_Svr( char *root );
+BOOL tftp_Svr( char *root );
 
 /****************term.c****************/
-void buff_Logg( char *fn );
-void buff_Srch( char *sstr );
 void term_Init( void );
 void term_Clear( void );
 void term_Size( void );
 void term_Parse( char *buf, int len );
 void term_Parse_XML( char *xml, int len );
 void term_Print( const char *fmt, ... );
-char *term_Exec( char *cmd );
-char *term_Disp( char *buf );
+void term_Keydown(DWORD key);
+void term_Timeout( char *cmd );
+void term_Prompt( char *cmd );
+void term_Waitfor( char *cmd );
+void term_Logg( char *fn );
+void term_Srch( char *sstr );
 char *term_Send( char *buf, int len );
+char *term_Disp( char *buf );
 int term_Recv( char *tl1text );
 int term_TL1( char *cmd, char **tl1text);
-void script_Open( char *fn );
-void script_Pause( void );
-void script_Stop( void );
-void tiny_Drop_Script( char *cmds );
 
 /****************tiny.c****************/
+int cmd_Exec( char *cmd, char **reply );
 void cmd_Disp( char *buf );
 void tiny_Redraw();
 void tiny_Beep();
 void tiny_Connecting();
 void tiny_Title( char *buf );
+void script_Open( char *fn );
+void script_Drop( char *cmds );
+void script_Pause( void );
+void script_Stop( void );

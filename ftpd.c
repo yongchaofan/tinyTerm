@@ -330,17 +330,13 @@ DWORD WINAPI ftpd(LPVOID p)
 	ftp_s0 = INVALID_SOCKET;
 	return 0;
 }
-void ftp_Svr(char *root) 
+BOOL ftp_Svr(char *root) 
 {
 	if ( ftp_s0 != INVALID_SOCKET ) {
 		closesocket( ftp_s0 );
 		ftp_s0 = INVALID_SOCKET;
 	}
 	else {
-		if ( *root == 0 ) 
-			root = getFolderName("Choose root directory");
-		else 
-			root++;
 		if ( _chdir(root)==0 ) {
 			struct sockaddr_in serveraddr;
 			int addrsize=sizeof(serveraddr);
@@ -354,12 +350,14 @@ void ftp_Svr(char *root)
 				if ( listen(ftp_s0, 1) != SOCKET_ERROR ) {
 					DWORD dwId;
 					CreateThread( NULL, 0, ftpd, (LPVOID)root, 0, &dwId);
+					return TRUE;
 				}
 			}
 			else 
 				cmd_Disp("Couldn't bind to FTP port");
 		}
 	}
+	return FALSE;
 }
 
 static SOCKET tftp_s0=INVALID_SOCKET, tftp_s1;
@@ -457,7 +455,7 @@ DWORD WINAPI tftpd(LPVOID p)
 	tftp_s0 = INVALID_SOCKET;
 	return 0;
 }
-void tftp_Svr( char *root )
+BOOL tftp_Svr( char *root )
 {
 	struct sockaddr_in svraddr;
 	int addrsize=sizeof(svraddr);
@@ -468,16 +466,12 @@ void tftp_Svr( char *root )
 		tftp_s0 = INVALID_SOCKET;
 	}
 	else {
-		if ( *root == 0 ) 
-			root = getFolderName("Choose root directory");
-		else 
-			root++;
 		if ( _chdir(root)==0 ) {
 			tftp_s0 = socket(AF_INET, SOCK_DGRAM, 0);
 			tftp_s1 = socket(AF_INET, SOCK_DGRAM, 0);
 			if ( tftp_s0==INVALID_SOCKET || tftp_s1==INVALID_SOCKET ) {
 				term_Disp( "Couldn't create sockets for TFTPd\r\n");
-				return;
+				return FALSE;
 			}
 			memset(&svraddr, 0, addrsize);
 			svraddr.sin_family=AF_INET;
@@ -490,10 +484,12 @@ void tftp_Svr( char *root )
 										addrsize)!=SOCKET_ERROR ) {
 					DWORD dwId;
 					CreateThread( NULL, 0, tftpd, (LPVOID)root, 0, &dwId);
+					return TRUE;
 				}
 			}
 			else
 				term_Disp( "Couldn't bind TFTPd port\r\n");
 		}
 	}
+	return FALSE;
 }

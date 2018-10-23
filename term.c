@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 20120 2018-10-10 21:05:10 $"
+// "$Id: term.c 19684 2018-10-10 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -22,23 +22,21 @@
 
 char buff[BUFFERSIZE], attr[BUFFERSIZE], c_attr;
 int line[MAXLINES];
-int cursor_x, cursor_y, save_x, save_y;
 int size_x, size_y;
-int screen_y;
-int scroll_y;
+int cursor_x, cursor_y;
+int screen_y, scroll_y;
 int sel_left, sel_right;
-int roll_top, roll_bot;
-BOOL bLogging, bEcho;
-BOOL bCursor, bAppCursor;
-BOOL bEnter=FALSE, bEnter1=FALSE;
+BOOL bLogging, bCursor, bEcho;
 
-static FILE *fpLogFile;
-static BOOL bPrompt=FALSE;
+static BOOL bPrompt=FALSE, bEnter=FALSE, bEnter1=FALSE;
 static char sPrompt[16]=";\n> ", *tl1text = NULL;
 static int  iPrompt=4, iTimeOut=30, tl1len = 0;
 static HANDLE hTL1Event;	//for term_TL1 reader
 
-static BOOL bAlterScreen, bGraphic, bEscape, bTitle, bInsert;
+static FILE *fpLogFile;
+static int save_x, save_y;
+static int roll_top, roll_bot;
+static BOOL bAppCursor, bAlterScreen, bGraphic, bEscape, bTitle, bInsert;
 static char title[256];
 static int title_idx = 0;
 unsigned char * vt100_Escape( unsigned char *sz, int cnt );
@@ -104,6 +102,18 @@ void term_nextLine()
 
 	if ( scroll_y<0 ) scroll_y--;
 	if ( screen_y<cursor_y-size_y+1 ) screen_y = cursor_y-size_y+1;
+}
+void term_Keydown(DWORD key)
+{		
+	switch( key ) {
+	case VK_UP:    	term_Send(bAppCursor?"\033OA":"\033[A",3); break;
+	case VK_DOWN:  	term_Send(bAppCursor?"\033OB":"\033[B",3); break;
+	case VK_RIGHT: 	term_Send(bAppCursor?"\033OC":"\033[C",3); break;
+	case VK_LEFT:  	term_Send(bAppCursor?"\033OD":"\033[D",3); break;
+	case VK_DELETE:	term_Send("\177",1); break;
+	case VK_RETURN:	bEnter = TRUE; break;
+	default:	if ( bEnter ) {	bEnter = FALSE;	bEnter1 = TRUE; }
+	}
 }
 void term_Parse( char *buf, int len )
 {
@@ -199,7 +209,7 @@ void term_Parse( char *buf, int len )
 					if ( cursor_x-line[cursor_y]>=size_x ) {
 						int char_cnt=0;
 						for ( int i=line[cursor_y]; i<cursor_x; i++ ) 
-							if ( ( buff[i]&0xc0)!=0x80 ) char_cnt++;
+							if ( !isUTF8c(buff[i]) ) char_cnt++;
 						if ( char_cnt==size_x ) {
 							if ( bAlterScreen ) 
 								cursor_x--; //don't overflow in vi
@@ -220,7 +230,7 @@ void term_Parse( char *buf, int len )
 			SetEvent( hTL1Event );
 		}
 	}
-	if ( scroll_y>-size_y ) tiny_Redraw();
+	tiny_Redraw();
 }
 void term_Print( const char *fmt, ... ) 
 {
@@ -249,7 +259,6 @@ int term_Recv( char *tl1text )
 {
 	return  buff+cursor_x - tl1text;
 }
-/****************************term_TL1*********************************/
 int term_TL1( char *cmd, char **pTl1Text )
 {
 	tl1len = 0; 
@@ -287,49 +296,34 @@ int term_TL1( char *cmd, char **pTl1Text )
 	if ( pTl1Text!=NULL ) *pTl1Text = tl1text;
 	return tl1len;
 }
-
-/********************Script Functions*******************************/
-char *term_Exec( char *pCmd )
+void term_Timeout( char *cmd )
 {
-	char *p = buff+cursor_x;
-	static char cmd[256];
-	strncpy( cmd, pCmd, 255 );
-	if ( strncmp(cmd, "Title", 5)==0 ) 		tiny_Title( cmd+5 ); 
-	else if ( strncmp(cmd, "Log", 3)==0 ) 	buff_Logg( cmd+4 ); 
-	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 	ftp_Svr( cmd+5 );
-	else if ( strncmp(cmd, "Tftpd", 5)==0 ) tftp_Svr( cmd+6 );
-	else if ( strncmp(cmd, "Timeout", 7)==0 ) iTimeOut = atoi( cmd+8 ); 
-	else if ( strncmp(cmd, "Disconn", 7)==0 ) host_Close(); 
-	else if ( strncmp(cmd, "serial ", 7)==0 ) host_Open( cmd+7 );
-	else if ( strncmp(cmd, "telnet ", 7)==0 ) host_Open( cmd+7 );
-	else if ( strncmp(cmd, "ssh ",    4)==0 ) host_Open( cmd+4 );
-	else if ( strncmp(cmd, "Wait ", 5)==0 ) Sleep(atoi(cmd+5)*1000);
-	else if ( strncmp(cmd, "Waitfor ", 8)==0 ) {
-		for ( int i=iTimeOut; i>0; i-- ) {
-			if ( strstr(tl1text, cmd+8)!=NULL ) break;
-			Sleep(1000);
-		}
-	}
-	else if ( strncmp(cmd, "Prompt ", 7)==0 ) {
-		char *p=cmd+7, *p1 = sPrompt;
-		while ( *p ) {
-			if ( *p=='%' && isdigit(p[1]) ) {
-				int a;
-				sscanf(p+1, "%02x", &a);
-				*p1++ = a;
-				p+=3;
-			}
-			else 
-				*p1++ = *p++;
-		}
-		*p1 = 0;
-		iPrompt = strlen(sPrompt);
-	}
-	return p;
+	iTimeOut = atoi( cmd+8 );
 }
-
-/***************************Buffer functions***************************/
-void buff_Logg( char *fn )
+void term_Waitfor( char *cmd )
+{
+	for ( int i=iTimeOut; i>0; i-- ) {
+		if ( strstr(tl1text, cmd+8)!=NULL ) return;
+		Sleep(1000);
+	}
+}
+void term_Prompt( char *cmd )
+{
+	char *p=cmd, *p1 = sPrompt;
+	while ( *p ) {
+		if ( *p=='%' && isdigit(p[1]) ) {
+			int a;
+			sscanf(p+1, "%02x", &a);
+			*p1++ = a;
+			p+=3;
+		}
+		else 
+			*p1++ = *p++;
+	}
+	*p1 = 0;
+	iPrompt = strlen(sPrompt);
+}
+void term_Logg( char *fn )
 {
 	char buf[256];
 	if ( bLogging ) {
@@ -346,7 +340,7 @@ void buff_Logg( char *fn )
 		}
 	}
 }
-void buff_Srch( char *sstr )
+void term_Srch( char *sstr )
 {
 	char buf[256], *p;
 	int i = screen_y+scroll_y;

@@ -226,7 +226,7 @@ void autocomplete_Destroy()
 	CAutoEnumString_Destruct(&cmdHistory);
 }
 
-void tiny_Drop_Script( char *cmds );
+void script_Drop( char *cmds );
 
 /************************************************************************
 	DropTarget implementation
@@ -646,7 +646,7 @@ void DropData(HWND hwnd, IDataObject *pDataObject)
 			// we asked for the data as a HGLOBAL, so access it appropriately
 			PVOID data = GlobalLock(stgmed.hGlobal);
 
-			tiny_Drop_Script(strdup((char *)data));
+			script_Drop(strdup((char *)data));
 
 			GlobalUnlock(stgmed.hGlobal);
 

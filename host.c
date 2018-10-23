@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 13434 2018-10-10 21:05:10 $"
+// "$Id: host.c 13432 2018-10-10 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -413,7 +413,7 @@ DWORD WINAPI *httpd( void *pv )
 				cmd_Disp(cmd+4);
 				if ( strncmp(cmd,"Cmd=",4)==0 ) {
 					if ( cmd[4]=='#' ) 
-						reply = term_Exec( cmd+5 );
+						replen = cmd_Exec( cmd+5, &reply );
 					else
 						replen = term_TL1( cmd+4, &reply );
 				} 
