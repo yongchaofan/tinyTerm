@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 19684 2018-10-10 21:05:10 $"
+// "$Id: term.c 20335 2018-11-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -41,7 +41,6 @@ static char title[256];
 static int title_idx = 0;
 unsigned char * vt100_Escape( unsigned char *sz, int cnt );
 
-/*******************************Line functions************************/
 void term_Init( )
 {
 	hTL1Event = CreateEvent( NULL, TRUE, FALSE, TEXT("TL1") );
@@ -103,9 +102,18 @@ void term_nextLine()
 	if ( scroll_y<0 ) scroll_y--;
 	if ( screen_y<cursor_y-size_y+1 ) screen_y = cursor_y-size_y+1;
 }
+void term_Scroll(int lines)
+{
+	scroll_y -= lines;
+	if ( scroll_y<-screen_y ) scroll_y = -screen_y;
+	if ( scroll_y>0 ) scroll_y = 0;
+	tiny_Redraw( );
+}
 void term_Keydown(DWORD key)
 {		
 	switch( key ) {
+	case VK_PRIOR:  term_Scroll(size_y-1); break;
+	case VK_NEXT:   term_Scroll(1-size_y); break; 
 	case VK_UP:    	term_Send(bAppCursor?"\033OA":"\033[A",3); break;
 	case VK_DOWN:  	term_Send(bAppCursor?"\033OB":"\033[B",3); break;
 	case VK_RIGHT: 	term_Send(bAppCursor?"\033OC":"\033[C",3); break;
@@ -242,22 +250,44 @@ void term_Print( const char *fmt, ... )
 	term_Parse(buff, len);
 	term_Parse("\033[37m",5);
 }
-char *term_Disp( char *msg )
+void term_Disp( char *msg )
 {
-	char *p = buff+cursor_x;
+	tl1text = buff+cursor_x;
 	term_Parse( msg, strlen(msg) );
-	return p;
 }
-char *term_Send( char *buf, int len )
+void term_Send( char *buf, int len )
 {
 	if ( bEcho ) term_Parse( buf, len );
-	char *p = buff+cursor_x;
 	host_Send( buf, len );
-	return p;
 }
-int term_Recv( char *tl1text ) 
+int term_Recv( char **pTL1text ) 
 {
-	return  buff+cursor_x - tl1text;
+	if ( pTL1text!=NULL ) *pTL1text = tl1text;
+	int len = buff+cursor_x - tl1text;
+	tl1text = buff+cursor_x;
+	return len;
+}
+int term_Selection(char **pSelText)
+{
+	if ( pSelText!=NULL ) *pSelText = buff+sel_left;
+	return sel_right-sel_left;
+}
+char *term_Mark_Prompt()
+{
+	bPrompt = FALSE; 
+	tl1len = 0;
+	tl1text = buff+cursor_x;
+	return tl1text;
+}
+int term_Waitfor_Prompt()
+{
+	int i=0, oldlen = tl1len;
+	ResetEvent(hTL1Event);
+	while ( WaitForSingleObject( hTL1Event, 100 ) == WAIT_TIMEOUT ) { 
+		if ( ++i==iTimeOut*10 ) break;
+		if ( tl1len>oldlen ) { i=0; oldlen=tl1len; }
+	}
+	return tl1len;
 }
 int term_TL1( char *cmd, char **pTl1Text )
 {
@@ -265,14 +295,10 @@ int term_TL1( char *cmd, char **pTl1Text )
 	if ( host_Status()==CONN_CONNECTED ) {	//retrieve from NE
 		bPrompt = FALSE; 
 		int cmdlen = strlen(cmd);
-		tl1text = term_Send(cmd, cmdlen);
+		tl1text = buff+cursor_x;
+		term_Send(cmd, cmdlen);
 		if ( cmd[cmdlen-1]!='\r' ) term_Send("\r", 1);
-		int i=0, oldlen = tl1len;
-		ResetEvent(hTL1Event);
-		while ( WaitForSingleObject( hTL1Event, 100 ) == WAIT_TIMEOUT ) { 
-			if ( ++i==iTimeOut*10 ) break;
-			if ( tl1len>oldlen ) { i=0; oldlen=tl1len; }
-		}
+		term_Waitfor_Prompt();
 	}
 	else {									//retrieve from buffer
 		static char *pcursor=buff;			//only when retrieve from buffer
@@ -303,6 +329,7 @@ void term_Timeout( char *cmd )
 void term_Waitfor( char *cmd )
 {
 	for ( int i=iTimeOut; i>0; i-- ) {
+		buff[cursor_x] = 0;
 		if ( strstr(tl1text, cmd+8)!=NULL ) return;
 		Sleep(1000);
 	}
@@ -331,7 +358,7 @@ void term_Logg( char *fn )
 		bLogging = FALSE;
 		cmd_Disp("Log file closed");
 	}
-	else {
+	else if ( fn!=NULL ) {
 		fpLogFile = fopen_utf8( fn, MODE_WB );
 		if ( fpLogFile != NULL ) {
 			bLogging = TRUE;
@@ -654,8 +681,12 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 }
 void term_Parse_XML(char *msg, int len)
 {
-	int indent=0;
-	BOOL previousIsOpen=TRUE;
+static int indent = 0;
+static BOOL previousIsOpen = TRUE;
+	if ( strncmp(msg, "<?xml ", 6)==0 ) {
+		indent = 0; 
+		previousIsOpen = TRUE;
+	}
 	char *p=msg, *q;
 	char spaces[256]="\r\n                                               \
                                                                               ";
@@ -676,9 +707,9 @@ void term_Parse_XML(char *msg, int len)
 				term_Parse(spaces, indent);
 				previousIsOpen = TRUE;
 			}
+			term_Parse("\033[32m",5);
 			q = strchr(p, '>');
 			if ( q!=NULL ) {
-				term_Parse("\033[32m",5);
 				char *r = strchr(p, ' ');
 				if ( r!=NULL && r<q ) {
 					term_Parse(p, r-p);
@@ -691,13 +722,15 @@ void term_Parse_XML(char *msg, int len)
 				if ( q[-1]=='/' ) previousIsOpen = FALSE;
 				p = q+1;
 			}
-			else
+			else {	//incomplete pair of '<' and '>'
+				term_Parse(p, strlen(p));
 				break;
+			}
 		}
 		else {			//data
+			term_Parse("\033[33m",5);
 			q = strchr(p, '<');
 			if ( q!=NULL ) {
-				term_Parse("\033[33m",5);
 				term_Parse(p, q-p);
 				p = q;
 			}
@@ -707,5 +740,4 @@ void term_Parse_XML(char *msg, int len)
 			}
 		}
 	}
-	term_Parse("\033[37m",5);
 }

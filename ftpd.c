@@ -1,5 +1,5 @@
 //
-// "$Id: ftpd.c 14622 2018-09-15 21:05:10 $"
+// "$Id: ftpd.c 14493 2018-11-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -62,7 +62,7 @@ DWORD WINAPI ftpd(LPVOID p)
 
 		sock_send( "220 Welcome\n");
 		getpeername(ftp_s1, (struct sockaddr *)&clientaddr, &addrsize);
-		term_Print("FTPd: connected from %s\r\n", 
+		term_Print("FTPd: connected from %s\n", 
 						inet_ntoa(clientaddr.sin_addr));
 
 		FILE *fp;
@@ -71,7 +71,7 @@ DWORD WINAPI ftpd(LPVOID p)
 		while ( (ret1=sock_select(ftp_s1, 300)) == 1 ) {
 			int cnt=recv( ftp_s1, szBuf, 1024, 0 );
 			if ( cnt<=0 ) {
-				term_Disp( "FTPd: client disconnected\r\n");
+				term_Disp( "FTPd: client disconnected\n");
 				break;
 			}
 			szBuf[cnt--]=0;
@@ -321,11 +321,11 @@ DWORD WINAPI ftpd(LPVOID p)
 		}
 		if( ret1 == 0 ) {
 			sock_send( "500 Timeout\n");
-			term_Disp( "FTPd: client timed out\r\n");
+			term_Disp( "FTPd: client timed out\n");
 		}
 		closesocket(ftp_s1);
 	}
-	term_Disp( ret0==0? "FTPd timed out\r\n" : "FTPd stopped\r\n" );
+	term_Disp( ret0==0? "FTPd timed out\n" : "FTPd stopped\n" );
 	closesocket(ftp_s0);
 	ftp_s0 = INVALID_SOCKET;
 	return 0;
@@ -376,7 +376,8 @@ void tftp_Read( FILE *fp )
 		term_Disp("#");
 		if ( sock_select( tftp_s1, 5 ) == 1 ) {
 			if ( recv(tftp_s1, ackBuf, 516, 0)==SOCKET_ERROR ) break;
-			if ( ackBuf[1]==4 && ackBuf[2]==dataBuf[2] && ackBuf[3]==dataBuf[3]) {
+			if ( ackBuf[1]==4 && ackBuf[2]==dataBuf[2] && 
+								 ackBuf[3]==dataBuf[3]) {
 				nRetry=0;
 				nCnt++;
 				len = nLen;
@@ -389,11 +390,10 @@ void tftp_Read( FILE *fp )
 }
 void tftp_Write( FILE *fp )
 {
-/*
-	while ( nLen > 0 ) {
 	char dataBuf[516], ackBuf[516];
 	unsigned short ntmp, nCnt=0, nRetry=0;
 	int nLen=516;
+	while ( nLen > 0 ) {
 		ackBuf[0]=0; ackBuf[1]=4;
 		ackBuf[2]=(nCnt>>8)&0xff; ackBuf[3]=nCnt&0xff;
 		send(tftp_s1, ackBuf, 4, 0);
@@ -412,7 +412,6 @@ void tftp_Write( FILE *fp )
 		}
 		else if ( ++nRetry==5 ) break;
 	} 
-*/
 }
 DWORD WINAPI tftpd(LPVOID p)
 {
@@ -432,7 +431,7 @@ DWORD WINAPI tftpd(LPVOID p)
 		connect(tftp_s1, (struct sockaddr *)&clientaddr, addrsize);
 		if ( dataBuf[1]==1  || dataBuf[1]==2 ) {
 			BOOL bRead = dataBuf[1]==1; 
-			term_Print("TFTPd: %cRQ from %s\r\n", bRead?'R':'W', 
+			term_Print("TFTPd: %cRQ from %s\n", bRead?'R':'W', 
 									inet_ntoa(clientaddr.sin_addr) ); 
 			strcpy(fn, svrRoot); 
 			strcat(fn, dataBuf+2);
@@ -449,7 +448,7 @@ DWORD WINAPI tftpd(LPVOID p)
 			}
 		}
 	}
-	term_Disp( ret==0 ? "TFTPD timed out\r\n" : "TFTPd stopped\r\n" );
+	term_Disp( ret==0 ? "TFTPD timed out\n" : "TFTPd stopped\n" );
 	closesocket( tftp_s1 );
 	closesocket( tftp_s0 );
 	tftp_s0 = INVALID_SOCKET;
@@ -470,7 +469,7 @@ BOOL tftp_Svr( char *root )
 			tftp_s0 = socket(AF_INET, SOCK_DGRAM, 0);
 			tftp_s1 = socket(AF_INET, SOCK_DGRAM, 0);
 			if ( tftp_s0==INVALID_SOCKET || tftp_s1==INVALID_SOCKET ) {
-				term_Disp( "Couldn't create sockets for TFTPd\r\n");
+				term_Disp( "Couldn't create sockets for TFTPd\n");
 				return FALSE;
 			}
 			memset(&svraddr, 0, addrsize);
@@ -488,7 +487,7 @@ BOOL tftp_Svr( char *root )
 				}
 			}
 			else
-				term_Disp( "Couldn't bind TFTPd port\r\n");
+				term_Disp( "Couldn't bind TFTPd port\n");
 		}
 	}
 	return FALSE;

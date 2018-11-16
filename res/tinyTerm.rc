@@ -1,72 +1,83 @@
+//
+// "$Id: tinyTerm.rc 2800 2018-11-15 21:05:10 $"
+//
+// tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
+//
+// tinyTerm.rc is the resource file defining dialog, icon and menus.
+//
+// Copyright 2015-2018 by Yongchao Fan.
+//
+// This library is free software distributed under GNU LGPL 3.0,
+// see the license at:
+//
+//     https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//
+// Please report all bugs and problems on the following page:
+//
+//     https://github.com/zoudaokou/tinyTerm/issues/new
+//
 #include <windows.h>
 #include <commctrl.h>
-#ifndef IDC_STATIC
-#define IDC_STATIC (-1)
-#endif
 
-#define IDD_CONNECT             133
-#define IDCONNECT               40000
-#define IDCANCELC               40001
-#define IDSTATIC				40002
-#define IDPROTO					40003
-#define IDPORT					40004
-#define IDHOST					40005
-//
-// Menu resources
-//
-129 MENU
-{
-    MENUITEM "Ftpd...", 77
-    MENUITEM "Tftpd...", 78
-    MENUITEM "Font Size\t^F", 70
-    MENUITEM "Local Echo\t^E", 69
-    MENUITEM "Transparency\t^T", 84
-}
-
-
-
-131 MENU
-{
-    MENUITEM SEPARATOR
-    MENUITEM "Run...", 85
-    MENUITEM "Pause\t^P", 80
-    MENUITEM "Stop\t^S", 83
-}
-
-
-
-//
-// Dialog resources
-//
-IDD_CONNECT DIALOG 40, 40, 180, 120
-CAPTION "Connect Dialog"
-FONT 10, "Ms Shell Dlg"
-{
-    COMBOBOX IDPROTO, 50, 10, 110, 16, CBS_DROPDOWNLIST|CBS_HASSTRINGS|WS_TABSTOP
-    LTEXT    "Protocol:", 	0, 	  16, 12, 32, 12, SS_RIGHT, WS_EX_LEFT
-    COMBOBOX IDPORT,  50, 34, 110, 16, CBS_DROPDOWN|CBS_HASSTRINGS|WS_TABSTOP
-    LTEXT    "Port:", 		0, 	  16, 36, 32, 12, SS_RIGHT, WS_EX_LEFT
-    COMBOBOX IDHOST,  50, 58, 110, 16, CBS_DROPDOWN|CBS_HASSTRINGS|WS_TABSTOP
-    LTEXT    "Hostname:", IDSTATIC,16, 60, 32, 12, SS_RIGHT, WS_EX_LEFT
-    DEFPUSHBUTTON "Connect", IDCONNECT, 40, 90, 50, 12, 0, WS_EX_LEFT
-    PUSHBUTTON    "Cancel", IDCANCELC, 100, 90, 50, 12, 0, WS_EX_LEFT
-}
-
-
-
+#define IDICON_TL1		128
+#define IDMENU_OPTIONS	130
+#define IDMENU_SCRIPT	131
+#define IDMENU_SERVE	132
+#define IDD_CONNECT     133
+#define IDCONNECT       40000
+#define IDCANCELC       40001
+#define IDSTATIC		40002
+#define IDPROTO			40003
+#define IDPORT			40004
+#define IDHOST			40005
 //
 // Icon resources
 //
-128                ICON           "TL1.ico"
-
-
-
+IDICON_TL1		ICON	"TL1.ico"
+//
+// Menu resources
+//
+IDMENU_OPTIONS MENU
+{
+    MENUITEM "Log...\t^L", 76
+    MENUITEM "Echo	\t^E", 69
+    MENUITEM "Font...\t^F", 70
+    MENUITEM "Transparency\t^T", 84
+}
+IDMENU_SCRIPT MENU
+{
+    MENUITEM SEPARATOR
+    MENUITEM "Open...\t^O", 79
+    MENUITEM "Pause\t^P", 80
+    MENUITEM "Stop\t^S", 83
+}
+IDMENU_SERVE MENU
+{
+    MENUITEM "Ftpd...", 77
+    MENUITEM "Tftpd...", 78
+}
+//
+// Dialog resources
+//
+IDD_CONNECT DIALOG 40, 30, 130, 90
+CAPTION "Connect Dialog"
+FONT 10, "Ms Shell Dlg"
+{
+    COMBOBOX IDPROTO, 40, 10, 70, 16, CBS_DROPDOWNLIST|CBS_HASSTRINGS|WS_TABSTOP
+    LTEXT    "Protocol:", 	0,  4, 12, 32, 12, SS_RIGHT, WS_EX_LEFT
+    COMBOBOX IDPORT,  40, 30, 70, 16, CBS_DROPDOWN|CBS_HASSTRINGS|WS_TABSTOP
+    LTEXT    "Port:", 		0,  4, 32, 32, 12, SS_RIGHT, WS_EX_LEFT
+    COMBOBOX IDHOST,  40, 50, 70, 16, CBS_DROPDOWN|CBS_HASSTRINGS|WS_TABSTOP
+    LTEXT    "Host:", IDSTATIC,	4, 52, 32, 12, SS_RIGHT, WS_EX_LEFT
+    DEFPUSHBUTTON "Connect", IDCONNECT, 70, 70, 40, 12, 0, WS_EX_LEFT
+    PUSHBUTTON    "Cancel",  IDCANCELC, 20, 70, 40, 12, 0, WS_EX_LEFT
+}
 //
 // Version Information resources
 //
 1 VERSIONINFO
-    FILEVERSION     2,0,1,8
-    PRODUCTVERSION  2,0,1,8
+    FILEVERSION     1,0,0,0
+    PRODUCTVERSION  1,0,0,0
     FILEOS          VOS__WINDOWS32
     FILETYPE        VFT_APP
     FILESUBTYPE     VFT2_UNKNOWN
@@ -80,7 +91,7 @@ FONT 10, "Ms Shell Dlg"
             VALUE "FileDescription", "Tiny Terminal Emulator"
             VALUE "LegalCopyright", "©2015-2018 Yongchao Fan"
             VALUE "ProductName", "tinyTerm"
-            VALUE "ProductVersion", "2.0.1.8"
+            VALUE "ProductVersion", "1.0.0"
         }
     }
     BLOCK "VarFileInfo"
@@ -88,9 +99,6 @@ FONT 10, "Ms Shell Dlg"
         VALUE "Translation", 0x0409, 0x04B0
     }
 }
-
-
-
 //
 // Manifest resources
 //

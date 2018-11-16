@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 3128 2018-10-10 21:05:10 $"
+// "$Id: tiny.h 3312 2018-11-11 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -69,14 +69,16 @@ int tcp( const char *hostname, short port );
 void ssh2_Init( void );
 void ssh2_Size( int w, int h );
 void ssh2_Send( char *buf, int len );
-void netconf_Send( char *msg, int len );
 void ssh2_Close( );
 void ssh2_Exit( void );
 void scp_pwd(char *pwd);
-int scp_write_one(const char *lpath, const char *rpath);
-int scp_cmd(char *cmd);
-int tun_cmd(char *cmd);
+char *scp_read(char *lpath, char *rpath);
+char *scp_write(char *lpath, char *rpath);
+int scp_cmd(char *cmd, char **preply);
+int tun_cmd(char *cmd, char **preply);
+int sftp_put(char *src, char *dest);
 int sftp_cmd(char *cmd);
+void netconf_Send( char *msg, int len );
 
 /****************ftpd.c****************/
 BOOL ftp_Svr( char *root );
@@ -89,25 +91,25 @@ void term_Size( void );
 void term_Parse( char *buf, int len );
 void term_Parse_XML( char *xml, int len );
 void term_Print( const char *fmt, ... );
+void term_Scroll(int lines);
 void term_Keydown(DWORD key);
 void term_Timeout( char *cmd );
 void term_Prompt( char *cmd );
 void term_Waitfor( char *cmd );
 void term_Logg( char *fn );
 void term_Srch( char *sstr );
-char *term_Send( char *buf, int len );
-char *term_Disp( char *buf );
-int term_Recv( char *tl1text );
-int term_TL1( char *cmd, char **tl1text);
+void term_Disp( char *buf );
+void term_Send( char *buf, int len );
+int term_Recv( char **pTL1Text );		//get new text since last Disp/Send/Recv
+int term_Selection( char **pSelText );	//get current selected text
+int term_TL1( char *cmd, char **pTL1Text);
+char *term_Mark_Prompt();
+int term_Waitfor_Prompt();
 
 /****************tiny.c****************/
-int cmd_Exec( char *cmd, char **reply );
+int tiny_Cmd( char *cmd, char **preply );
 void cmd_Disp( char *buf );
-void tiny_Redraw();
 void tiny_Beep();
+void tiny_Redraw();
 void tiny_Connecting();
 void tiny_Title( char *buf );
-void script_Open( char *fn );
-void script_Drop( char *cmds );
-void script_Pause( void );
-void script_Stop( void );

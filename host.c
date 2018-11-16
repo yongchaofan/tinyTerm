@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 13432 2018-10-10 21:05:10 $"
+// "$Id: host.c 12929 2018-11-11 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -26,11 +26,10 @@
 
 int host_type = 0;
 int host_status=CONN_IDLE;
+SOCKET sock;					//for tcp connection used by telnet/ssh reader
+HANDLE hReaderThread = NULL;	//reader thread handle
+static HANDLE hExitEvent, hWrite;//for serial reader
 
-static HANDLE hExitEvent, hWrite;	//for serial reader
-static SOCKET sock;					//for telnet reader
-
-DWORD dwReaderId = 0;				//reader thread id
 DWORD WINAPI serial( void *pv );
 DWORD WINAPI telnet( void *pv );
 DWORD WINAPI ssh( void *pv );
@@ -59,11 +58,11 @@ static char Port[256];
 	if ( strncmp(port, "sftp", 4)==0 )	 { port+=5; reader = sftp; }
 	if ( strncmp(port, "netconf", 7)==0 ) { port+=8; reader= netconf; }
 	if ( *port=='!' ) { port++; reader = stdio; }
-	if ( dwReaderId==0 ) {
+	if ( hReaderThread==NULL ) {
 		strncpy(Port, port, 255); Port[255]=0;
 		host_status=CONN_CONNECTING;
 		tiny_Connecting();
-		CreateThread( NULL,0,reader, Port,0,&dwReaderId );
+		hReaderThread = CreateThread(NULL, 0, reader, Port, 0, NULL);
 	}
 }
 void host_Send( char *buf, int len )
@@ -71,13 +70,11 @@ void host_Send( char *buf, int len )
 	DWORD dwWrite;
 	switch ( host_type ) {
 	case STDIO: 
-	case SERIAL:WriteFile(hWrite, buf, len, &dwWrite, NULL);
-				break;
-	case TELNET:send( sock, buf, len, 0);
-				break;
+	case SERIAL:WriteFile(hWrite, buf, len, &dwWrite, NULL); break;
+	case TELNET:send( sock, buf, len, 0); break;
 	case SSH:
 	case SFTP:
-	case NETCONF: 
+	case NETCONF:
 	default:	ssh2_Send(buf, len); break;
 	}
 }
@@ -93,20 +90,19 @@ int host_Type()
 {
 	return host_type;
 }
-void host_Close( void )
+void host_Close()
 {
 	switch ( host_type ) {
 	case STDIO:	 stdio_Close(); break;
 	case SERIAL: SetEvent( hExitEvent ); break;
-	case TELNET: closesocket( sock ); break;
+	case SFTP:	 ssh2_Send("\r",1); ssh2_Send("bye\r",4); break;
 	case SSH:
-	case SFTP:
-	case NETCONF:ssh2_Close(); break;
+	case NETCONF:ssh2_Close(); 
+	case TELNET: closesocket(sock); break;
 	}
 }
-void host_Destory( void )
+void host_Destory()
 {
-	if ( host_type!=0 ) host_Close( );
 	ssh2_Exit();
 	http_Svr("127.0.0.1");
 }
@@ -171,7 +167,7 @@ DWORD WINAPI serial(void *pv)
 	}
 	CloseHandle(hCommPort);
 	host_status=CONN_IDLE;
-	dwReaderId = 0;
+	hReaderThread = NULL;
 	return 1;
 }
 
@@ -222,7 +218,7 @@ DWORD WINAPI telnet( void *pv )
 
 socket_close:
 	host_status=CONN_IDLE;
-	dwReaderId = 0;
+	hReaderThread = NULL;
 
 	return 1;
 }
@@ -344,7 +340,7 @@ DWORD WINAPI stdio( void *pv)
 
 stdio_close:
 	host_status=CONN_IDLE;
-	dwReaderId = 0;
+	hReaderThread = NULL;
 	return 1;
 }
 void stdio_Close() 
@@ -362,8 +358,7 @@ const char HEADER[]="HTTP/1.1 200 Ok\
 					\nAccess-Control-Allow-Origin: *\
 					\nContent-Type: text/plain\
 					\nContent-length: %d\
-					\nConnection: Keep-Alive\
-					\nCache-Control: no-cache\n\n";		//max-age=1
+					\nCache-Control: no-cache\n\n";	
 DWORD WINAPI *httpd( void *pv )
 {
 	char buf[1024], *cmd, *reply;
@@ -383,14 +378,10 @@ DWORD WINAPI *httpd( void *pv )
 				cmd_Disp(buf);
 				replen = term_TL1( buf, &reply );
 				send( http_s1, reply, replen, 0 );
-				reply += replen;
 
 				if ( host_status==CONN_CONNECTED ) do {
-					replen = term_Recv( reply ); 
-					if ( replen > 0 ) {
-						send(http_s1, reply, replen, 0);
-						reply += replen;
-					}
+					replen = term_Recv( &reply ); 
+					if ( replen > 0 ) send(http_s1, reply, replen, 0);
 					FD_ZERO(&readset);
 					FD_SET(http_s1, &readset);
 				} while ( select(1, &readset, NULL, NULL, &tv) == 0 );
@@ -410,27 +401,11 @@ DWORD WINAPI *httpd( void *pv )
 					}
 				}
 				replen = 0;
-				cmd_Disp(cmd+4);
-				if ( strncmp(cmd,"Cmd=",4)==0 ) {
-					if ( cmd[4]=='#' ) 
-						replen = cmd_Exec( cmd+5, &reply );
-					else
-						replen = term_TL1( cmd+4, &reply );
-				} 
-				else if ( strncmp(cmd,"Disp=",5)==0 ) {
-					reply = term_Disp( cmd+5 );
-				} 
-				else if ( strncmp(cmd,"Send=",5)==0 ) {
-					reply = term_Send( cmd+5, strlen(cmd+5) );
-				} 
-				else if ( strncmp(cmd,"Recv=",5)==0 ) { 
-					replen = term_Recv( reply );
-					if ( replen<0 ) replen=0;
-				}
+				cmd_Disp(cmd);
+				replen = tiny_Cmd( cmd, &reply );
 				int len = sprintf( buf, HEADER, replen );
 				send( http_s1, buf, len, 0 );
-				send( http_s1, reply, replen, 0 );
-				reply += replen;
+				if ( replen>0 ) send( http_s1, reply, replen, 0 );
 			}
 			cmdlen = recv( http_s1, buf, 1023, 0 );
 		}
