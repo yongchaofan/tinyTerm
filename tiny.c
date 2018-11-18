@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 31276 2018-11-15 21:05:10 $"
+// "$Id: tiny.c 32150 2018-11-15 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -29,7 +29,7 @@ extern int screen_y;
 extern int scroll_y;
 extern int sel_left, sel_right;
 extern BOOL bEcho, bCursor, bLogging;
-
+int iTitleHeight;
 #define iCmdHeight		18
 
 #define ID_ABOUT		65	
@@ -51,10 +51,10 @@ extern BOOL bEcho, bCursor, bLogging;
 
 #define CONN_TIMER		127
 #define IDICON_TL1		128
-#define IDMENU_CONTEXT	129
-#define IDMENU_OPTIONS	130
-#define IDMENU_SCRIPT	131
-#define IDMENU_SERVE	132
+#define IDMENU_TERM		129
+#define IDMENU_SCRIPT	130
+#define IDMENU_OPTIONS	131
+#define IDMENU_CONTEXT	132
 
 #define IDD_CONNECT     133
 #define IDCONNECT       40000
@@ -72,7 +72,7 @@ const char WELCOME[]="\n\n\n\
 \t    * Command history and autocompletion\n\n\
 \t    * Drag and Drop to run command batches\n\n\
 \t    * Scripting interface xmlhttp://127.0.0.1:%d\n\n\n\
-\tBy yongchaofan@gmail.com		11-15-2018\n\n\
+\tBy yongchaofan@gmail.com		11-18-2018\n\n\
 \thttps://github.com/zoudaokou/tinyTerm\n\n\n";
 
 const COLORREF COLORS[9] ={ RGB(0,0,0), 	RGB(224,0,0), RGB(0,224,0), 
@@ -82,8 +82,9 @@ static HINSTANCE hInst;
 static RECT termRect, wndRect;
 static HWND hwndMain, hwndCmd;
 static HFONT hTermFont, hEditFont;
-static HMENU hSysMenu, hScriptMenu, hOptionMenu, hServeMenu, hContextMenu;
 static HBRUSH dwBkBrush, dwScrollBrush, dwSliderBrush;
+static HMENU hMenu[3], hTermMenu, hScriptMenu, hOptionMenu, hContextMenu;
+static int menuX[4] = {32, 72, 120, 200};
 
 static int iFontHeight, iFontWidth;
 static int iScriptCount, httport;
@@ -311,14 +312,13 @@ void cmd_Disp( char *buf )
 	SetWindowText(hwndCmd, wbuf);
 	PostMessage(hwndCmd, EM_SETSEL, 0, -1);
 }
+WCHAR Title[256] = L"   Term      Script      Options                           ";
 void tiny_Title( char *buf )
 {
-	WCHAR Title[256] = L"tinyTerm ";
-	WCHAR wbuf[256];
-	utf8_to_wchar(buf, strlen(buf)+1, wbuf, 256);
-	wcscat(Title, wbuf); 
+	utf8_to_wchar(buf, strlen(buf)+1, Title+55, 220);
+	Title[255] = 0;
 	SetWindowText(hwndMain, Title);
-	ModifyMenu(hSysMenu, ID_CONNECT, MF_BYCOMMAND, ID_CONNECT, 
+	ModifyMenu(hTermMenu, ID_CONNECT, MF_BYCOMMAND, ID_CONNECT, 
 					( *buf==0 ? L"Connect..." : L"Disconnect\t^D") );
 	if ( *buf ) 
 		host_Size(size_x, size_y);
@@ -491,10 +491,10 @@ BOOL menu_Command( WPARAM wParam )
 				OFN_PATHMUSTEXIST|OFN_NOREADONLYRETURN|OFN_OVERWRITEPROMPT) );
 		else
 			term_Logg( NULL ); 
-		check_Option( hOptionMenu, ID_LOGGING, bLogging ); 
+		check_Option( hTermMenu, ID_LOGGING, bLogging ); 
 		break;
 	case ID_ECHO:
-		check_Option( hOptionMenu, ID_ECHO, bEcho=!bEcho ); 
+		check_Option( hTermMenu, ID_ECHO, bEcho=!bEcho ); 
 		break;
 	case ID_FONT: 
 		if ( fontDialog() ) tiny_Font( hwndMain ); 
@@ -506,11 +506,11 @@ BOOL menu_Command( WPARAM wParam )
 		break;
 	case ID_FTPD:	 
 		bFTPd = ftp_Svr(bFTPd?NULL:getFolderName("Choose root directory")); 
-		check_Option( hServeMenu, ID_FTPD, bFTPd );
+		check_Option( hOptionMenu, ID_FTPD, bFTPd );
 		break;
 	case ID_TFTPD:
 		bTFTPd = tftp_Svr(bTFTPd?NULL:getFolderName("Choose root directory")); 
-		check_Option( hServeMenu, ID_TFTPD, bTFTPd );
+		check_Option( hOptionMenu, ID_TFTPD, bTFTPd );
 		break;
 	case ID_SCOPEN: {
 		char *fn = fileDialog( L"scripts\0*.txt\0All\0*.*\0\0",
@@ -580,6 +580,8 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		SetBkMode(hBufDC, OPAQUE);
 		ReleaseDC(hwnd, hDC);
 		tiny_Redraw( );
+	case WM_MOVE:
+		GetWindowRect( hwnd, &wndRect );
 		break;
 	case WM_PAINT: 
 		hDC = BeginPaint(hwnd, &ps);
@@ -782,10 +784,23 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	case WM_MBUTTONUP:
 		term_Send(buff+sel_left, sel_right-sel_left);
 		break;
-	case WM_RBUTTONUP:
+	case WM_RBUTTONUP: 
 		TrackPopupMenu(hContextMenu,TPM_RIGHTBUTTON, 
 					GET_X_LPARAM(lParam)+wndRect.left, 
 					GET_Y_LPARAM(lParam)+wndRect.top, 0, hwnd, NULL);
+		break;
+	case WM_NCLBUTTONDOWN: {
+		int x = GET_X_LPARAM(lParam)-wndRect.left;
+		int y = GET_Y_LPARAM(lParam)-wndRect.top;
+		int i;
+		for (i=0; i<3; i++ ) if ( x>menuX[i] && x<menuX[i+1] ) break; 
+		if ( i<3 && y>0 && y<iTitleHeight ) 
+			TrackPopupMenu(hMenu[i],TPM_LEFTBUTTON, 
+							wndRect.left+menuX[i]-menuX[0],
+							wndRect.top+iTitleHeight, 0, hwnd, NULL);
+		else
+			return DefWindowProc(hwnd,msg,wParam,lParam);
+		}
 		break;
 	case WM_DROPFILES: 
 		if ( host_Status()==CONN_CONNECTED ) DropFiles((HDROP)wParam);
@@ -820,41 +835,49 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	}
 	return 0;
 }
-void tiny_Sysmenu( HWND hwnd )
+void tiny_Menu( HWND hwnd )
 {
-	hOptionMenu = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_OPTIONS));
-	hScriptMenu = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_SCRIPT));
-	hServeMenu  = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_SERVE));
+	iTitleHeight = GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CYCAPTION) +
+    				GetSystemMetrics(SM_CXPADDEDBORDER);
+	HDC wndDC = GetWindowDC(hwnd);
+//	NONCLIENTMETRICS ncmetrics;
+//	SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &ncmetrics, 0);
+//	SelectObject(wndDC, CreateFontIndirect(&(ncmetrics.lfCaptionFont)));
+	RECT menuRect;
+	DrawText(wndDC, L"   Term   ", 10, &menuRect, DT_CALCRECT);
+	menuX[1] = menuX[0]+menuRect.right-menuRect.left;
+	DrawText(wndDC, L"   Script   ", 12, &menuRect, DT_CALCRECT);
+	menuX[2] = menuX[1]+menuRect.right-menuRect.left;
+	DrawText(wndDC, L"   Options   ", 13, &menuRect, DT_CALCRECT);
+	menuX[3] = menuX[2]+menuRect.right-menuRect.left;
+	ReleaseDC(hwnd, wndDC);
+
+	hMenu[0] = hTermMenu  = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_TERM));
+	hMenu[1] = hScriptMenu = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_SCRIPT));
+	hMenu[2] = hOptionMenu = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_OPTIONS));
+	hContextMenu = CreatePopupMenu();
+	InsertMenu(hContextMenu, 0, MF_BYPOSITION|MF_POPUP, 
+							(UINT_PTR)hOptionMenu, 		L"Options");
+	InsertMenu(hContextMenu, 0, MF_BYPOSITION|MF_POPUP, 
+							(UINT_PTR)hScriptMenu, 		L"Script");
+	InsertMenu(hContextMenu, 0, MF_BYPOSITION|MF_POPUP, 
+							(UINT_PTR)hTermMenu, 		L"Term");
+	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_PASTE,L"Paste");
+	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_COPY, L"Copy");
+
 	WIN32_FIND_DATA FindFileData;
 	HANDLE hFind;
 	iScriptCount = 1;
 	hFind = FindFirstFile(L"*.js", &FindFileData);
 	if (hFind != INVALID_HANDLE_VALUE) {
 		do {
-			InsertMenu( hScriptMenu, 0, MF_BYPOSITION, ID_SCRIPT+iScriptCount++,
+			InsertMenu( hContextMenu, -1, MF_BYPOSITION, ID_SCRIPT+iScriptCount,
+														FindFileData.cFileName);
+			InsertMenu( hScriptMenu, -1, MF_BYPOSITION, ID_SCRIPT+iScriptCount++,
 														FindFileData.cFileName);
 		} while( FindNextFile(hFind, &FindFileData) );
 	}
-
-	hSysMenu = GetSystemMenu(hwnd, FALSE);
-	InsertMenu(hSysMenu, 0, MF_BYPOSITION|MF_SEPARATOR, 0, NULL);
-	InsertMenu(hSysMenu, 0, MF_BYPOSITION, ID_ABOUT, 	L"About");
-	InsertMenu(hSysMenu, 0, MF_BYPOSITION|MF_POPUP, 
-							(UINT_PTR)hServeMenu, 		L"Serve");
-	InsertMenu(hSysMenu, 0, MF_BYPOSITION|MF_POPUP, 
-							(UINT_PTR)hScriptMenu, 		L"Script");
-	InsertMenu(hSysMenu, 0, MF_BYPOSITION|MF_POPUP, 
-							(UINT_PTR)hOptionMenu, 		L"Options");
-	InsertMenu(hSysMenu, 0, MF_BYPOSITION, ID_CONNECT, 	L"Connect...");
-	hContextMenu = CreatePopupMenu();
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION|MF_POPUP, 
-							(UINT_PTR)hScriptMenu, 		L"Script");
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION|MF_POPUP, 
-							(UINT_PTR)hOptionMenu, 		L"Options");
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_SELALL,L"Select all");
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_ERASE,L"Erase all");
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_PASTE,L"Paste");
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_COPY, L"Copy");
+	
 }
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, 
 									LPSTR lpCmdLine, INT nCmdShow)
@@ -888,10 +911,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	hTermFont = CreateFont( 18,0,0,0,FW_MEDIUM, FALSE,FALSE,FALSE,
 						DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
 						DEFAULT_QUALITY, FIXED_PITCH, L"Consolas");
-	hwndMain = CreateWindowEx( WS_EX_LAYERED, L"TWnd", L"tinyTerm",
+	hwndMain = CreateWindowEx( WS_EX_LAYERED, L"TWnd", Title,
 						WS_TILEDWINDOW|WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT,
 						1, 1, NULL, NULL, hInst, NULL );
-	tiny_Sysmenu( hwndMain );
+	tiny_Menu(hwndMain);
+
 	if ( *lpCmdLine==0 ) 
 		PostMessage(hwndMain, WM_SYSCOMMAND, ID_CONNECT, 0);
 	else

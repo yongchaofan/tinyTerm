@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 20335 2018-11-12 21:05:10 $"
+// "$Id: term.c 20378 2018-11-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -369,20 +369,22 @@ void term_Logg( char *fn )
 }
 void term_Srch( char *sstr )
 {
-	char buf[256], *p;
-	int i = screen_y+scroll_y;
-	int l = strlen(sstr)-1;
-	while ( --i>=0 ) {
-		strncpy(buf, buff+line[i], line[i+1]-line[i]+l);
-		if ( (p=strstr( buf, sstr ))!=NULL ) {
-			scroll_y = i-screen_y-size_y/2;
-			p = strstr(buff+line[i], sstr);
-			sel_left = p-buff;
-			sel_right = sel_left+strlen(sstr);
-			tiny_Redraw( FALSE );
+	int l = strlen(sstr);
+	char *p = buff+sel_left;
+	if ( sel_left==sel_right ) p = buff+cursor_x;
+	while ( --p>=buff+l ) {
+		int i;
+		for ( i=l-1; i>=0; i--) 
+			if ( sstr[i]!=p[i-l] ) break;
+		if ( i==-1 ) {
+			sel_left = p-l-buff;
+			sel_right = p-buff;
+			while (line[screen_y+scroll_y]>sel_left ) scroll_y--;
 			break;
 		}
 	}
+	if ( p<buff+l ) sel_left = sel_right = scroll_y = 0;
+	tiny_Redraw();
 }
 unsigned char *vt100_Escape( unsigned char *sz, int cnt ) 
 {
