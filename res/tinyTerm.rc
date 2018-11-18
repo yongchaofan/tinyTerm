@@ -20,9 +20,10 @@
 #include <commctrl.h>
 
 #define IDICON_TL1		128
-#define IDMENU_OPTIONS	130
-#define IDMENU_SCRIPT	131
-#define IDMENU_SERVE	132
+#define IDMENU_TERM		129
+#define IDMENU_SCRIPT	130
+#define IDMENU_OPTIONS	131
+#define IDMENU_CONTEXT	132
 #define IDD_CONNECT     133
 #define IDCONNECT       40000
 #define IDCANCELC       40001
@@ -37,24 +38,28 @@ IDICON_TL1		ICON	"TL1.ico"
 //
 // Menu resources
 //
-IDMENU_OPTIONS MENU
+IDMENU_TERM MENU
 {
-    MENUITEM "Log...\t^L", 76
-    MENUITEM "Echo	\t^E", 69
-    MENUITEM "Font...\t^F", 70
-    MENUITEM "Transparency\t^T", 84
+    MENUITEM "Connect", 		68
+    MENUITEM "Logging...\t^L", 	76
+    MENUITEM "local Echo\t^E", 	69
+    MENUITEM "Select All",		73
+    MENUITEM "Erase All",		74
+    MENUITEM "About",			65
 }
 IDMENU_SCRIPT MENU
 {
+    MENUITEM "Open...\t^O", 	79
+    MENUITEM "Pause\t^P", 		80
+    MENUITEM "Stop\t^S", 		83
     MENUITEM SEPARATOR
-    MENUITEM "Open...\t^O", 79
-    MENUITEM "Pause\t^P", 80
-    MENUITEM "Stop\t^S", 83
 }
-IDMENU_SERVE MENU
+IDMENU_OPTIONS MENU
 {
-    MENUITEM "Ftpd...", 77
-    MENUITEM "Tftpd...", 78
+    MENUITEM "Transparency\t^T",84
+    MENUITEM "Font...\t^F", 	70
+    MENUITEM "Ftpd...", 		77
+    MENUITEM "Tftpd...", 		78
 }
 //
 // Dialog resources
