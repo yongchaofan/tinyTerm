@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 13444 2018-11-11 21:05:10 $"
+// "$Id: host.c 13442 2018-11-11 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
