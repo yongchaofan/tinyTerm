@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 32150 2018-11-15 21:05:10 $"
+// "$Id: tiny.c 32075 2018-11-15 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -72,7 +72,7 @@ const char WELCOME[]="\n\n\n\
 \t    * Command history and autocompletion\n\n\
 \t    * Drag and Drop to run command batches\n\n\
 \t    * Scripting interface xmlhttp://127.0.0.1:%d\n\n\n\
-\tBy yongchaofan@gmail.com		11-18-2018\n\n\
+\tBy yongchaofan@gmail.com		11-20-2018\n\n\
 \thttps://github.com/zoudaokou/tinyTerm\n\n\n";
 
 const COLORREF COLORS[9] ={ RGB(0,0,0), 	RGB(224,0,0), RGB(0,224,0), 
@@ -97,7 +97,7 @@ static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
 void CopyText( );
 void PasteText( );
 void DropFiles( HDROP hDrop );
-void OpenScript( char *fn );
+void OpenScript( WCHAR *fn );
 void DropScript( char *tl1s );
 
 BOOL isUTF8c(char c)
@@ -126,10 +126,9 @@ int stat_utf8(const char *fn, struct _stat *buffer)
 	return _wstat(wfn, buffer);
 }
 
-char * fileDialog( WCHAR *szFilter, DWORD dwFlags )
+WCHAR *fileDialog( WCHAR *szFilter, DWORD dwFlags )
 {
-	static char fname[MAX_PATH];
-	WCHAR wname[MAX_PATH];
+	static WCHAR wname[MAX_PATH];
 	BOOL ret = FALSE;
 	OPENFILENAME ofn;						// common dialog box structure
 
@@ -149,22 +148,19 @@ char * fileDialog( WCHAR *szFilter, DWORD dwFlags )
 		ret = GetSaveFileName(&ofn);
 	else
 		ret = GetOpenFileName(&ofn);
-	if ( ret ) {
-		wchar_to_utf8(wname,wcslen(wname)+1, fname,MAX_PATH);
-		return fname;
-	}
+	if ( ret ) 
+		return wname;
 	else
 		return NULL;
 }
-char *getFolderName(char *title)
+char *getFolderName(WCHAR *wtitle)
 {
 	static BROWSEINFO bi;
 	static char szFolder[MAX_PATH];
 	WCHAR szDispName[MAX_PATH];
 	LPITEMIDLIST pidl;
 
-	WCHAR wtitle[1024], wfolder[MAX_PATH];
-	utf8_to_wchar(title, strlen(title), wtitle, 1024);
+	WCHAR wfolder[MAX_PATH];
 	memset(&bi, 0, sizeof(BROWSEINFO));
 	bi.hwndOwner = 0;
 	bi.pidlRoot = NULL;
@@ -486,9 +482,15 @@ BOOL menu_Command( WPARAM wParam )
 	case ID_ERASE:	term_Clear(); break;
 	case ID_SELALL: sel_left=0; sel_right=cursor_x; tiny_Redraw( ); break;
 	case ID_LOGGING: 
-		if ( !bLogging ) 
-			term_Logg( fileDialog(L"logfile\0*.log\0All\0*.*\0\0",
-				OFN_PATHMUSTEXIST|OFN_NOREADONLYRETURN|OFN_OVERWRITEPROMPT) );
+		if ( !bLogging ) {
+			WCHAR *wfn = fileDialog(L"logfile\0*.log\0All\0*.*\0\0",
+				OFN_PATHMUSTEXIST|OFN_NOREADONLYRETURN|OFN_OVERWRITEPROMPT);
+			if ( wfn!=NULL ) {
+				char fn[MAX_PATH];
+				wchar_to_utf8(wfn, wcslen(wfn)+1, fn, MAX_PATH);
+				term_Logg( fn );
+			}
+		}
 		else
 			term_Logg( NULL ); 
 		check_Option( hTermMenu, ID_LOGGING, bLogging ); 
@@ -505,17 +507,17 @@ BOOL menu_Command( WPARAM wParam )
 		SetLayeredWindowAttributes(hwndMain,0,(bTransparent?224:255),LWA_ALPHA);
 		break;
 	case ID_FTPD:	 
-		bFTPd = ftp_Svr(bFTPd?NULL:getFolderName("Choose root directory")); 
+		bFTPd = ftp_Svr(bFTPd?NULL:getFolderName(L"Choose root directory")); 
 		check_Option( hOptionMenu, ID_FTPD, bFTPd );
 		break;
 	case ID_TFTPD:
-		bTFTPd = tftp_Svr(bTFTPd?NULL:getFolderName("Choose root directory")); 
+		bTFTPd = tftp_Svr(bTFTPd?NULL:getFolderName(L"Choose root directory")); 
 		check_Option( hOptionMenu, ID_TFTPD, bTFTPd );
 		break;
 	case ID_SCOPEN: {
-		char *fn = fileDialog( L"scripts\0*.txt\0All\0*.*\0\0",
+		WCHAR *wfn = fileDialog( L"scripts\0*.js;*.vbs;*.txt\0All\0*.*\0\0",
 								OFN_PATHMUSTEXIST|OFN_FILEMUSTEXIST);
-		if ( fn!=NULL ) OpenScript( fn );
+		if ( wfn!=NULL ) OpenScript( wfn );
 		}
 		break;
 	case ID_SCPAUSE: 
@@ -527,10 +529,9 @@ BOOL menu_Command( WPARAM wParam )
 		break;
 	default:	
 		if ( wParam>ID_SCRIPT && wParam<=ID_SCRIPT+iScriptCount ) { 
-			WCHAR fn[256], port[256];
-			GetMenuString(hScriptMenu, wParam, fn, 255, 0);
-			wsprintf(port, L"%d", httport); 
-			_wspawnlp( _P_NOWAIT, L"WScript.exe",L"WScript.exe",fn,port,NULL );
+			WCHAR wfn[256]=L"script\\";
+			GetMenuString(hScriptMenu, wParam, wfn+7, 248, 0);
+			OpenScript(wfn);
 			break;
 		}
 		return FALSE; 
@@ -837,12 +838,10 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 }
 void tiny_Menu( HWND hwnd )
 {
-	iTitleHeight = GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CYCAPTION) +
-    				GetSystemMetrics(SM_CXPADDEDBORDER);
+	iTitleHeight = 	 GetSystemMetrics(SM_CYFRAME)
+					+GetSystemMetrics(SM_CYCAPTION)
+					+GetSystemMetrics(SM_CXPADDEDBORDER);
 	HDC wndDC = GetWindowDC(hwnd);
-//	NONCLIENTMETRICS ncmetrics;
-//	SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &ncmetrics, 0);
-//	SelectObject(wndDC, CreateFontIndirect(&(ncmetrics.lfCaptionFont)));
 	RECT menuRect;
 	DrawText(wndDC, L"   Term   ", 10, &menuRect, DT_CALCRECT);
 	menuX[1] = menuX[0]+menuRect.right-menuRect.left;
@@ -868,13 +867,12 @@ void tiny_Menu( HWND hwnd )
 	WIN32_FIND_DATA FindFileData;
 	HANDLE hFind;
 	iScriptCount = 1;
-	hFind = FindFirstFile(L"*.js", &FindFileData);
+	hFind = FindFirstFile(L"script\\*.*", &FindFileData);
 	if (hFind != INVALID_HANDLE_VALUE) {
 		do {
-			InsertMenu( hContextMenu, -1, MF_BYPOSITION, ID_SCRIPT+iScriptCount,
-														FindFileData.cFileName);
-			InsertMenu( hScriptMenu, -1, MF_BYPOSITION, ID_SCRIPT+iScriptCount++,
-														FindFileData.cFileName);
+			if ( FindFileData.cFileName[0]!=L'.' )
+				InsertMenu( hScriptMenu, -1, MF_BYPOSITION,
+							ID_SCRIPT+iScriptCount++, FindFileData.cFileName);
 		} while( FindNextFile(hFind, &FindFileData) );
 	}
 	
@@ -1080,13 +1078,21 @@ void DropScript( char *tl1s )
 		free(tl1s);
 	}
 }
-void OpenScript( char *fn )
+void OpenScript( WCHAR *wfn )
 {
+	int len = wcslen(wfn);
+	if ( wcscmp(wfn+len-3, L".js")==0 || wcscmp(wfn+len-4, L".vbs")==0 ) {
+		WCHAR port[256];
+		wsprintf(port, L"%d", httport); 
+		_wspawnlp( _P_NOWAIT, L"WScript.exe", L"WScript.exe", wfn, port, NULL );
+		return;
+	}
+	
 	struct _stat sb;
-	if ( stat_utf8(fn, &sb)==0 ) {
+	if ( _wstat(wfn, &sb)==0 ) {
 		char *tl1s = (char *)malloc(sb.st_size+1);
 		if ( tl1s!=NULL ) {
-			FILE *fpScript = fopen_utf8( fn, MODE_RB );
+			FILE *fpScript = _wfopen( wfn, L"rb" );
 			if ( fpScript != NULL ) {
 				int lsize = fread( tl1s, 1, sb.st_size, fpScript );
 				fclose( fpScript );
