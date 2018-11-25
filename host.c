@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 13444 2018-11-11 21:05:10 $"
+// "$Id: host.c 13441 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -52,12 +52,21 @@ void host_Open( char *port )
 {
 static char Port[256];
 
-	LPTHREAD_START_ROUTINE reader = serial;
-	if ( strncmp(port, "telnet", 6)==0 ) { port+=7; reader = telnet; }
-	if ( strncmp(port, "ssh", 3)==0 )	 { port+=4; reader = ssh; }
-	if ( strncmp(port, "sftp", 4)==0 )	 { port+=5; reader = sftp; }
-	if ( strncmp(port, "netconf", 7)==0 ){ port+=8; reader = netconf; }
-	if ( *port=='!' ) { port++; reader = stdio; }
+	LPTHREAD_START_ROUTINE reader = stdio;
+	if ( strnicmp(port, "com",3)==0 ) reader = serial;
+	else if ( strncmp(port, "telnet", 6)==0 ) { 
+		port+=7; reader = telnet;
+	}
+	else if ( strncmp(port, "ssh", 3)==0 ) { 
+		port+=4; reader = ssh;
+	}
+	else if ( strncmp(port, "sftp", 4)==0 ){
+		port+=5; reader = sftp;
+	}
+	else if ( strncmp(port, "netconf", 7)==0 ) {
+		port+=8; reader = netconf;
+	}
+
 	if ( hReaderThread==NULL ) {
 		strncpy(Port, port, 255); Port[255]=0;
 		host_status=CONN_CONNECTING;
@@ -70,7 +79,8 @@ void host_Send( char *buf, int len )
 	DWORD dwWrite;
 	switch ( host_type ) {
 	case STDIO: WriteFile(hStdioWrite, buf, len, &dwWrite, NULL); break;
-	case SERIAL:WriteFile(hSerial, buf, len, &dwWrite, NULL); break;
+	case SERIAL:WriteFile(hSerial, buf, len, &dwWrite, NULL); 
+				break;
 	case TELNET:send( sock, buf, len, 0); break;
 	case SSH:
 	case SFTP:
@@ -110,7 +120,6 @@ void host_Destory()
 /***************************Serial*****************************/
 DWORD WINAPI serial(void *pv)
 {
-	BOOL bConnected = TRUE;
 	char port[256] = "\\\\.\\";
 	strcat( port, (char *)pv );
 
@@ -120,55 +129,57 @@ DWORD WINAPI serial(void *pv)
 
 	hSerial = CreateFileA( port, GENERIC_READ|GENERIC_WRITE, 0, NULL,
 												OPEN_EXISTING, 0, NULL);
-	bConnected = (hSerial!=INVALID_HANDLE_VALUE);
-	if ( !bConnected ) {				//timeout and buffer settings
-		COMMTIMEOUTS timeouts ={10,		//ReadIntervalTimeout = 10
-								 0,		//ReadTotalTimeoutMultiplier = 0
-								 1,		//ReadTotalTimeoutConstant = 1
-								 0,		//WriteTotalTimeoutMultiplier = 0
-								 0 };	//WriteTotalTimeoutConstant = 0
-		bConnected = (SetCommTimeouts(hSerial,&timeouts)!=0); 
-		if ( bConnected )
-			SetupComm( hSerial, 4096, 1024 );	//comm buffer sizes
-		else
-			term_Disp("couldn't set comm timeout\r\n");
+	if ( hSerial==INVALID_HANDLE_VALUE ) {
+		term_Disp("Couldn't open comm port\n");
+		goto comm_close;
 	}
-	else
-		term_Disp("Couldn't open COM port\r\n");
-	
-	if ( bConnected ) {
-		DCB dcb;							// comm port settings
-		memset(&dcb, 0, sizeof(dcb));
-		dcb.DCBlength = sizeof(dcb);
-		BuildCommDCBA(p, &dcb);
-		bConnected = (SetCommState(hSerial, &dcb)!=0);
-		if ( !bConnected ) 
-			term_Disp("Invalid comm port settings\r\n" );
+	COMMTIMEOUTS timeouts = { 1, 0, 1, 0, 0 };	
+							//ReadIntervalTimeout = 10
+							//ReadTotalTimeoutMultiplier = 0
+							//ReadTotalTimeoutConstant = 1
+							//WriteTotalTimeoutMultiplier = 0
+							//WriteTotalTimeoutConstant = 0
+	if ( SetCommTimeouts(hSerial,&timeouts)==0 ) {
+		term_Disp("couldn't set comm timeout\n");
+		CloseHandle(hSerial);
+		goto comm_close; 
 	}
+	SetupComm( hSerial, 4096, 1024 );	//comm buffer sizes
 	
-	if ( bConnected ) {
-		host_status=CONN_CONNECTED;
-		host_type = SERIAL;
-		tiny_Title( (char *)pv );
-		hExitEvent = CreateEventA( NULL, TRUE, FALSE, "COM exit" );
-		while ( WaitForSingleObject( hExitEvent, 0 ) == WAIT_TIMEOUT ) { 
-			char buf[256];
-			DWORD dwCCH;
-			if ( ReadFile(hSerial, buf, 255, &dwCCH, NULL) ) {
-				if ( dwCCH > 0 ) {
-					buf[dwCCH] = 0;
-					term_Parse( buf, dwCCH );
-				}
-			}
-			else
-				if ( !ClearCommError(hSerial, NULL, NULL ) ) break;
-		}
-		CloseHandle(hExitEvent);
-		tiny_Title("");
-		host_type = 0;
+	DCB dcb;							// comm port settings
+	memset(&dcb, 0, sizeof(dcb));
+	dcb.DCBlength = sizeof(dcb);
+	BuildCommDCBA(p, &dcb);
+	if ( SetCommState(hSerial, &dcb)==0 ) {
+		term_Disp("Invalid comm port settings\n" );
+		CloseHandle(hSerial);
+		goto comm_close;
 	}
 
+	host_status=CONN_CONNECTED;
+	host_type = SERIAL;
+	tiny_Title( (char *)pv );
+	hExitEvent = CreateEventA( NULL, TRUE, FALSE, "COM exit" );
+	while ( WaitForSingleObject( hExitEvent, 0 ) == WAIT_TIMEOUT ) { 
+		char buf[256];
+		DWORD dwCCH;
+		if ( ReadFile(hSerial, buf, 255, &dwCCH, NULL) ) {
+			if ( dwCCH > 0 ) {
+				buf[dwCCH] = 0;
+				term_Parse( buf, dwCCH );
+			}
+			else 
+				Sleep(1);//give WriteFile a chance to complete
+		}
+		else
+			if ( !ClearCommError(hSerial, NULL, NULL ) ) break;
+	}
+	CloseHandle(hExitEvent);
+	tiny_Title("");
+	host_type = 0;
 	CloseHandle(hSerial);
+
+comm_close:
 	host_status=CONN_IDLE;
 	hReaderThread = NULL;
 	return 1;
@@ -341,8 +352,12 @@ DWORD WINAPI stdio( void *pv)
 	DWORD dwCCH;
 	char buf[1536];
 	while ( ReadFile( hStdioRead, buf, 1500, &dwCCH, NULL) > 0 ) {
-		buf[dwCCH] = 0;
-		if ( dwCCH > 0 ) term_Parse( buf, dwCCH ); 
+		if ( dwCCH > 0 ) {
+			buf[dwCCH] = 0;
+			term_Parse( buf, dwCCH ); 
+		}
+		else
+			Sleep(1);
 	}
 	tiny_Title("");
 	host_type = 0;
@@ -378,7 +393,7 @@ DWORD WINAPI *httpd( void *pv )
 	SOCKET http_s1, http_s0 = *(SOCKET *)pv;
 
 	while ( (http_s1=accept(http_s0, (struct sockaddr*)&cltaddr, &addrsize))!= INVALID_SOCKET ) {
-		cmd_Disp( "xmlhttp connected" );
+		cmd_Disp_utf8( "xmlhttp connected" );
 		cmdlen=recv(http_s1,buf,1023,0);
 		while ( cmdlen>4 ) {
 			buf[cmdlen] = 0;
@@ -386,7 +401,6 @@ DWORD WINAPI *httpd( void *pv )
 				FD_SET readset;
 				struct timeval tv = { 0, 300 };	//tv_sec=0, tv_usec=300
 
-				cmd_Disp(buf);
 				replen = term_TL1( buf, &reply );
 				send( http_s1, reply, replen, 0 );
 
@@ -412,7 +426,6 @@ DWORD WINAPI *httpd( void *pv )
 					}
 				}
 				replen = 0;
-				cmd_Disp(cmd);
 				if ( *cmd=='?' ) {
 					replen = tiny_Cmd( cmd+1, &reply );
 					int len = sprintf( buf, HEADER, replen );
@@ -422,7 +435,7 @@ DWORD WINAPI *httpd( void *pv )
 			}
 			cmdlen = recv( http_s1, buf, 1023, 0 );
 		}
-		cmd_Disp( "xmlhttp disconnected" );
+		cmd_Disp_utf8( "xmlhttp disconnected" );
 		closesocket(http_s1);
 	}
 	return 0;

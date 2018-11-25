@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 20378 2018-11-12 21:05:10 $"
+// "$Id: term.c 20972 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -29,7 +29,7 @@ int sel_left, sel_right;
 BOOL bLogging, bCursor, bEcho;
 
 static BOOL bPrompt=FALSE, bEnter=FALSE, bEnter1=FALSE;
-static char sPrompt[16]=";\n> ", *tl1text = NULL;
+static char sPrompt[32]=";\n> ", *tl1text = NULL;
 static int  iPrompt=4, iTimeOut=30, tl1len = 0;
 static HANDLE hTL1Event;	//for term_TL1 reader
 
@@ -109,8 +109,9 @@ void term_Scroll(int lines)
 	if ( scroll_y>0 ) scroll_y = 0;
 	tiny_Redraw( );
 }
-void term_Keydown(DWORD key)
+int term_Keydown(DWORD key)
 {		
+	int rc = 1;
 	switch( key ) {
 	case VK_PRIOR:  term_Scroll(size_y-1); break;
 	case VK_NEXT:   term_Scroll(1-size_y); break; 
@@ -119,9 +120,11 @@ void term_Keydown(DWORD key)
 	case VK_RIGHT: 	term_Send(bAppCursor?"\033OC":"\033[C",3); break;
 	case VK_LEFT:  	term_Send(bAppCursor?"\033OD":"\033[D",3); break;
 	case VK_DELETE:	term_Send("\177",1); break;
-	case VK_RETURN:	bEnter = TRUE; break;
+	case VK_RETURN:	bEnter = TRUE; rc = 1; break;
 	default:	if ( bEnter ) {	bEnter = FALSE;	bEnter1 = TRUE; }
+				rc = 1;
 	}
+	return rc;
 }
 void term_Parse( char *buf, int len )
 {
@@ -267,11 +270,6 @@ int term_Recv( char **pTL1text )
 	tl1text = buff+cursor_x;
 	return len;
 }
-int term_Selection(char **pSelText)
-{
-	if ( pSelText!=NULL ) *pSelText = buff+sel_left;
-	return sel_right-sel_left;
-}
 char *term_Mark_Prompt()
 {
 	bPrompt = FALSE; 
@@ -322,48 +320,60 @@ int term_TL1( char *cmd, char **pTl1Text )
 	if ( pTl1Text!=NULL ) *pTl1Text = tl1text;
 	return tl1len;
 }
-void term_Timeout( char *cmd )
+int term_Cmd( char *cmd, char **preply )
 {
-	iTimeOut = atoi( cmd+8 );
-}
-void term_Waitfor( char *cmd )
-{
-	for ( int i=iTimeOut; i>0; i-- ) {
-		buff[cursor_x] = 0;
-		if ( strstr(tl1text, cmd+8)!=NULL ) return;
-		Sleep(1000);
+	int rc = 0;
+	if ( strncmp(cmd, "Clear",5)==0 ) 	term_Clear();
+	else if ( strncmp(cmd, "Log", 3)==0 ) 	term_Logg( cmd+3 ); 
+	else if ( strncmp(cmd, "Disp ",5)==0 )  term_Disp(cmd+5);
+	else if ( strncmp(cmd, "Recv" ,4)==0 )  rc=term_Recv(preply);
+	else if ( strncmp(cmd, "Send ",5)==0 )  term_Send(cmd+5,strlen(cmd+5));
+	else if ( strncmp(cmd, "Timeout",7)==0 )iTimeOut = atoi( cmd+8 );
+	else if ( strncmp(cmd,"Selection",9)==0) {
+		if ( preply!=NULL ) *preply = buff+sel_left;
+		rc = sel_right-sel_left;
 	}
-}
-void term_Prompt( char *cmd )
-{
-	char *p=cmd, *p1 = sPrompt;
-	while ( *p ) {
-		if ( *p=='%' && isdigit(p[1]) ) {
-			int a;
-			sscanf(p+1, "%02x", &a);
-			*p1++ = a;
-			p+=3;
+	else if ( strncmp(cmd, "Waitfor",7)==0) {
+		for ( int i=iTimeOut; i>0; i-- ) {
+			buff[cursor_x] = 0;
+			if ( strstr(tl1text, cmd+8)!=NULL ) {
+				if ( preply!=NULL ) *preply = tl1text;
+				rc = buff+cursor_x-tl1text;
+				break;
+			}
+			Sleep(1000);
 		}
-		else 
-			*p1++ = *p++;
 	}
-	*p1 = 0;
-	iPrompt = strlen(sPrompt);
+	else if ( strncmp(cmd, "Prompt ",7)==0 ) {
+		char *p=cmd+7, *p1 = sPrompt;
+		while ( *p && p1-sPrompt<31) {
+			if ( *p=='%' && isdigit(p[1]) ) {
+				int a;
+				sscanf(p+1, "%02x", &a);
+				*p1++ = a;
+				p+=3;
+			}
+			else 
+				*p1++ = *p++;
+		}
+		*p1 = 0;
+		iPrompt = p1-sPrompt;
+	}
+	return rc;
 }
 void term_Logg( char *fn )
 {
-	char buf[256];
 	if ( bLogging ) {
 		fclose( fpLogFile );
 		bLogging = FALSE;
-		cmd_Disp("Log file closed");
+		term_Print("\033[33m\n%s logging stopped\n", fn);
 	}
 	else if ( fn!=NULL ) {
+		if ( *fn==' ' ) fn++;
 		fpLogFile = fopen_utf8( fn, MODE_WB );
 		if ( fpLogFile != NULL ) {
 			bLogging = TRUE;
-			sprintf( buf, "%s opened for logging", fn);
-			cmd_Disp( buf);
+			term_Print("\033[33m\n%s logging started\n", fn);
 		}
 	}
 }

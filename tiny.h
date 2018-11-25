@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 3312 2018-11-11 21:05:10 $"
+// "$Id: tiny.h 3254 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -29,8 +29,8 @@
 #define CONN_CONNECTED		4
 
 #define STDIO  	1
-#define TELNET 	2
-#define SERIAL 	3
+#define SERIAL 	2
+#define TELNET 	3
 #define SSH		4
 #define SFTP	5
 #define NETCONF	6
@@ -50,8 +50,8 @@ void drop_Destroy( HWND hwnd );
 int autocomplete_Init( HWND hWnd );
 int autocomplete_Add( LPCTSTR cmd );
 int autocomplete_Destroy( );
-char *autocomplete_Prev( );
-char *autocomplete_Next( );
+WCHAR *autocomplete_Prev( );
+WCHAR *autocomplete_Next( );
 
 /****************host.c****************/
 int host_Init( );
@@ -92,24 +92,23 @@ void term_Parse( char *buf, int len );
 void term_Parse_XML( char *xml, int len );
 void term_Print( const char *fmt, ... );
 void term_Scroll(int lines);
-void term_Keydown(DWORD key);
-void term_Timeout( char *cmd );
+int term_Keydown(DWORD key);
 void term_Prompt( char *cmd );
 void term_Waitfor( char *cmd );
 void term_Logg( char *fn );
 void term_Srch( char *sstr );
 void term_Disp( char *buf );
 void term_Send( char *buf, int len );
-int term_Recv( char **pTL1Text );		//get new text since last Disp/Send/Recv
-int term_Selection( char **pSelText );	//get current selected text
-int term_TL1( char *cmd, char **pTL1Text);
+int term_Recv( char **preply );		//get new text since last Disp/Send/Recv
+int term_Cmd( char *cmd, char **preply );
+int term_TL1( char *cmd, char **preply);
 char *term_Mark_Prompt();
 int term_Waitfor_Prompt();
 
 /****************tiny.c****************/
 int tiny_Cmd( char *cmd, char **preply );
-void cmd_Disp( char *buf );
 void tiny_Beep();
 void tiny_Redraw();
 void tiny_Connecting();
 void tiny_Title( char *buf );
+void cmd_Disp_utf8(char *buf);

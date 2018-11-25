@@ -1,5 +1,5 @@
 //
-// "$Id: ftpd.c 14493 2018-11-12 21:05:10 $"
+// "$Id: ftpd.c 14496 2018-11-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -354,7 +354,7 @@ BOOL ftp_Svr(char *root)
 				}
 			}
 			else 
-				cmd_Disp("Couldn't bind to FTP port");
+				term_Disp("Couldn't bind to FTP port\n");
 		}
 	}
 	return FALSE;

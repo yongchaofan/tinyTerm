@@ -1,0 +1,11 @@
+#Prompt %20$%20
+#Clear
+#Log test.log
+ls -al
+#Wait 3
+traceroute wikipedia.com
+#Timeout 60
+#Waitfor ls -la
+ test.log
+#Log
+#Loop 2

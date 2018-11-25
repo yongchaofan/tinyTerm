@@ -1,0 +1,23 @@
+!com3:9600,n,8,1
+!telnet 192.168.1.1
+!ssh 192.168.12.3
+!sftp -l admin -pw password 192.168.1.1
+!netconf -P 830 192.168.1.1
+
+#Clear
+#Log test.log
+#Prompt $%20
+#Timeout 30
+#Wait 10
+#Waitfor 100%
+#Disp test case #1
+#Send ping 192.168.1.1
+#Recv 
+#Selection
+#Ftpd c:/tmp
+#Tftpd c:/tmp
+#scp test.txt :test.txt
+#scp ./test/test1.txt d:/ 
+#tun 127.0.0.1:2222 127.0.0.1:22
+#tun 3256
+#tun

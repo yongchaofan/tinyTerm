@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 38395 2018-11-12 21:05:10 $"
+// "$Id: ssh2.c 38371 2018-11-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -252,7 +252,7 @@ int ssh_authentication(char *username, char *password, char *passphrase)
 {
 	char user[256], pass[256];
 	if ( username==NULL ) {
-		term_Disp("\r\nusername:");
+		term_Disp("\nusername:");
 		ssh2_Gets(user, FALSE, 30);
 		username = user;
 	}
@@ -272,7 +272,7 @@ int ssh_authentication(char *username, char *password, char *passphrase)
 	}
 	for ( int rep=0; rep<3; rep++ ) {			
 		if ( password==NULL ) {
-			term_Disp("\r\npassword:");
+			term_Disp("\npassword:");
 			ssh2_Gets(pass, TRUE, 30);
 			password = pass;
 		}
@@ -380,17 +380,17 @@ int scp_read_one(const char *rpath, const char *lpath)
 		if (!scp_channel) {
 			if ( err_no==LIBSSH2_ERROR_EAGAIN) 
 				if ( ssh_wait_socket()>0 ) continue;
-			term_Print("\r\n\033[31mSCP: couldn't open \033[32m%s",rpath);
+			term_Print("\n\033[31mSCP: couldn't open \033[32m%s",rpath);
 			return -1;
 		}
 	} while (!scp_channel);
 
 	FILE *fp = fopen_utf8(lpath, MODE_WB);
 	if ( fp==NULL ) {
-		term_Print("\r\n\033[31mSCP: couldn't write to \033[32m%s", lpath);
+		term_Print("\n\033[31mSCP: couldn't write to \033[32m%s", lpath);
 		goto Close;
 	}
-	term_Print("\r\n\033[32mSCP: %s\t ", lpath);
+	term_Print("\n\033[32mSCP: %s\t ", lpath);
 
 	time_t start = time(NULL);
 	libssh2_struct_stat_size got = 0;
@@ -435,7 +435,7 @@ int scp_write_one(const char *lpath, const char *rpath)
 	struct _stat fileinfo;
 	FILE *fp =fopen_utf8(lpath, MODE_RB);
 	if ( !fp ) {
-		term_Print("\r\n\033[31mSCP: couldn't read from \033[32m%s", lpath);
+		term_Print("\n\033[31mSCP: couldn't read from \033[32m%s", lpath);
 		return -1;
 	}
 	stat_utf8(lpath, &fileinfo);
@@ -450,13 +450,13 @@ int scp_write_one(const char *lpath, const char *rpath)
 		if ( !scp_channel ) {
 			if ( err_no==LIBSSH2_ERROR_EAGAIN ) 
 				if ( ssh_wait_socket()>0 ) continue;
-			term_Print("\r\n\033[31mSCP: couldn't create \033[32m%s",rpath);
+			term_Print("\n\033[31mSCP: couldn't create \033[32m%s",rpath);
 			fclose(fp);
 			return -2;
 		}
 	} while ( !scp_channel );
  
-	term_Print("\r\n\033[32mSCP: %s\t", rpath);
+	term_Print("\n\033[32mSCP: %s\t", rpath);
 	time_t start = time(NULL);
 	size_t nread = 0, total = 0;
 	int rc, nmeg = 0;
@@ -629,7 +629,7 @@ char *scp_write( char *lpath, char *rpath )
 		}
 
 		if ( (dir=opendir(ldir) ) == NULL ){
-			term_Print("\r\n\033[31mSCP: couldn't open \033[32m%s\n", ldir);
+			term_Print("\n\033[31mSCP: couldn't open \033[32m%s\n", ldir);
 			return 0;
 		}
 		while ( (dp=readdir(dir)) != NULL ) {
@@ -693,7 +693,7 @@ struct Tunnel *tun_add( int tun_sock, LIBSSH2_CHANNEL *tun_channel,
 			tunnel_list = tun;
 			ReleaseMutex(mtx_tun);
 		}
-		term_Print("\r\n\033[32mtunnel %d %s:%d %s:%d\n", tun_sock,
+		term_Print("\n\033[32mtunnel %d %s:%d %s:%d\n", tun_sock,
 							localip, localport, remoteip, remoteport);
 	}
 	return tun;
@@ -712,7 +712,7 @@ void tun_del(int tun_sock)
 				else 
 					tunnel_list = tun->next;
 				free(tun);
-				term_Print("\r\n\033[32mtunnel %d closed\n", tun_sock);
+				term_Print("\n\033[32mtunnel %d closed\n", tun_sock);
 				break;
 			}
 			tun_pre = tun;
@@ -757,7 +757,7 @@ DWORD WINAPI tun_worker( void *pv )
 		rc = select(tun_sock+1, &fds, NULL, NULL, &tv);
 		if ( rc==0 ) continue;
 		if ( rc==-1 ) {
-			term_Print("\r\n\033[31mselect error\n");
+			term_Print("\n\033[31mselect error\n");
 			break;
 		}
 		if ( FD_ISSET(tun_sock, &fds) ) {

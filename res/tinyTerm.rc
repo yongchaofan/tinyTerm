@@ -1,5 +1,5 @@
 //
-// "$Id: tinyTerm.rc 2800 2018-11-15 21:05:10 $"
+// "$Id: tinyTerm.rc 3046 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -18,53 +18,54 @@
 //
 #include <windows.h>
 #include <commctrl.h>
+#include "resource.h"
 
-#define IDICON_TL1		128
-#define IDMENU_TERM		129
-#define IDMENU_SCRIPT	130
-#define IDMENU_OPTIONS	131
-#define IDMENU_CONTEXT	132
-#define IDD_CONNECT     133
-#define IDCONNECT       40000
-#define IDCANCELC       40001
-#define IDSTATIC		40002
-#define IDPROTO			40003
-#define IDPORT			40004
-#define IDHOST			40005
-//
-// Icon resources
-//
-IDICON_TL1		ICON	"TL1.ico"
-//
-// Menu resources
-//
-IDMENU_TERM MENU
+IDICON_TL1	ICON	"TL1.ico"
+
+IDMENU_MAIN MENU
 {
-    MENUITEM "Connect", 		68
-    MENUITEM "Logging...\t^L", 	76
-    MENUITEM "local Echo\t^E", 	69
-    MENUITEM "Select All",		73
-    MENUITEM "Erase All",		74
-    MENUITEM "About",			65
+	POPUP "&Term" 
+	{
+		MENUITEM "&Connect\tAlt+C", 	ID_CONNECT
+		MENUITEM "&Logging...\tAlt+L", 	ID_LOGGING
+		MENUITEM "Copy &All\tAlt+A",	ID_COPYALL
+		MENUITEM "local echo", 			ID_ECHO
+		MENUITEM "About",				ID_ABOUT
+		MENUITEM SEPARATOR
+	}
+	POPUP "&Script"
+	{
+		MENUITEM "&Run...\tAlt+R", 		ID_SCRUN
+		MENUITEM "&Pause\tAlt+P", 		ID_SCPAUSE
+		MENUITEM "&Quit\tAlt+Q", 		ID_SCQUIT
+		MENUITEM SEPARATOR
+	}
+	POPUP "&Options"
+	{
+		MENUITEM "&Font...",			ID_FONT
+		MENUITEM "Ftpd...", 			ID_FTPD
+		MENUITEM "Tftpd...", 			ID_TFTPD
+		MENUITEM "Load Dict...",		ID_LOADDICT
+		MENUITEM "Save Dict...", 		ID_SAVEDICT
+		MENUITEM "&Transparency",		ID_TRANSPARENT
+	}
 }
-IDMENU_SCRIPT MENU
+IDACCEL_MAIN ACCELERATORS
 {
-    MENUITEM "Open...\t^O", 	79
-    MENUITEM "Pause\t^P", 		80
-    MENUITEM "Stop\t^S", 		83
-    MENUITEM SEPARATOR
-}
-IDMENU_OPTIONS MENU
-{
-    MENUITEM "Transparency\t^T",84
-    MENUITEM "Font...\t^F", 	70
-    MENUITEM "Ftpd...", 		77
-    MENUITEM "Tftpd...", 		78
-}
-//
-// Dialog resources
-//
-IDD_CONNECT DIALOG 40, 30, 130, 90
+  "a",	ID_COPYALL,	ALT
+  "b", 	ID_EDITOR, 	ALT
+  "c",	ID_CONNECT, ALT
+  "d",	ID_DISCONN, ALT
+  "l",	ID_LOGGING, ALT
+  "r",	ID_SCRUN,	ALT
+  "p", 	ID_SCPAUSE, ALT
+  "q",	ID_SCQUIT,	ALT
+  "o",	ID_OPTIONS, ALT
+  "s", 	ID_SCRIPT, 	ALT
+  "t", 	ID_TERM, 	ALT
+ }
+
+IDD_CONNECT DIALOG 90, 60, 130, 90	// Connection Dialog
 CAPTION "Connect Dialog"
 FONT 10, "Ms Shell Dlg"
 {
@@ -77,10 +78,8 @@ FONT 10, "Ms Shell Dlg"
     DEFPUSHBUTTON "Connect", IDCONNECT, 70, 70, 40, 12, 0, WS_EX_LEFT
     PUSHBUTTON    "Cancel",  IDCANCELC, 20, 70, 40, 12, 0, WS_EX_LEFT
 }
-//
-// Version Information resources
-//
-1 VERSIONINFO
+
+1 VERSIONINFO						// Version Information
     FILEVERSION     1,0,0,0
     PRODUCTVERSION  1,0,0,0
     FILEOS          VOS__WINDOWS32
@@ -104,7 +103,4 @@ FONT 10, "Ms Shell Dlg"
         VALUE "Translation", 0x0409, 0x04B0
     }
 }
-//
-// Manifest resources
-//
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST    "tiny.manifest"

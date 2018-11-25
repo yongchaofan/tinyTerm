@@ -1,5 +1,5 @@
 //
-// "$Id: auto_drop.c 19928 2018-09-15 21:05:10 $"
+// "$Id: auto_drop.c 20023 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -173,13 +173,17 @@ int CAutoEnumString_AddString(CAutoEnumString* this, LPOLESTR lpszStr)
 }
 LPOLESTR CAutoEnumString_prevString(CAutoEnumString* this)
 {
-    if ( this->m_rtrvCur>0 ) this->m_rtrvCur--;
-    return this->m_arString[this->m_rtrvCur];
+    if ( this->m_rtrvCur > 0 ) 
+		return this->m_arString[--this->m_rtrvCur];
+	else
+		return L"";
 }
 LPOLESTR CAutoEnumString_nextString(CAutoEnumString* this)
 {
-    if ( ++this->m_rtrvCur==this->m_addCur ) this->m_rtrvCur--;
-    return this->m_arString[this->m_rtrvCur];
+    if ( this->m_rtrvCur < this->m_addCur-1 ) 
+		return this->m_arString[++this->m_rtrvCur];
+	else
+		return L"";
 }
 /************************************************************************
 	AutoComplete implementation
@@ -197,19 +201,24 @@ void autocomplete_Init(HWND hwndCmd)
 		&IID_IAutoComplete,(LPVOID *) &pauto );
 
 	if ( pauto ) {
-		pauto->lpVtbl->QueryInterface(pauto, &IID_IAutoComplete2, (PVOID*)&pauto2);
+		pauto->lpVtbl->QueryInterface(pauto, &IID_IAutoComplete2, 
+															(PVOID*)&pauto2);
 		if ( pauto2 ) {
 			pauto2->lpVtbl->SetOptions(pauto2, ACO_AUTOSUGGEST|ACO_AUTOAPPEND );
 			pauto2->lpVtbl->Release(pauto2);
 		}
 		CAutoEnumString_Construct( &cmdHistory );
-		cmdHistory.lpVtbl->QueryInterface((IEnumString *)&cmdHistory, &IID_IEnumString, (PVOID*)&penum);
-		if ( penum ) pauto->lpVtbl->Init(pauto, m_hwnd, (IUnknown *)penum, NULL, NULL);
+		cmdHistory.lpVtbl->QueryInterface((IEnumString *)&cmdHistory, 
+											&IID_IEnumString, (PVOID*)&penum);
+		if ( penum ) 
+			pauto->lpVtbl->Init(pauto, m_hwnd, (IUnknown *)penum, NULL, NULL);
 	}
 }
 int autocomplete_Add(LPOLESTR cmd)
 {
-	return ( pauto && penum ) ? CAutoEnumString_AddString(&cmdHistory, cmd) : 0;
+	if ( cmd==NULL || pauto==NULL || penum==NULL ) return 0;
+	if ( *cmd==0 ) return 0;
+	return CAutoEnumString_AddString(&cmdHistory, cmd);
 }
 LPOLESTR autocomplete_Prev( void )
 {
