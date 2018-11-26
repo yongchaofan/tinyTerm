@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 20972 2018-11-25 21:05:10 $"
+// "$Id: term.c 21085 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -22,15 +22,15 @@
 
 char buff[BUFFERSIZE], attr[BUFFERSIZE], c_attr;
 int line[MAXLINES];
-int size_x, size_y;
+int size_x=TERMCOLS, size_y=TERMLINES;
 int cursor_x, cursor_y;
 int screen_y, scroll_y;
 int sel_left, sel_right;
-BOOL bLogging, bCursor, bEcho;
+BOOL bLogging=FALSE, bEcho=FALSE, bCursor;
 
 static BOOL bPrompt=FALSE, bEnter=FALSE, bEnter1=FALSE;
-static char sPrompt[32]=";\n> ", *tl1text = NULL;
-static int  iPrompt=4, iTimeOut=30, tl1len = 0;
+static char sPrompt[32]=";\n> ", *tl1text=NULL;
+static int  iPrompt=4, iTimeOut=30, tl1len=0;
 static HANDLE hTL1Event;	//for term_TL1 reader
 
 static FILE *fpLogFile;
@@ -43,11 +43,7 @@ unsigned char * vt100_Escape( unsigned char *sz, int cnt );
 
 void term_Init( )
 {
-	hTL1Event = CreateEvent( NULL, TRUE, FALSE, TEXT("TL1") );
-	size_y = TERMLINES;
-	size_x = TERMCOLS;
-	bLogging = FALSE;
-	bEcho = FALSE;
+	hTL1Event = CreateEventA( NULL, TRUE, FALSE, "TL1" );
 	term_Clear( );
 }
 void term_Clear( )
@@ -66,7 +62,7 @@ void term_Clear( )
 	bInsert = FALSE;
 	bTitle = FALSE;
 	bCursor = TRUE;
-	tiny_Redraw( FALSE );
+	tiny_Redraw();
 }
 void term_Size()
 {
@@ -107,7 +103,7 @@ void term_Scroll(int lines)
 	scroll_y -= lines;
 	if ( scroll_y<-screen_y ) scroll_y = -screen_y;
 	if ( scroll_y>0 ) scroll_y = 0;
-	tiny_Redraw( );
+	tiny_Redraw();
 }
 int term_Keydown(DWORD key)
 {		
@@ -263,6 +259,12 @@ void term_Send( char *buf, int len )
 	if ( bEcho ) term_Parse( buf, len );
 	host_Send( buf, len );
 }
+BOOL term_Echo()
+{
+	bEcho=!bEcho;
+	term_Print("\n\033[32mEcho %s\n", bEcho?"On":"Off");
+	return bEcho;
+}
 int term_Recv( char **pTL1text ) 
 {
 	if ( pTL1text!=NULL ) *pTL1text = tl1text;
@@ -328,6 +330,7 @@ int term_Cmd( char *cmd, char **preply )
 	else if ( strncmp(cmd, "Disp ",5)==0 )  term_Disp(cmd+5);
 	else if ( strncmp(cmd, "Recv" ,4)==0 )  rc=term_Recv(preply);
 	else if ( strncmp(cmd, "Send ",5)==0 )  term_Send(cmd+5,strlen(cmd+5));
+	else if ( strncmp(cmd, "Echo", 4)==0 )  rc = term_Echo() ? 1 : 0;
 	else if ( strncmp(cmd, "Timeout",7)==0 )iTimeOut = atoi( cmd+8 );
 	else if ( strncmp(cmd,"Selection",9)==0) {
 		if ( preply!=NULL ) *preply = buff+sel_left;

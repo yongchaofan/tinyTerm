@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 38371 2018-11-12 21:05:10 $"
+// "$Id: ssh2.c 38371 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //

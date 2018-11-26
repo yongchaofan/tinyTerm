@@ -16,7 +16,8 @@
 #Log test.log
 #Disp test case #1
 #Send ping 192.168.1.1
-#Recv 
+#Recv
+#Echo
 #Selection
 #Ftpd c:/tmp
 #Tftpd c:/tmp

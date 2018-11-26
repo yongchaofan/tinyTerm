@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 3254 2018-11-25 21:05:10 $"
+// "$Id: tiny.h 3247 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -77,7 +77,6 @@ char *scp_write(char *lpath, char *rpath);
 int scp_cmd(char *cmd, char **preply);
 int tun_cmd(char *cmd, char **preply);
 int sftp_put(char *src, char *dest);
-int sftp_cmd(char *cmd);
 void netconf_Send( char *msg, int len );
 
 /****************ftpd.c****************/
@@ -102,8 +101,9 @@ void term_Send( char *buf, int len );
 int term_Recv( char **preply );		//get new text since last Disp/Send/Recv
 int term_Cmd( char *cmd, char **preply );
 int term_TL1( char *cmd, char **preply);
-char *term_Mark_Prompt();
 int term_Waitfor_Prompt();
+char *term_Mark_Prompt();
+BOOL term_Echo();
 
 /****************tiny.c****************/
 int tiny_Cmd( char *cmd, char **preply );

@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 33734 2018-11-25 21:05:10 $"
+// "$Id: tiny.c 33726 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -29,7 +29,7 @@ extern int size_y, size_x;
 extern int screen_y;
 extern int scroll_y;
 extern int sel_left, sel_right;
-extern BOOL bEcho, bCursor, bLogging;
+extern BOOL bCursor, bLogging;
 int iTitleHeight;
 #define iCmdHeight		18
 #define CONN_TIMER		64
@@ -566,7 +566,7 @@ BOOL menu_Command( WPARAM wParam )
 		check_Option( hTermMenu, ID_LOGGING, bLogging ); 
 		break;
 	case ID_ECHO:
-		check_Option( hTermMenu, ID_ECHO, bEcho=!bEcho ); 
+		check_Option( hTermMenu, ID_ECHO, term_Echo() ); 
 		break;
 	case ID_FONT: 
 		if ( fontDialog() ) tiny_Font( hwndMain ); 
