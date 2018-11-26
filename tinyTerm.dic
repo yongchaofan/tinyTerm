@@ -4,12 +4,16 @@
 !sftp -l admin -pw password 192.168.1.1
 !netconf -P 830 192.168.1.1
 
+#Transparency 192
+#FontFace Consolas
+#FontSize 18
+#TermSize 100x40
 #Clear
-#Log test.log
 #Prompt $%20
 #Timeout 30
 #Wait 10
 #Waitfor 100%
+#Log test.log
 #Disp test case #1
 #Send ping 192.168.1.1
 #Recv 

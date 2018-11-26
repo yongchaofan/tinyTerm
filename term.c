@@ -366,14 +366,14 @@ void term_Logg( char *fn )
 	if ( bLogging ) {
 		fclose( fpLogFile );
 		bLogging = FALSE;
-		term_Print("\033[33m\n%s logging stopped\n", fn);
+		term_Print("\n\033[33m%s logging stopped\n", fn);
 	}
 	else if ( fn!=NULL ) {
 		if ( *fn==' ' ) fn++;
 		fpLogFile = fopen_utf8( fn, MODE_WB );
 		if ( fpLogFile != NULL ) {
 			bLogging = TRUE;
-			term_Print("\033[33m\n%s logging started\n", fn);
+			term_Print("\n\033[33m%s logging started\n", fn);
 		}
 	}
 }

@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 32540 2018-11-25 21:05:10 $"
+// "$Id: tiny.c 33734 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -60,14 +60,19 @@ static HBRUSH dwBkBrush, dwScrollBrush, dwSliderBrush;
 static HMENU hMenu[3], hTermMenu, hScriptMenu, hOptionMenu, hContextMenu;
 static int menuX[4] = {16, 0, 0, 0};
 
+static WCHAR wsFontFace[256]=L"Consolas";
 static int iFontHeight, iFontWidth;
+static int iTransparency = 255;
 static int iConnectCount, iScriptCount, httport;
-static BOOL bTransparent = FALSE;
 static BOOL bScrollbar = FALSE;
 static BOOL bFocus = FALSE;
 static BOOL bFTPd = FALSE, bTFTPd = FALSE;
 static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
 
+void tiny_TermSize(char *size);
+void tiny_FontFace(char *fontface);
+void tiny_FontSize(int fontsize);
+void tiny_Transparency(int t);
 void CopyText( );
 void PasteText( );
 void LoadDict( WCHAR *wfn );
@@ -164,35 +169,42 @@ BOOL fontDialog()
 	cf.Flags = CF_SCREENFONTS|CF_FIXEDPITCHONLY;
 
 	BOOL rc = ChooseFont(&cf);
-	if ( rc ) hTermFont = CreateFontIndirect(cf.lpLogFont);
+	if ( rc ) {
+		DeleteObject(hTermFont);
+		hTermFont = CreateFontIndirect(cf.lpLogFont);
+	}
 	return rc;
 }
 int tiny_Cmd( char *cmd, char **preply )
 {
 	int rc = 0;
 	if ( preply ) *preply = buff+cursor_x;
-	if ( host_Status()!=CONN_IDLE )	{
-		if ( *cmd=='#' ) {
-			cmd_Disp_utf8(cmd++);
-			if ( strncmp(cmd, "Disconn",7)==0 )host_Close(); 
-			else if ( strncmp(cmd, "Tftpd",5)==0 )	tftp_Svr( cmd+6 );
-			else if ( strncmp(cmd, "Ftpd", 4)==0 ) 	ftp_Svr( cmd+5 );
-			else if ( strncmp(cmd, "scp ", 4)==0 && host_Type()==SSH ) 
-				rc = scp_cmd(cmd+4, preply);
-			else if ( strncmp(cmd, "tun",  3)==0 && host_Type()==SSH ) 
-				rc = tun_cmd(cmd+3, preply);
-			else 
-				rc = term_Cmd(cmd, preply);
-		}
+	if ( *cmd=='#' ) {
+		cmd_Disp_utf8(cmd++);
+		if (strncmp(cmd,"Transparency",12)==0) tiny_Transparency(atoi(cmd+13));
+		else if ( strncmp(cmd, "FontSize", 8)==0 )	tiny_FontSize(atoi(cmd+9));
+		else if ( strncmp(cmd, "FontFace", 8)==0 )	tiny_FontFace(cmd+9);
+		else if ( strncmp(cmd, "TermSize", 8)==0 )	tiny_TermSize(cmd+9);
+		else if ( strncmp(cmd, "Disconn",7)==0 )	host_Close(); 
+		else if ( strncmp(cmd, "Tftpd",5)==0 )		tftp_Svr( cmd+6 );
+		else if ( strncmp(cmd, "Ftpd", 4)==0 ) 		ftp_Svr( cmd+5 );
+		else if ( strncmp(cmd, "scp ", 4)==0 && host_Type()==SSH ) 
+			rc = scp_cmd(cmd+4, preply);
+		else if ( strncmp(cmd, "tun",  3)==0 && host_Type()==SSH ) 
+			rc = tun_cmd(cmd+3, preply);
 		else 
-			rc = term_TL1(cmd, preply);
+			rc = term_Cmd(cmd, preply);
 	}
 	else {
-		if ( *cmd=='!' ) 
-			host_Open(cmd+1);
+		if ( host_Status()!=CONN_IDLE )
+			rc = term_TL1(cmd, preply);
 		else {
-			term_Disp(cmd);
-			term_Disp("\n");
+			if ( *cmd=='!' ) 
+				host_Open(cmd+1);
+			else {
+				term_Disp(cmd);
+				term_Disp("\n");
+			}
 		}
 	}
 	return rc;
@@ -222,12 +234,12 @@ void cmd_Enter(void)
 		switch ( *cmd ) {
 		case '/': term_Srch(cmd+1); break;
 		case '^': cmd[1]-=64; host_Send(cmd+1, 1); break;
-		case '#': if ( strncmp(cmd+1, "scp ", 4)==0 )
+		case '#': if ( strncmp(cmd+1, "scp ", 4)==0 && host_Type()==SSH )
 					CreateThread(NULL, 0, scper, strdup(cmd+5), 0, NULL);
-				  else if ( strncmp(cmd+1, "tun",  3)==0 )
+				  else if ( strncmp(cmd+1, "tun",  3)==0 && host_Type()==SSH )
 					CreateThread(NULL, 0, tuner, strdup(cmd+4), 0, NULL);
 				  else
-					term_Cmd(cmd, NULL);
+					tiny_Cmd(cmd, NULL);
 				  break;
 		case '!': if ( host_Status()==CONN_IDLE ) {
 					host_Open(cmd+1);
@@ -265,6 +277,10 @@ LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 		}
 	}
 	return ret?TRUE:CallWindowProc(wpOrigCmdProc, hwnd, uMsg, wParam, lParam);
+}
+void check_Option( HMENU hMenu, DWORD id, BOOL op)
+{
+	CheckMenuItem( hMenu, id, MF_BYCOMMAND|(op?MF_CHECKED:MF_UNCHECKED));
 }
 WCHAR Title[256] = L"   Term      Script      Options                       ";
 void tiny_Title( char *buf )
@@ -314,6 +330,34 @@ void tiny_Font( HWND hwnd )
 	AdjustWindowRect(&wndRect, WS_TILEDWINDOW, FALSE);
 	MoveWindow( hwnd, x, y, wndRect.right-wndRect.left, 
 							wndRect.bottom-wndRect.top, TRUE );
+}
+void tiny_TermSize(char *size)
+{
+	char *p = strchr(size, 'x');
+	if ( p!=NULL ) {
+		size_x = atoi(size); 
+		size_y = atoi(p+1);
+		tiny_Font(hwndMain);
+	}
+}
+void tiny_FontFace(char *fontface)
+{
+	utf8_to_wchar(fontface, strlen(fontface)+1, wsFontFace, 255);
+	wsFontFace[255] = 0;
+}
+void tiny_FontSize(int fontsize)
+{
+	DeleteObject(hTermFont);
+	hTermFont = CreateFont(fontsize,0,0,0,FW_MEDIUM, FALSE,FALSE,FALSE,
+						DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
+						DEFAULT_QUALITY, FIXED_PITCH, wsFontFace);
+	tiny_Font(hwndMain);
+}
+void tiny_Transparency(int t)
+{
+	iTransparency = t;
+	SetLayeredWindowAttributes(hwndMain,0,iTransparency,LWA_ALPHA);
+	check_Option( hOptionMenu, ID_TRANSPARENT, (iTransparency&0xff)!=255 );
 }
 void tiny_Paint(HDC hDC)
 {
@@ -480,10 +524,6 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 	}
 	return FALSE;
 }
-void check_Option( HMENU hMenu, DWORD id, BOOL op)
-{
-	CheckMenuItem( hMenu, id, MF_BYCOMMAND|(op?MF_CHECKED:MF_UNCHECKED));
-}
 BOOL menu_Command( WPARAM wParam )
 {
 	switch ( LOWORD(wParam) ) {
@@ -532,9 +572,7 @@ BOOL menu_Command( WPARAM wParam )
 		if ( fontDialog() ) tiny_Font( hwndMain ); 
 		break;
 	case ID_TRANSPARENT: 
-		bTransparent=!bTransparent;
-		check_Option( hOptionMenu, ID_TRANSPARENT, bTransparent );
-		SetLayeredWindowAttributes(hwndMain,0,(bTransparent?224:255),LWA_ALPHA);
+		tiny_Transparency( iTransparency==255 ? 224 : 255 );
 		break;
 	case ID_FTPD:	 
 		bFTPd = ftp_Svr(bFTPd?NULL:getFolderName(L"Choose root directory")); 
@@ -905,10 +943,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 						DEFAULT_QUALITY, VARIABLE_PITCH,L"Arial");
 	hTermFont = CreateFont( 18,0,0,0,FW_MEDIUM, FALSE,FALSE,FALSE,
 						DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
-						DEFAULT_QUALITY, FIXED_PITCH, L"Consolas");
+						DEFAULT_QUALITY, FIXED_PITCH, wsFontFace);
 	hwndMain = CreateWindowEx( WS_EX_LAYERED, L"TWnd", Title,
 						WS_TILEDWINDOW|WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT,
-						1, 1, NULL, NULL, hInst, NULL );
+						800, 480, NULL, NULL, hInst, NULL );
 	tiny_Menu(hwndMain);
 	iConnectCount = 1;
 	LoadDict(L"tinyTerm.dic");
