@@ -1,5 +1,5 @@
 //
-// "$Id: tinyTerm.rc 3046 2018-11-25 21:05:10 $"
+// "$Id: tinyTerm.rc 3049 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -26,7 +26,7 @@ IDMENU_MAIN MENU
 {
 	POPUP "&Term" 
 	{
-		MENUITEM "&Connect\tAlt+C", 	ID_CONNECT
+		MENUITEM "&Connect...\tAlt+C", 	ID_CONNECT
 		MENUITEM "&Logging...\tAlt+L", 	ID_LOGGING
 		MENUITEM "Copy &All\tAlt+A",	ID_COPYALL
 		MENUITEM "local echo", 			ID_ECHO

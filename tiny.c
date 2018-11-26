@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 33726 2018-11-25 21:05:10 $"
+// "$Id: tiny.c 33716 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -38,7 +38,7 @@ int iTitleHeight;
 
 const char WELCOME[]="\n\n\n\
 \ttinyTerm is a minimalist terminal emulator designed for network \n\n\
-\tengineers, a single executable smaller than 360KB that features:\n\n\n\
+\tengineers, a single executable in 345KB that features:\n\n\n\
 \t    * Serial/Telnet/SSH/SFTP/Netconf connections\n\n\
 \t    * FTP/TFTP server for file transfer\n\n\
 \t    * Command history and autocompletion\n\n\
