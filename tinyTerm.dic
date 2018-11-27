@@ -1,7 +1,7 @@
 !com3:9600,n,8,1
 !telnet 192.168.1.1
 !ssh 192.168.12.3
-!sftp -l admin -pw password 192.168.1.1
+!sftp -l admin 192.168.1.1
 !netconf -P 830 192.168.1.1
 
 #Transparency 192

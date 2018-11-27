@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 33716 2018-11-25 21:05:10 $"
+// "$Id: tiny.c 33800 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -58,7 +58,7 @@ static HBITMAP hBufMap=NULL;
 static HFONT hTermFont, hEditFont;
 static HBRUSH dwBkBrush, dwScrollBrush, dwSliderBrush;
 static HMENU hMenu[3], hTermMenu, hScriptMenu, hOptionMenu, hContextMenu;
-static int menuX[4] = {16, 0, 0, 0};
+static int menuX[4] = {32, 0, 0, 0};	//menuX[0]=32 leave space for small icon
 
 static WCHAR wsFontFace[256]=L"Consolas";
 static int iFontHeight, iFontWidth;
@@ -282,10 +282,10 @@ void check_Option( HMENU hMenu, DWORD id, BOOL op)
 {
 	CheckMenuItem( hMenu, id, MF_BYCOMMAND|(op?MF_CHECKED:MF_UNCHECKED));
 }
-WCHAR Title[256] = L"   Term      Script      Options                       ";
+WCHAR Title[256] = L"   Term      Script      Options               ";
 void tiny_Title( char *buf )
 {
-	utf8_to_wchar(buf, strlen(buf)+1, Title+55, 220);
+	utf8_to_wchar(buf, strlen(buf)+1, Title+47, 208);
 	Title[255] = 0;
 	SetWindowText(hwndMain, Title);
 
@@ -387,15 +387,17 @@ void tiny_Paint(HDC hDC)
 				SetTextColor( hBufDC, COLORS[attr[i]&7] );
 				SetBkColor( hBufDC, COLORS[(attr[i]>>4)&7] );
 			}
+			int len = j-i;
+			if ( buff[j-1]==0x0a ) len--;	//remove unprintable 0x0a for XP
 			if ( utf ) {
-				int cch = utf8_to_wchar(buff+i, j-i, wbuf, 1024);
+				int cch = utf8_to_wchar(buff+i, len, wbuf, 1024);
 				TextOutW(hBufDC, dx, dy, wbuf, cch);
 				DrawText(hBufDC, wbuf, cch, &text_rect, DT_CALCRECT);
 				dx += text_rect.right;
 			}
 			else {
-				TextOutA(hBufDC, dx, dy, buff+i, j-i);
-				dx += iFontWidth*(j-i);
+				TextOutA(hBufDC, dx, dy, buff+i, len);
+				dx += iFontWidth*len;
 			}
 			i=j;
 		}
@@ -831,16 +833,12 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	case WM_NCLBUTTONDOWN: {
 		int x = GET_X_LPARAM(lParam)-wndRect.left;
 		int y = GET_Y_LPARAM(lParam)-wndRect.top;
-		int i;
-		for (i=0; i<3; i++ ) if ( x>menuX[i] && x<menuX[i+1] ) break; 
-		if ( i<3 && y>0 && y<iTitleHeight ) 
-			TrackPopupMenu(hMenu[i],TPM_LEFTBUTTON, 
-							wndRect.left+menuX[i],
-							wndRect.top+iTitleHeight, 0, hwnd, NULL);
-		else
-			return DefWindowProc(hwnd,msg,wParam,lParam);
+		if ( y>0 && y<iTitleHeight ) for ( int i=0; i<3; i++ ) 
+			if ( x>menuX[i] && x<menuX[i+1] ) 
+				TrackPopupMenu( hMenu[i],TPM_LEFTBUTTON, wndRect.left+menuX[i],
+									wndRect.top+iTitleHeight, 0, hwnd, NULL );
 		}
-		break;
+		return DefWindowProc(hwnd,msg,wParam,lParam);
 	case WM_DROPFILES: 
 		if ( host_Status()==CONN_CONNECTED ) DropFiles((HDROP)wParam);
 		break;
@@ -881,11 +879,11 @@ void tiny_Menu( HWND hwnd )
 					+GetSystemMetrics(SM_CXPADDEDBORDER);
 	HDC wndDC = GetWindowDC(hwnd);
 	RECT menuRect;
-	DrawText(wndDC, L"   Term   ", 10, &menuRect, DT_CALCRECT);
+	DrawText(wndDC, L"  Term  ", 8, &menuRect, DT_CALCRECT);
 	menuX[1] = menuX[0]+menuRect.right-menuRect.left;
-	DrawText(wndDC, L"   Script   ", 12, &menuRect, DT_CALCRECT);
+	DrawText(wndDC, L"  Script  ", 10, &menuRect, DT_CALCRECT);
 	menuX[2] = menuX[1]+menuRect.right-menuRect.left;
-	DrawText(wndDC, L"   Options   ", 13, &menuRect, DT_CALCRECT);
+	DrawText(wndDC, L"  Options  ", 11, &menuRect, DT_CALCRECT);
 	menuX[3] = menuX[2]+menuRect.right-menuRect.left;
 	ReleaseDC(hwnd, wndDC);
 
