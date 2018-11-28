@@ -27,9 +27,9 @@ User interface design is minimal too, there is one window, main menu shares titl
 
 Makefiles are provided for building with MSYS2+MingW64/32
 
-    Makefile    32bit executable for Windows 7 or above
-    Makefile64  64bit executable for Windows 7 or above
-    MakefileXP  32bit executable for Windows XP using mbedtls crypto library
+    Makefile    building 32bit tinyTerm.exe for Windows 7/10 using wincng crypto
+    Makefile64  building 64bit tinyTerm64.exe for Windows 7/10 using wincng crypto
+    MakefileXP  building 32bit tinyTermXP.exe for Windows XP/7/10 using mbedtls crypto
 
 ### Librarys
     libssh2 using any daily snapshot after March, 2018 for full support of WinCNG crypto functions
