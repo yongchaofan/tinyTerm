@@ -25,7 +25,7 @@ User interface design is minimal too, there is one window, main menu shares titl
 
 ## Building
 
-Makefiles are provided for building with MSYS2/MingW64/MingW32
+Makefiles are provided for building with MSYS2+MingW64/32
 
     Makefile    32bit executable for Windows 7 or above
     Makefile64  64bit executable for Windows 7 or above
@@ -51,10 +51,11 @@ Makefiles are provided for building with MSYS2/MingW64/MingW32
     auto_drop.c COM wrapper for auto completion and drag&drop function
     
 
-## Roadmap
-
-See the [open issues](https://github.com/zoudaokou/tinyTerm/issues) for a list of proposed features (and known issues).
-
 ## Contributing
 
 Interested in contributing to tinyTerm? I'd love your help. tinyTerm is made an open source project for users and developers to contribute and make it better together. See [the CONTRIBUTING file](docs/CONTRIBUTING.md) for instructions on how to contribute.
+
+
+## Roadmap
+
+See the [open issues](https://github.com/zoudaokou/tinyTerm/issues) for a list of proposed features (and known issues).
