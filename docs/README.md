@@ -18,7 +18,7 @@
 
 ## Project philosophy
 
-tinyTerm is intended to be small, simple and scriptable, WIN32 executable is only 345KB, source code is consist of 7 .c/.h files totaling 140KB, only required external dependency is libssh2. 
+tinyTerm is intended to be small, simple and scriptable, WIN32 executable is only 345KB, source code is consist of 7 .c/.h files totaling 140KB, ~5000 sloc, only required external dependency is libssh2. 
 
 User interface design is minimal too, there is one window, main menu shares title bar space, scrollbar hidden until user trys to scroll back, only one dialog for makeing connections, 
 
