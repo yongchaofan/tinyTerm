@@ -1,9 +1,9 @@
-# [tinyTerm](http://zoudaokou.github.io/tinyTerm).
+# [tinyTerm](http://zoudaokou.github.io/tinyTerm)
 
 [![Build Status](https://travis-ci.org/pages-themes/minimal.svg?branch=master)](https://travis-ci.org/pages-themes/minimal) 
 
 
-*Minimalist terminal emulator, designed by network engineer for network engineers, with unique features to improve effeciency when managing network devices like routers, switches, transponders and ROADMs using command line interface.*
+*Minimalist terminal emulator, designed by network engineer for network engineers, with unique features for effeciency and effectiveness when managing network devices like routers, switches, transponders and ROADMs through command line interface.*
 
 ![Thumbnail of minimal](thumbnail.png)
 
