@@ -2,13 +2,12 @@
 
 [![Build Status](https://travis-ci.org/pages-themes/minimal.svg?branch=master)](https://travis-ci.org/pages-themes/minimal) 
 
-
 *Minimalist terminal emulator, designed by network engineer for network engineers, with unique features for effeciency and effectiveness when managing network devices like routers, switches, transponders and ROADMs through command line interface.*
 
 ![Thumbnail of minimal](thumbnail.png)
 
-## Features
 
+## Features
     1. serial/telnet/ssh/sftp/netconf connections
     2. embeded ftpd and tftpd for sile transfer
     3. command history and command autocompletion
@@ -17,16 +16,13 @@
 
 
 ## Project philosophy
-
 tinyTerm is intended to be small, simple and scriptable, WIN32 executable is only 345KB, source code is consist of 7 .c/.h files totaling 140KB, ~5000 sloc, only required external dependency is libssh2. 
 
 User interface design is minimal too, there is one window, main menu shares title bar space, scrollbar hidden until user trys to scroll back, only one dialog for makeing connections, 
 
 
 ## Building
-
 Makefiles are provided for building with MSYS2+MingW64/32
-
     Makefile    building 32bit tinyTerm.exe for Windows 7/10 using wincng crypto
     Makefile64  building 64bit tinyTerm64.exe for Windows 7/10 using wincng crypto
     MakefileXP  building 32bit tinyTermXP.exe for Windows XP/7/10 using mbedtls crypto
@@ -52,10 +48,8 @@ Makefiles are provided for building with MSYS2+MingW64/32
     
 
 ## Contributing
-
 Interested in contributing to tinyTerm? I'd love your help. tinyTerm is made an open source project for users and developers to contribute and make it better together. See [the CONTRIBUTING file](docs/CONTRIBUTING.md) for instructions on how to contribute.
 
 
 ## Roadmap
-
 See the [open issues](https://github.com/zoudaokou/tinyTerm/issues) for a list of proposed features (and known issues).
