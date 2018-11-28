@@ -9,11 +9,11 @@
 
 ## Features
 
-1. serial/telnet/ssh/sftp/netconf connections
-2. embeded ftpd and tftpd for sile transfer
-3. command history and command autocompletion
-4. text file based batch command automation
-5. xmlhttp interface for easy extension
+    1. serial/telnet/ssh/sftp/netconf connections
+    2. embeded ftpd and tftpd for sile transfer
+    3. command history and command autocompletion
+    4. text file based batch command automation
+    5. xmlhttp interface for easy extension
 
 
 ## Project philosophy
@@ -22,9 +22,11 @@ tinyTerm is intended to be small, simple and scriptable, WIN32 executable is onl
 
 User interface design is minimal too, there is one window, main menu shares title bar space, scrollbar hidden until user trys to scroll back, only one dialog for makeing connections, 
 
+
 ## Building
 
 Makefiles are provided for building with MSYS2/MingW64/MingW32
+
     Makefile    32bit executable for Windows 7 or above
     Makefile64  64bit executable for Windows 7 or above
     MakefileXP  32bit executable for Windows XP using mbedtls crypto library
@@ -48,6 +50,7 @@ Makefiles are provided for building with MSYS2/MingW64/MingW32
     ftpd.c  ftp and tftp server implementation
     auto_drop.c COM wrapper for auto completion and drag&drop function
     
+
 ## Roadmap
 
 See the [open issues](https://github.com/zoudaokou/tinyTerm/issues) for a list of proposed features (and known issues).
@@ -55,11 +58,3 @@ See the [open issues](https://github.com/zoudaokou/tinyTerm/issues) for a list o
 ## Contributing
 
 Interested in contributing to tinyTerm? I'd love your help. tinyTerm is made an open source project for users and developers to contribute and make it better together. See [the CONTRIBUTING file](docs/CONTRIBUTING.md) for instructions on how to contribute.
-
-### Running tests
-
-The theme contains a minimal test suite, to ensure a site with the theme would build successfully. To run the tests, simply run `script/cibuild`. You'll need to run `script/bootstrap` one before the test script will work.
-
-
-
-
