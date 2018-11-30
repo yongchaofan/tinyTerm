@@ -23,6 +23,7 @@ User interface design is minimal too, there is one window, main menu shares titl
 
 ## Building
 Makefiles are provided for building with MSYS2+MingW64/32
+
     Makefile    building 32bit tinyTerm.exe for Windows 7/10 using wincng crypto
     Makefile64  building 64bit tinyTerm64.exe for Windows 7/10 using wincng crypto
     MakefileXP  building 32bit tinyTermXP.exe for Windows XP/7/10 using mbedtls crypto
