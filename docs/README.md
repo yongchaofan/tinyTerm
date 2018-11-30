@@ -7,14 +7,6 @@
 ![Thumbnail of minimal](thumbnail.png)
 
 
-## Features
-    1. serial/telnet/ssh/sftp/netconf connections
-    2. embeded ftpd and tftpd for sile transfer
-    3. command history and command autocompletion
-    4. text file based batch command automation
-    5. xmlhttp interface for easy extension
-
-
 ## Project philosophy
 tinyTerm is intended to be small, simple and scriptable, WIN32 executable is only 345KB, source code is consist of 7 .c/.h files totaling 140KB, ~5000 sloc, only required external dependency is libssh2. 
 
