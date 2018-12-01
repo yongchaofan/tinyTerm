@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 3247 2018-11-25 21:05:10 $"
+// "$Id: tiny.h 3278 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -48,9 +48,10 @@ BOOL isUTF8c(char c);	//check if a byte is a UTF8 continuation byte
 void drop_Init( HWND hwnd );
 void drop_Destroy( HWND hwnd );
 int autocomplete_Init( HWND hWnd );
-int autocomplete_Add( LPCTSTR cmd );
 int autocomplete_Destroy( );
+int autocomplete_Add( WCHAR *cmd );
 WCHAR *autocomplete_Prev( );
+WCHAR *autocomplete_First( );
 WCHAR *autocomplete_Next( );
 
 /****************host.c****************/
@@ -91,7 +92,7 @@ void term_Parse( char *buf, int len );
 void term_Parse_XML( char *xml, int len );
 void term_Print( const char *fmt, ... );
 void term_Scroll(int lines);
-int term_Keydown(DWORD key);
+void term_Keydown(DWORD key);
 void term_Prompt( char *cmd );
 void term_Waitfor( char *cmd );
 void term_Logg( char *fn );

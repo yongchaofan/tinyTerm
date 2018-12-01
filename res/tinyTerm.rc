@@ -1,5 +1,5 @@
 //
-// "$Id: tinyTerm.rc 3049 2018-11-25 21:05:10 $"
+// "$Id: tinyTerm.rc 2965 2018-11-30 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -24,7 +24,7 @@ IDICON_TL1	ICON	"TL1.ico"
 
 IDMENU_MAIN MENU
 {
-	POPUP "&Term" 
+	POPUP "&Term"
 	{
 		MENUITEM "&Connect...\tAlt+C", 	ID_CONNECT
 		MENUITEM "&Logging...\tAlt+L", 	ID_LOGGING
@@ -37,7 +37,7 @@ IDMENU_MAIN MENU
 	{
 		MENUITEM "&Run...\tAlt+R", 		ID_SCRUN
 		MENUITEM "&Pause\tAlt+P", 		ID_SCPAUSE
-		MENUITEM "&Quit\tAlt+Q", 		ID_SCQUIT
+		MENUITEM "&Stop\tAlt+Q", 		ID_SCQUIT
 		MENUITEM SEPARATOR
 	}
 	POPUP "&Options"
@@ -45,8 +45,6 @@ IDMENU_MAIN MENU
 		MENUITEM "&Font...",			ID_FONT
 		MENUITEM "Ftpd...", 			ID_FTPD
 		MENUITEM "Tftpd...", 			ID_TFTPD
-		MENUITEM "Load Dict...",		ID_LOADDICT
-		MENUITEM "Save Dict...", 		ID_SAVEDICT
 		MENUITEM "&Transparency",		ID_TRANSPARENT
 	}
 }
@@ -65,7 +63,7 @@ IDACCEL_MAIN ACCELERATORS
   "t", 	ID_TERM, 	ALT
  }
 
-IDD_CONNECT DIALOG 90, 60, 130, 90	// Connection Dialog
+IDD_CONNECT DIALOG 45, 30, 130, 90	// Connection Dialog
 CAPTION "Connect Dialog"
 FONT 10, "Ms Shell Dlg"
 {

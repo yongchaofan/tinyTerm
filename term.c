@@ -1,9 +1,9 @@
 //
-// "$Id: term.c 21085 2018-11-25 21:05:10 $"
+// "$Id: term.c 20882 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
-// term.c is the minimal xterm implementation, only common ESCAPE 
+// term.c is the minimal xterm implementation, only common ESCAPE
 // control sequences are supported for apps like top, vi etc.
 //
 // Copyright 2015-2018 by Yongchao Fan.
@@ -31,7 +31,7 @@ BOOL bLogging=FALSE, bEcho=FALSE, bCursor;
 static BOOL bPrompt=FALSE, bEnter=FALSE, bEnter1=FALSE;
 static char sPrompt[32]=";\n> ", *tl1text=NULL;
 static int  iPrompt=4, iTimeOut=30, tl1len=0;
-static HANDLE hTL1Event;	//for term_TL1 reader
+static HANDLE hTL1Event;
 
 static FILE *fpLogFile;
 static int save_x, save_y;
@@ -51,7 +51,7 @@ void term_Clear( )
 	memset( buff, 0, BUFFERSIZE );
 	memset( attr, 0, BUFFERSIZE );
 	memset( line, 0, MAXLINES*sizeof(int) );
-	c_attr = 7; 
+	c_attr = 7;
 	cursor_y = cursor_x = 0;
 	scroll_y = screen_y = 0;
 	sel_left = sel_right = 0;
@@ -82,7 +82,7 @@ void term_nextLine()
 
 	if ( cursor_x>=BUFFERSIZE-1024 || cursor_y==MAXLINES-2 ) {
 		int i, len = line[1024];
-		tl1text -= len; 
+		tl1text -= len;
 		cursor_x -= len;
 		cursor_y -= 1024;
 		memmove( buff, buff+len, BUFFERSIZE-len );
@@ -105,28 +105,27 @@ void term_Scroll(int lines)
 	if ( scroll_y>0 ) scroll_y = 0;
 	tiny_Redraw();
 }
-int term_Keydown(DWORD key)
-{		
-	int rc = 1;
+void term_Keydown(DWORD key)
+{
 	switch( key ) {
+	case VK_HOME:	term_Scroll(screen_y); break;
 	case VK_PRIOR:  term_Scroll(size_y-1); break;
-	case VK_NEXT:   term_Scroll(1-size_y); break; 
+	case VK_NEXT:   term_Scroll(1-size_y); break;
 	case VK_UP:    	term_Send(bAppCursor?"\033OA":"\033[A",3); break;
 	case VK_DOWN:  	term_Send(bAppCursor?"\033OB":"\033[B",3); break;
 	case VK_RIGHT: 	term_Send(bAppCursor?"\033OC":"\033[C",3); break;
 	case VK_LEFT:  	term_Send(bAppCursor?"\033OD":"\033[D",3); break;
 	case VK_DELETE:	term_Send("\177",1); break;
-	case VK_RETURN:	bEnter = TRUE; rc = 1; break;
+	case VK_RETURN:	bEnter = TRUE; break;
 	default:	if ( bEnter ) {	bEnter = FALSE;	bEnter1 = TRUE; }
-				rc = 1;
+				if ( scroll_y!=0 ) term_Scroll(scroll_y);
 	}
-	return rc;
 }
 void term_Parse( char *buf, int len )
 {
 	unsigned char *p=(unsigned char *)buf;
 	unsigned char *zz = p+len;
-	
+
 	if ( bEnter1 ) { //capture prompt for scripting after Enter key pressed
 		if ( len==1 ) {//and the echo is just one letter
 			sPrompt[0] = buff[cursor_x-2];
@@ -136,7 +135,7 @@ void term_Parse( char *buf, int len )
 		bEnter1 = FALSE;
 	}
 	if ( bLogging ) fwrite( buf, 1, len, fpLogFile );
-	if ( bEscape ) p = vt100_Escape( p, zz-p ); 
+	if ( bEscape ) p = vt100_Escape( p, zz-p );
 	while ( p < zz ) {
 		unsigned char c = *p++;
 		if ( bTitle ) {
@@ -156,35 +155,35 @@ void term_Parse( char *buf, int len )
 		case 0x08: 	if ( isUTF8c(buff[cursor_x--]) )//utf8 continuation byte
 						while ( isUTF8c(buff[cursor_x]) ) cursor_x--;
 					break;
-		case 0x09: 	do { 
+		case 0x09: 	do {
 						attr[cursor_x] = c_attr;
-						buff[cursor_x++]=' '; 
+						buff[cursor_x++]=' ';
 					}
 					while ( (cursor_x-line[cursor_y])%8!=0 );
 					break;
-		case 0x0a: 	if ( bAlterScreen ) { // scroll down if reached bottom
-						if ( cursor_y==roll_bot+screen_y ) 
+		case 0x0a: 	if ( bAlterScreen ) {	// scroll down if reached bottom
+						if ( cursor_y==roll_bot+screen_y )
 							vt100_Escape((unsigned char *)"D", 1);
 						else {
 							int x = cursor_x - line[cursor_y];
 							cursor_x = line[++cursor_y] + x;
 						}
 					}
-					else {						//hard line feed
+					else {					//hard line feed
 						cursor_x = line[cursor_y+1];
 						if ( line[cursor_y+2]!=0 ) cursor_x--;
-						attr[cursor_x] = c_attr; 
+						attr[cursor_x] = c_attr;
 						buff[cursor_x++] = c;
 						term_nextLine();
 					}
 					break;
-		case 0x0d: 	if ( cursor_x-line[cursor_y]==size_x+1 && *p!=0x0a ) 
-						term_nextLine();		//soft line feed
+		case 0x0d: 	if ( cursor_x-line[cursor_y]==size_x+1 && *p!=0x0a )
+						term_nextLine();	//soft line feed
 					else
 						cursor_x = line[cursor_y];
-					break; 
+					break;
 		case 0x1b: 	p = vt100_Escape( p, zz-p ); break;
-		case 0xe2: 	if ( bAlterScreen ) { 
+		case 0xe2: 	if ( bAlterScreen ) {
 						c = ' ';			//hack utf8 box drawing
 						if ( *p++==0x94 ){	//to make alterscreen easier
 							switch ( *p ) {
@@ -202,29 +201,29 @@ void term_Parse( char *buf, int len )
 						p++;
 					}
 		default:	if ( bGraphic ) switch ( c ) {
-						case 'q': c='_'; break; //c=0xc4; break;
-						case 'x':				//c=0xb3; break;
-						case 't':				//c=0xc3; break;
-						case 'u':				//c=0xb4; break;
-						case 'm':				//c=0xc0; break;
-						case 'j': c='|'; break; //c=0xd9; break;
-						case 'l':				//c=0xda; break;
-						case 'k':				//c=0xbf; break;
+						case 'q': c='_'; break;
+						case 'x':
+						case 't':
+						case 'u':
+						case 'm':
+						case 'j': c='|'; break;
+						case 'l':
+						case 'k':
 						default: c = ' ';
 					}
 					if ( bInsert ) vt100_Escape((unsigned char *)"[1@", 3);
 					if ( cursor_x-line[cursor_y]>=size_x ) {
 						int char_cnt=0;
-						for ( int i=line[cursor_y]; i<cursor_x; i++ ) 
+						for ( int i=line[cursor_y]; i<cursor_x; i++ )
 							if ( !isUTF8c(buff[i]) ) char_cnt++;
 						if ( char_cnt==size_x ) {
-							if ( bAlterScreen ) 
+							if ( bAlterScreen )
 								cursor_x--; //don't overflow in vi
 							else
 								term_nextLine();
 							}
 					}
-					attr[cursor_x] = c_attr; 
+					attr[cursor_x] = c_attr;
 					buff[cursor_x++] = c;
 					if ( line[cursor_y+1]<cursor_x ) line[cursor_y+1]=cursor_x;
 		}
@@ -239,7 +238,7 @@ void term_Parse( char *buf, int len )
 	}
 	tiny_Redraw();
 }
-void term_Print( const char *fmt, ... ) 
+void term_Print( const char *fmt, ... )
 {
 	char buff[4096];
 	va_list args;
@@ -265,7 +264,7 @@ BOOL term_Echo()
 	term_Print("\n\033[32mEcho %s\n", bEcho?"On":"Off");
 	return bEcho;
 }
-int term_Recv( char **pTL1text ) 
+int term_Recv( char **pTL1text )
 {
 	if ( pTL1text!=NULL ) *pTL1text = tl1text;
 	int len = buff+cursor_x - tl1text;
@@ -274,7 +273,7 @@ int term_Recv( char **pTL1text )
 }
 char *term_Mark_Prompt()
 {
-	bPrompt = FALSE; 
+	bPrompt = FALSE;
 	tl1len = 0;
 	tl1text = buff+cursor_x;
 	return tl1text;
@@ -283,7 +282,7 @@ int term_Waitfor_Prompt()
 {
 	int i=0, oldlen = tl1len;
 	ResetEvent(hTL1Event);
-	while ( WaitForSingleObject( hTL1Event, 100 ) == WAIT_TIMEOUT ) { 
+	while ( WaitForSingleObject( hTL1Event, 100 ) == WAIT_TIMEOUT ) {
 		if ( ++i==iTimeOut*10 ) break;
 		if ( tl1len>oldlen ) { i=0; oldlen=tl1len; }
 	}
@@ -291,9 +290,9 @@ int term_Waitfor_Prompt()
 }
 int term_TL1( char *cmd, char **pTl1Text )
 {
-	tl1len = 0; 
+	tl1len = 0;
 	if ( host_Status()==CONN_CONNECTED ) {	//retrieve from NE
-		bPrompt = FALSE; 
+		bPrompt = FALSE;
 		int cmdlen = strlen(cmd);
 		tl1text = buff+cursor_x;
 		term_Send(cmd, cmdlen);
@@ -302,7 +301,7 @@ int term_TL1( char *cmd, char **pTl1Text )
 	}
 	else {									//retrieve from buffer
 		static char *pcursor=buff;			//only when retrieve from buffer
-		buff[cursor_x]=0; 
+		buff[cursor_x]=0;
 		char *p = strstr( pcursor, cmd );
 		if ( p==NULL ) { pcursor = buff; p = strstr( pcursor, cmd ); }
 		if ( p!=NULL ) { p = strstr( p, "\r\n" );
@@ -326,7 +325,7 @@ int term_Cmd( char *cmd, char **preply )
 {
 	int rc = 0;
 	if ( strncmp(cmd, "Clear",5)==0 ) 	term_Clear();
-	else if ( strncmp(cmd, "Log", 3)==0 ) 	term_Logg( cmd+3 ); 
+	else if ( strncmp(cmd, "Log", 3)==0 ) 	term_Logg( cmd+3 );
 	else if ( strncmp(cmd, "Disp ",5)==0 )  term_Disp(cmd+5);
 	else if ( strncmp(cmd, "Recv" ,4)==0 )  rc=term_Recv(preply);
 	else if ( strncmp(cmd, "Send ",5)==0 )  term_Send(cmd+5,strlen(cmd+5));
@@ -356,7 +355,7 @@ int term_Cmd( char *cmd, char **preply )
 				*p1++ = a;
 				p+=3;
 			}
-			else 
+			else
 				*p1++ = *p++;
 		}
 		*p1 = 0;
@@ -387,7 +386,7 @@ void term_Srch( char *sstr )
 	if ( sel_left==sel_right ) p = buff+cursor_x;
 	while ( --p>=buff+l ) {
 		int i;
-		for ( i=l-1; i>=0; i--) 
+		for ( i=l-1; i>=0; i--)
 			if ( sstr[i]!=p[i-l] ) break;
 		if ( i==-1 ) {
 			sel_left = p-l-buff;
@@ -399,17 +398,17 @@ void term_Srch( char *sstr )
 	if ( p<buff+l ) sel_left = sel_right = scroll_y = 0;
 	tiny_Redraw();
 }
-unsigned char *vt100_Escape( unsigned char *sz, int cnt ) 
+unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 {
 	static char code[20];
 	static int idx=0;
 	unsigned char *zz = sz+cnt;
-	
-	bEscape = TRUE; 
+
+	bEscape = TRUE;
 	while ( sz<zz && bEscape ) {
 		code[idx++] = *sz++;
 		switch( code[0] ) {
-		case '[': if ( isalpha(code[idx-1]) 
+		case '[': if ( isalpha(code[idx-1])
 						|| code[idx-1]=='@'
 						|| code[idx-1]=='`' ) {
 			bEscape = FALSE;
@@ -424,7 +423,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 			}
 			int x;
 			switch ( code[idx-1] ) {
-			case 'A': 
+			case 'A':
 					x = cursor_x - line[cursor_y];
 					cursor_y -= n0;
 					cursor_x = line[cursor_y]+x;
@@ -436,7 +435,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 					cursor_x = line[cursor_y]+x;
 					break;
 			case 'e': //line position relative
-			case 'B': 
+			case 'B':
 					x = cursor_x - line[cursor_y];
 					cursor_y += n0;
 					cursor_x = line[cursor_y]+x;
@@ -447,8 +446,8 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 					if ( isUTF8c(buff[++cursor_x]) )
 						while ( isUTF8c(buff[++cursor_x]) );
 					}
-					break; 
-			case 'D': 
+					break;
+			case 'D':
 					while ( n0-- > 0 ) {
 						if ( isUTF8c(buff[--cursor_x]) )
 							while ( isUTF8c(buff[--cursor_x]) );
@@ -464,15 +463,15 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 					break;
 			case '`': //character position absolute
 			case 'G':
-					n1 = cursor_y-screen_y+1; 
-					n2 = n0; 
+					n1 = cursor_y-screen_y+1;
+					n2 = n0;
 			case 'f': //horizontal and vertical position forced
 					if ( n1==0 ) n1=1;
 					if ( n2==0 ) n2=1;
-			case 'H': 
+			case 'H':
 					if ( n1>size_y ) n1 = size_y;
 					if ( n2>size_x ) n2 = size_x;
-					cursor_y = screen_y+n1-1; 
+					cursor_y = screen_y+n1-1;
 					cursor_x = line[cursor_y];
 					while ( --n2>0 ) {
 						cursor_x++;
@@ -481,11 +480,11 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 					break;
 			case 'J': 	//[J kill till end, 1J begining, 2J entire screen
 					if ( code[idx-2]=='[' ) {
-						if ( bAlterScreen ) 
+						if ( bAlterScreen )
 							screen_y = cursor_y;
 						else {
 							int i=cursor_y+1; line[i]=cursor_x;
-							while ( ++i<=screen_y+size_y ) line[i]=0; 
+							while ( ++i<=screen_y+size_y ) line[i]=0;
 							break;
 						}
 					}
@@ -502,33 +501,33 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 			case 'K': {		//[K kill till end, 1K begining, 2K entire line
 					int i = line[cursor_y];
 					int j = line[cursor_y+1];
-					if ( code[idx-2]=='[' ) 
+					if ( code[idx-2]=='[' )
 						i = cursor_x;
-					else 
+					else
 						if ( n0==1 ) j = cursor_x;
 					if ( j>i ) {
-						memset( buff+i, ' ', j-i ); 
-						memset( attr+i,   0, j-i ); 
+						memset( buff+i, ' ', j-i );
+						memset( attr+i,   0, j-i );
 						}
 					}
 					break;
 			case 'L':	//insert lines
 					for ( int i=roll_bot; i>cursor_y-screen_y; i-- ) {
-						memcpy( buff+line[screen_y+i], 
+						memcpy( buff+line[screen_y+i],
 								buff+line[screen_y+i-n0], size_x);
-						memcpy( attr+line[screen_y+i], 
+						memcpy( attr+line[screen_y+i],
 								attr+line[screen_y+i-n0], size_x);
 					}
 					for ( int i=0; i<n0; i++ ) {
 						memset(buff+line[cursor_y+i], ' ', size_x);
 						memset(attr+line[cursor_y+i],   0, size_x);
 					}
-					break; 
+					break;
 			case 'M'://delete lines
 					for ( int i=cursor_y-screen_y; i<=roll_bot-n0; i++ ) {
-						memcpy( buff+line[screen_y+i], 
+						memcpy( buff+line[screen_y+i],
 								buff+line[screen_y+i+n0], size_x);
-						memcpy( attr+line[screen_y+i], 
+						memcpy( attr+line[screen_y+i],
 								attr+line[screen_y+i+n0], size_x);
 					}
 					for ( int i=0; i<n0; i++ ) {
@@ -536,11 +535,11 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 						memset(attr+line[screen_y+roll_bot-i],   0, size_x);
 					}
 					break;
-			case 'P': 
-					for ( int i=cursor_x; i<line[cursor_y+1]-n0; i++ ) { 
-						buff[i]=buff[i+n0]; 
+			case 'P':
+					for ( int i=cursor_x; i<line[cursor_y+1]-n0; i++ ) {
+						buff[i]=buff[i+n0];
 						attr[i]=attr[i+n0];
-					} 
+					}
 					if ( !bAlterScreen ) {
 						line[cursor_y+1]-=n0;
 						if ( line[cursor_y+2]>0 ) line[cursor_y+2]-=n0;
@@ -548,9 +547,9 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 						memset(attr+line[cursor_y+1],   0, n0);
 					}
 					break;
-			case '@': 
+			case '@':
 					for ( int i=line[cursor_y+1]; i>=cursor_x; i-- ) {
-						buff[i+n0]=buff[i]; 
+						buff[i+n0]=buff[i];
 						attr[i+n0]=attr[i];
 					}
 					memset(buff+cursor_x, ' ', n0);
@@ -589,13 +588,13 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 				case 'Z': //cursor backward n0 tab stops
 					cursor_x -= n0*8;
 					break;
-			case 'h': 
+			case 'h':
 					if ( code[1]=='4' )  bInsert = TRUE;
 					if ( code[1]=='?' ) {
 						n0 = atoi(code+2);
 						if ( n0==1 ) bAppCursor = TRUE;
 						if ( n0==25 ) bCursor = TRUE;
-						if ( n0==1049 ) { 	//?1049h alternate screen, 
+						if ( n0==1049 ) { 	//?1049h alternate screen,
 							bAlterScreen = TRUE;
 							screen_y = cursor_y;
 							cursor_x = line[cursor_y];
@@ -608,18 +607,18 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 						n0 = atoi(code+2);
 						if ( n0==1 ) bAppCursor = FALSE;
 						if ( n0==25 ) bCursor = FALSE;
-						if ( n0==1049 ) { 	//?1049l exit alternate screen, 
-							bAlterScreen = FALSE; 
-							cursor_y = screen_y; 
+						if ( n0==1049 ) { 	//?1049l exit alternate screen,
+							bAlterScreen = FALSE;
+							cursor_y = screen_y;
 							cursor_x = line[cursor_y];
 							for ( int i=1; i<=size_y+1; i++ )
 								line[cursor_y+i] = 0;
-							screen_y = cursor_y-size_y+1; 
+							screen_y = cursor_y-size_y+1;
 							if ( screen_y<0 ) screen_y=0;
 						}
 					}
 					break;
-			case 'm': 
+			case 'm':
 					if ( n0==0 ) n0 = n2; 	//ESC[0;0m	ESC[01;34m
 					switch ( (int)(n0/10) ) {		//ESC[34m
 					case 0: if ( n0%10==7 ) {c_attr = 0x70; break;}
@@ -631,7 +630,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 							c_attr = (c_attr&0x0f)+((n0%10)<<4); break;
 					}
 					break;
-			case 'r': 
+			case 'r':
 					roll_top=n1-1; roll_bot=n2-1;
 					break;
 			case 's': //save cursor
@@ -649,7 +648,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 				for ( int i=roll_top; i<roll_bot; i++ ) {
 					memcpy( buff+line[screen_y+i],
 							buff+line[screen_y+i+1], size_x );
-					memcpy( attr+line[screen_y+i], 
+					memcpy( attr+line[screen_y+i],
 							attr+line[screen_y+i+1], size_x );
 				}
 				memset(buff+line[screen_y+roll_bot], ' ', size_x);
@@ -663,15 +662,15 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 				break;
 		case 'M': // scroll up one line
 				for ( int i=roll_bot; i>roll_top; i-- ) {
-					memcpy( buff+line[screen_y+i], 
+					memcpy( buff+line[screen_y+i],
 							buff+line[screen_y+i-1], size_x);
-					memcpy( attr+line[screen_y+i], 
+					memcpy( attr+line[screen_y+i],
 							attr+line[screen_y+i-1], size_x);
 				}
 				memset(buff+line[screen_y+roll_top], ' ', size_x);
 				memset(attr+line[screen_y+roll_top], ' ', size_x);
 				bEscape = FALSE;
-				break; 
+				break;
 		case ']':
 				if ( code[idx-1]==';' ) {
 					if ( code[1]=='0' ) {
@@ -684,7 +683,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 		case '(':
 				if ( (code[1]=='B'||code[1]=='0') ) {
 					bGraphic = (code[1]=='0');
-					bEscape = FALSE; 
+					bEscape = FALSE;
 				}
 				break;
 		default: bEscape = FALSE;
@@ -699,7 +698,7 @@ void term_Parse_XML(char *msg, int len)
 static int indent = 0;
 static BOOL previousIsOpen = TRUE;
 	if ( strncmp(msg, "<?xml ", 6)==0 ) {
-		indent = 0; 
+		indent = 0;
 		previousIsOpen = TRUE;
 	}
 	char *p=msg, *q;

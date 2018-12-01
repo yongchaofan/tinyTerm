@@ -1,10 +1,10 @@
 //
-// "$Id: auto_drop.c 20023 2018-11-25 21:05:10 $"
+// "$Id: auto_drop.c 20184 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // auto_drop.c extends the Windows Edit control with autocompletion
-// plus enabling text drop target function for scripting 
+// plus enabling text drop target function for scripting
 //
 // Copyright 2015-2018 by Yongchao Fan.
 //
@@ -38,7 +38,7 @@ DEFINE_GUID(CLSID_AutoComplete,  0x00bb2763, 0x6a77, 0x11d0, 0xa5, 0x35, 0x00, 0
 #define STRINGSIZE 256
 /**************************************************************************
 	class CAutoEnumString
-	Description: to impletement the IEnumString interface, 
+	Description: to impletement the IEnumString interface,
 	then provided to IAutoCompelte for command history
 **************************************************************************/
 typedef struct CAutoEnumString {
@@ -152,8 +152,8 @@ void CAutoEnumString_Destruct(CAutoEnumString* this)
 }
 int CAutoEnumString_AddString(CAutoEnumString* this, LPOLESTR lpszStr)
 {
-	for ( int i=0; i<this->m_addCur; i++ ) 
-		if ( wcscmp(this->m_arString[i], lpszStr) == 0 ) 
+	for ( int i=0; i<this->m_addCur; i++ )
+		if ( wcscmp(this->m_arString[i], lpszStr) == 0 )
 			return 0;
 
 	this->m_arString[this->m_addCur] = _wcsdup(lpszStr);
@@ -173,14 +173,22 @@ int CAutoEnumString_AddString(CAutoEnumString* this, LPOLESTR lpszStr)
 }
 LPOLESTR CAutoEnumString_prevString(CAutoEnumString* this)
 {
-    if ( this->m_rtrvCur > 0 ) 
+    if ( this->m_rtrvCur > 0 )
 		return this->m_arString[--this->m_rtrvCur];
+	else
+		return L"";
+}
+LPOLESTR CAutoEnumString_firstString(CAutoEnumString* this)
+{
+    this->m_rtrvCur = 0;
+	if ( this->m_addCur>0 )
+		return this->m_arString[this->m_rtrvCur];
 	else
 		return L"";
 }
 LPOLESTR CAutoEnumString_nextString(CAutoEnumString* this)
 {
-    if ( this->m_rtrvCur < this->m_addCur-1 ) 
+    if ( this->m_rtrvCur < this->m_addCur-1 )
 		return this->m_arString[++this->m_rtrvCur];
 	else
 		return L"";
@@ -201,16 +209,16 @@ void autocomplete_Init(HWND hwndCmd)
 		&IID_IAutoComplete,(LPVOID *) &pauto );
 
 	if ( pauto ) {
-		pauto->lpVtbl->QueryInterface(pauto, &IID_IAutoComplete2, 
+		pauto->lpVtbl->QueryInterface(pauto, &IID_IAutoComplete2,
 															(PVOID*)&pauto2);
 		if ( pauto2 ) {
 			pauto2->lpVtbl->SetOptions(pauto2, ACO_AUTOSUGGEST|ACO_AUTOAPPEND );
 			pauto2->lpVtbl->Release(pauto2);
 		}
 		CAutoEnumString_Construct( &cmdHistory );
-		cmdHistory.lpVtbl->QueryInterface((IEnumString *)&cmdHistory, 
+		cmdHistory.lpVtbl->QueryInterface((IEnumString *)&cmdHistory,
 											&IID_IEnumString, (PVOID*)&penum);
-		if ( penum ) 
+		if ( penum )
 			pauto->lpVtbl->Init(pauto, m_hwnd, (IUnknown *)penum, NULL, NULL);
 	}
 }
@@ -219,6 +227,10 @@ int autocomplete_Add(LPOLESTR cmd)
 	if ( cmd==NULL || pauto==NULL || penum==NULL ) return 0;
 	if ( *cmd==0 ) return 0;
 	return CAutoEnumString_AddString(&cmdHistory, cmd);
+}
+LPOLESTR autocomplete_First( void )
+{
+	return CAutoEnumString_firstString(&cmdHistory);
 }
 LPOLESTR autocomplete_Prev( void )
 {
@@ -277,98 +289,98 @@ typedef struct {
 typedef struct WB_IDataObjectVtbl
 	{
 		BEGIN_INTERFACE
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryInterface )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryInterface )(
 			WB_IDataObject __RPC_FAR * This,
 			/* [in] */ REFIID riid,
 			/* [iid_is][out] */ void __RPC_FAR *__RPC_FAR *ppvObject);
-		
-		ULONG ( STDMETHODCALLTYPE __RPC_FAR *AddRef )( 
+
+		ULONG ( STDMETHODCALLTYPE __RPC_FAR *AddRef )(
 			WB_IDataObject __RPC_FAR * This);
-		
-		ULONG ( STDMETHODCALLTYPE __RPC_FAR *Release )( 
+
+		ULONG ( STDMETHODCALLTYPE __RPC_FAR *Release )(
 			WB_IDataObject __RPC_FAR * This);
-		
-		/* [local] */ HRESULT ( STDMETHODCALLTYPE __RPC_FAR *GetData )( 
+
+		/* [local] */ HRESULT ( STDMETHODCALLTYPE __RPC_FAR *GetData )(
 			WB_IDataObject __RPC_FAR * This,
 			/* [unique][in] */ FORMATETC __RPC_FAR *pformatetcIn,
 			/* [out] */ STGMEDIUM __RPC_FAR *pmedium);
-		
-		/* [local] */ HRESULT ( STDMETHODCALLTYPE __RPC_FAR *GetDataHere )( 
+
+		/* [local] */ HRESULT ( STDMETHODCALLTYPE __RPC_FAR *GetDataHere )(
 			WB_IDataObject __RPC_FAR * This,
 			/* [unique][in] */ FORMATETC __RPC_FAR *pformatetc,
 			/* [out][in] */ STGMEDIUM __RPC_FAR *pmedium);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryGetData )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryGetData )(
 			WB_IDataObject __RPC_FAR * This,
 			/* [unique][in] */ FORMATETC __RPC_FAR *pformatetc);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *GetCanonicalFormatEtc )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *GetCanonicalFormatEtc )(
 			WB_IDataObject __RPC_FAR * This,
 			/* [unique][in] */ FORMATETC __RPC_FAR *pformatectIn,
 			/* [out] */ FORMATETC __RPC_FAR *pformatetcOut);
-		
-		/* [local] */ HRESULT ( STDMETHODCALLTYPE __RPC_FAR *SetData )( 
+
+		/* [local] */ HRESULT ( STDMETHODCALLTYPE __RPC_FAR *SetData )(
 			WB_IDataObject __RPC_FAR * This,
 			/* [unique][in] */ FORMATETC __RPC_FAR *pformatetc,
 			/* [unique][in] */ STGMEDIUM __RPC_FAR *pmedium,
 			/* [in] */ BOOL fRelease);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *EnumFormatEtc )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *EnumFormatEtc )(
 			WB_IDataObject __RPC_FAR * This,
 			/* [in] */ DWORD dwDirection,
 			/* [out] */ IEnumFORMATETC __RPC_FAR *__RPC_FAR *ppenumFormatEtc);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *DAdvise )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *DAdvise )(
 			WB_IDataObject __RPC_FAR * This,
 			/* [in] */ FORMATETC __RPC_FAR *pformatetc,
 			/* [in] */ DWORD advf,
 			/* [unique][in] */ IAdviseSink __RPC_FAR *pAdvSink,
 			/* [out] */ DWORD __RPC_FAR *pdwConnection);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *DUnadvise )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *DUnadvise )(
 			WB_IDataObject __RPC_FAR * This,
 			/* [in] */ DWORD dwConnection);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *EnumDAdvise )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *EnumDAdvise )(
 			WB_IDataObject __RPC_FAR * This,
 			/* [out] */ IEnumSTATDATA __RPC_FAR *__RPC_FAR *ppenumAdvise);
-		
+
 		END_INTERFACE
 	} WB_IDataObjectVtbl;
 
 typedef struct WB_IEnumFORMATETCVtbl
 	{
 		BEGIN_INTERFACE
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryInterface )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryInterface )(
 			WB_IEnumFORMATETC __RPC_FAR * This,
 			/* [in] */ REFIID riid,
 			/* [iid_is][out] */ void __RPC_FAR *__RPC_FAR *ppvObject);
-		
-		ULONG ( STDMETHODCALLTYPE __RPC_FAR *AddRef )( 
+
+		ULONG ( STDMETHODCALLTYPE __RPC_FAR *AddRef )(
 			WB_IEnumFORMATETC __RPC_FAR * This);
-		
-		ULONG ( STDMETHODCALLTYPE __RPC_FAR *Release )( 
+
+		ULONG ( STDMETHODCALLTYPE __RPC_FAR *Release )(
 			WB_IEnumFORMATETC __RPC_FAR * This);
-		
-		/* [local] */ HRESULT ( STDMETHODCALLTYPE __RPC_FAR *Next )( 
+
+		/* [local] */ HRESULT ( STDMETHODCALLTYPE __RPC_FAR *Next )(
 			WB_IEnumFORMATETC __RPC_FAR * This,
 			/* [in] */ ULONG celt,
 			/* [length_is][size_is][out] */ FORMATETC __RPC_FAR *rgelt,
 			/* [out] */ ULONG __RPC_FAR *pceltFetched);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *Skip )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *Skip )(
 			WB_IEnumFORMATETC __RPC_FAR * This,
 			/* [in] */ ULONG celt);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *Reset )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *Reset )(
 			WB_IEnumFORMATETC __RPC_FAR * This);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *Clone )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *Clone )(
 			WB_IEnumFORMATETC __RPC_FAR * This,
 			/* [out] */ WB_IEnumFORMATETC __RPC_FAR *__RPC_FAR *ppenum);
-		
+
 		END_INTERFACE
 	} WB_IEnumFORMATETCVtbl;
 
@@ -376,68 +388,68 @@ typedef struct WB_IEnumFORMATETCVtbl
 typedef struct WB_IDropSourceVtbl
 	{
 		BEGIN_INTERFACE
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryInterface )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryInterface )(
 			WB_IDropSource __RPC_FAR * This,
 			/* [in] */ REFIID riid,
 			/* [iid_is][out] */ void __RPC_FAR *__RPC_FAR *ppvObject);
-		
-		ULONG ( STDMETHODCALLTYPE __RPC_FAR *AddRef )( 
+
+		ULONG ( STDMETHODCALLTYPE __RPC_FAR *AddRef )(
 			WB_IDropSource __RPC_FAR * This);
-		
-		ULONG ( STDMETHODCALLTYPE __RPC_FAR *Release )( 
+
+		ULONG ( STDMETHODCALLTYPE __RPC_FAR *Release )(
 			WB_IDropSource __RPC_FAR * This);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryContinueDrag )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryContinueDrag )(
 			WB_IDropSource __RPC_FAR * This,
 			/* [in] */ BOOL fEscapePressed,
 			/* [in] */ DWORD grfKeyState);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *GiveFeedback )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *GiveFeedback )(
 			WB_IDropSource __RPC_FAR * This,
 			/* [in] */ DWORD dwEffect);
-		
+
 		END_INTERFACE
 	} WB_IDropSourceVtbl;
 
 typedef struct WB_IDropTargetVtbl
 	{
 		BEGIN_INTERFACE
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryInterface )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *QueryInterface )(
 			WB_IDropTarget __RPC_FAR * This,
 			/* [in] */ REFIID riid,
 			/* [iid_is][out] */ void __RPC_FAR *__RPC_FAR *ppvObject);
-		
-		ULONG ( STDMETHODCALLTYPE __RPC_FAR *AddRef )( 
+
+		ULONG ( STDMETHODCALLTYPE __RPC_FAR *AddRef )(
 			WB_IDropTarget __RPC_FAR * This);
-		
-		ULONG ( STDMETHODCALLTYPE __RPC_FAR *Release )( 
+
+		ULONG ( STDMETHODCALLTYPE __RPC_FAR *Release )(
 			WB_IDropTarget __RPC_FAR * This);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *DragEnter )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *DragEnter )(
 			WB_IDropTarget __RPC_FAR * This,
 			/* [unique][in] */ WB_IDataObject __RPC_FAR *pDataObj,
 			/* [in] */ DWORD grfKeyState,
 			/* [in] */ POINTL pt,
 			/* [out][in] */ DWORD __RPC_FAR *pdwEffect);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *DragOver )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *DragOver )(
 			WB_IDropTarget __RPC_FAR * This,
 			/* [in] */ DWORD grfKeyState,
 			/* [in] */ POINTL pt,
 			/* [out][in] */ DWORD __RPC_FAR *pdwEffect);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *DragLeave )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *DragLeave )(
 			WB_IDropTarget __RPC_FAR * This);
-		
-		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *Drop )( 
+
+		HRESULT ( STDMETHODCALLTYPE __RPC_FAR *Drop )(
 			WB_IDropTarget __RPC_FAR * This,
 			/* [unique][in] */ IDataObject __RPC_FAR *pDataObj,
 			/* [in] */ DWORD grfKeyState,
 			/* [in] */ POINTL pt,
 			/* [out][in] */ DWORD __RPC_FAR *pdwEffect);
-		
+
 		END_INTERFACE
 	} WB_IDropTargetVtbl;
 
@@ -453,7 +465,7 @@ void DropData(HWND hwnd, IDataObject *pDataObject);
 //
 void PositionCursor(HWND hwndEdit, POINTL pt)
 {
-	DWORD curpos; 
+	DWORD curpos;
 
 	// get the character position of mouse
 	ScreenToClient(hwndEdit, (POINT *)&pt);
@@ -482,7 +494,7 @@ static DWORD DropEffect(DWORD grfKeyState, POINTL pt, DWORD dwAllowed)
 	DWORD dwEffect = 0;
 
 	// 1. check "pt" -> do we allow a drop at the specified coordinates?
-	
+
 	// 2. work out that the drop-effect should be based on grfKeyState
 	if(grfKeyState & MK_CONTROL)
 	{
@@ -492,7 +504,7 @@ static DWORD DropEffect(DWORD grfKeyState, POINTL pt, DWORD dwAllowed)
 //	{
 //		dwEffect = dwAllowed & DROPEFFECT_MOVE;
 //	}
-	
+
 	// 3. no key-modifiers were specified (or drop effect not allowed), so
 	//    base the effect on those allowed by the dropsource
 	if(dwEffect == 0)
@@ -500,7 +512,7 @@ static DWORD DropEffect(DWORD grfKeyState, POINTL pt, DWORD dwAllowed)
 		if(dwAllowed & DROPEFFECT_COPY) dwEffect = DROPEFFECT_COPY;
 //		if(dwAllowed & DROPEFFECT_MOVE) dwEffect = DROPEFFECT_MOVE;
 	}
-	
+
 	return dwEffect;
 }
 
@@ -562,7 +574,7 @@ static HRESULT STDMETHODCALLTYPE idroptarget_dragenter(WB_IDropTarget* This, WB_
 {
 	// does the dataobject contain data we want?
 	This->m_fAllowDrop = QueryDataObject(pDataObject);
-	
+
 	if(This->m_fAllowDrop)
 	{
 		// get the dropeffect based on keyboard state
@@ -668,7 +680,7 @@ void DropData(HWND hwnd, IDataObject *pDataObject)
 void RegisterDropWindow(HWND hwnd, WB_IDropTarget **ppDropTarget)
 {
 	WB_IDropTarget *pDropTarget;
-	
+
 	CreateDropTarget(hwnd, &pDropTarget);
 
 	// acquire a strong lock
@@ -706,11 +718,11 @@ WB_IDropTarget * WB_IDropTarget_new(HWND hwnd)
   result->m_lRefCount  = 1;
   result->m_hWnd = hwnd;
   result->m_fAllowDrop = FALSE;
-  
+
   return result;
 }
 
-HRESULT CreateDropTarget(HWND hwnd, WB_IDropTarget **ppDropTarget) 
+HRESULT CreateDropTarget(HWND hwnd, WB_IDropTarget **ppDropTarget)
 {
 	if(ppDropTarget == 0)
 		return E_INVALIDARG;

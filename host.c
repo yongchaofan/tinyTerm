@@ -1,9 +1,9 @@
 //
-// "$Id: host.c 13441 2018-11-25 21:05:10 $"
+// "$Id: host.c 13385 2018-11-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
-// host.c is the host communication implementation 
+// host.c is the host communication implementation
 // serial communication is based on WIN32 API.
 // telnet communication is based on posix socket API
 //
@@ -54,10 +54,10 @@ static char Port[256];
 
 	LPTHREAD_START_ROUTINE reader = stdio;
 	if ( strnicmp(port, "com",3)==0 ) reader = serial;
-	else if ( strncmp(port, "telnet", 6)==0 ) { 
+	else if ( strncmp(port, "telnet", 6)==0 ) {
 		port+=7; reader = telnet;
 	}
-	else if ( strncmp(port, "ssh", 3)==0 ) { 
+	else if ( strncmp(port, "ssh", 3)==0 ) {
 		port+=4; reader = ssh;
 	}
 	else if ( strncmp(port, "sftp", 4)==0 ){
@@ -79,7 +79,7 @@ void host_Send( char *buf, int len )
 	DWORD dwWrite;
 	switch ( host_type ) {
 	case STDIO: WriteFile(hStdioWrite, buf, len, &dwWrite, NULL); break;
-	case SERIAL:WriteFile(hSerial, buf, len, &dwWrite, NULL); 
+	case SERIAL:WriteFile(hSerial, buf, len, &dwWrite, NULL);
 				break;
 	case TELNET:send( sock, buf, len, 0); break;
 	case SSH:
@@ -107,7 +107,7 @@ void host_Close()
 	case SERIAL: SetEvent( hExitEvent ); break;
 	case SFTP:	 ssh2_Send("\r",1); ssh2_Send("bye\r",4); break;
 	case SSH:
-	case NETCONF:ssh2_Close(); 
+	case NETCONF:ssh2_Close();
 	case TELNET: closesocket(sock); break;
 	}
 }
@@ -133,7 +133,7 @@ DWORD WINAPI serial(void *pv)
 		term_Disp("Couldn't open comm port\n");
 		goto comm_close;
 	}
-	COMMTIMEOUTS timeouts = { 1, 0, 1, 0, 0 };	
+	COMMTIMEOUTS timeouts = { 1, 0, 1, 0, 0 };
 							//ReadIntervalTimeout = 10
 							//ReadTotalTimeoutMultiplier = 0
 							//ReadTotalTimeoutConstant = 1
@@ -142,10 +142,10 @@ DWORD WINAPI serial(void *pv)
 	if ( SetCommTimeouts(hSerial,&timeouts)==0 ) {
 		term_Disp("couldn't set comm timeout\n");
 		CloseHandle(hSerial);
-		goto comm_close; 
+		goto comm_close;
 	}
 	SetupComm( hSerial, 4096, 1024 );	//comm buffer sizes
-	
+
 	DCB dcb;							// comm port settings
 	memset(&dcb, 0, sizeof(dcb));
 	dcb.DCBlength = sizeof(dcb);
@@ -160,7 +160,7 @@ DWORD WINAPI serial(void *pv)
 	host_type = SERIAL;
 	tiny_Title( (char *)pv );
 	hExitEvent = CreateEventA( NULL, TRUE, FALSE, "COM exit" );
-	while ( WaitForSingleObject( hExitEvent, 0 ) == WAIT_TIMEOUT ) { 
+	while ( WaitForSingleObject( hExitEvent, 0 ) == WAIT_TIMEOUT ) {
 		char buf[256];
 		DWORD dwCCH;
 		if ( ReadFile(hSerial, buf, 255, &dwCCH, NULL) ) {
@@ -168,7 +168,7 @@ DWORD WINAPI serial(void *pv)
 				buf[dwCCH] = 0;
 				term_Parse( buf, dwCCH );
 			}
-			else 
+			else
 				Sleep(1);//give WriteFile a chance to complete
 		}
 		else
@@ -188,15 +188,15 @@ comm_close:
 /***************Telnet*******************************/
 int tcp(const char *host, short port)
 {
-	struct addrinfo *ainfo;	   
+	struct addrinfo *ainfo;
 	if ( getaddrinfo(host, NULL, NULL, &ainfo)!=0 ) return -1;
 	SOCKET s = socket(ainfo->ai_family, SOCK_STREAM, 0);
 	((struct sockaddr_in *)(ainfo->ai_addr))->sin_port = htons(port);
-	
+
 	int rc = connect(s, ainfo->ai_addr, ainfo->ai_addrlen);
 	freeaddrinfo(ainfo);
 	if ( rc!=SOCKET_ERROR ) return s;
-	
+
 	term_Disp( "connection failure!\r\n" );
 	closesocket(s);
 	return -1;
@@ -274,40 +274,40 @@ unsigned char * telnet_Options( unsigned char *buf )
 			}
 			p += 3;
 			break;
-		case TNO_WILL: 
+		case TNO_WILL:
 			if ( *p==TNO_ECHO ) bEcho = FALSE;
 			negoreq[1]=TNO_DO; negoreq[2]=*p;
 			term_Send((char*)negoreq, 3);
 			break;
-		case TNO_WONT: 
+		case TNO_WONT:
 			negoreq[1]=TNO_DONT; negoreq[2]=*p;
 			term_Send((char*)negoreq, 3);
 		   break;
 		case TNO_DONT:
 			break;
 		}
-	return p+1; 
+	return p+1;
 }
 
 /***************************STDIO*******************************/
-static HANDLE Stdin_Rd, Stdin_Wr ;
-static HANDLE Stdout_Rd, Stdout_Wr, Stderr_Wr;
-static PROCESS_INFORMATION piStd; 
+static PROCESS_INFORMATION piStd;
 DWORD WINAPI stdio( void *pv)
 {
-	memset( &piStd, 0, sizeof(PROCESS_INFORMATION) );	
-	//Set up PROCESS_INFORMATION 
+	HANDLE Stdin_Rd, Stdin_Wr ;
+	HANDLE Stdout_Rd, Stdout_Wr, Stderr_Wr;
+	memset( &piStd, 0, sizeof(PROCESS_INFORMATION) );
+	//Set up PROCESS_INFORMATION
 
-	SECURITY_ATTRIBUTES saAttr; 
-	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+	SECURITY_ATTRIBUTES saAttr;
+	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
 	saAttr.bInheritHandle = TRUE;			//Set the bInheritHandle flag
 	saAttr.lpSecurityDescriptor = NULL;		//so pipe handles are inherited
 
-	CreatePipe(&Stdout_Rd, &Stdout_Wr, &saAttr, 0);//pipe for child's STDOUT 
+	CreatePipe(&Stdout_Rd, &Stdout_Wr, &saAttr, 0);//pipe for child's STDOUT
 	SetHandleInformation(Stdout_Rd, HANDLE_FLAG_INHERIT, 0);
 	// Ensure the read handle to the pipe for STDOUT is not inherited
-	CreatePipe(&Stdin_Rd, &Stdin_Wr, &saAttr, 0);	//pipe for child's STDIN 
-	SetHandleInformation(Stdin_Wr, HANDLE_FLAG_INHERIT, 0);	
+	CreatePipe(&Stdin_Rd, &Stdin_Wr, &saAttr, 0);	//pipe for child's STDIN
+	SetHandleInformation(Stdin_Wr, HANDLE_FLAG_INHERIT, 0);
 	// Ensure the write handle to the pipe for STDIN is not inherited
 	DuplicateHandle(GetCurrentProcess(),Stdout_Wr,
                     GetCurrentProcess(),&Stderr_Wr,0,
@@ -323,29 +323,29 @@ DWORD WINAPI stdio( void *pv)
 
 	struct _STARTUPINFOA siStartInfo;
 	memset( &siStartInfo, 0, sizeof(STARTUPINFO) );	// Set STARTUPINFO
-	siStartInfo.cb = sizeof(STARTUPINFO); 
+	siStartInfo.cb = sizeof(STARTUPINFO);
 	siStartInfo.hStdError = Stderr_Wr;
 	siStartInfo.hStdOutput = Stdout_Wr;
 	siStartInfo.hStdInput = Stdin_Rd;
 	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
 	if ( !CreateProcessA( NULL,			// Create the child process.
-						(char *)pv,		// command line 
-						NULL,			// process security attributes 
-						NULL,			// primary thread security attributes 
-						TRUE,			// handles are inherited 
-						CREATE_NO_WINDOW,// creation flags 
-						NULL,			// use parent's environment 
-						NULL,			// use parent's current directory 
-						&siStartInfo,	// STARTUPINFO pointer 
-						&piStd) ) {		// receives PROCESS_INFORMATION 
+						(char *)pv,		// command line
+						NULL,			// process security attributes
+						NULL,			// primary thread security attributes
+						TRUE,			// handles are inherited
+						CREATE_NO_WINDOW,// creation flags
+						NULL,			// use parent's environment
+						NULL,			// use parent's current directory
+						&siStartInfo,	// STARTUPINFO pointer
+						&piStd) ) {		// receives PROCESS_INFORMATION
 		term_Disp("Couldn't create STDIO process\r\n");
 		goto stdio_close;
 	}
 	CloseHandle( Stdin_Rd );
 	CloseHandle( Stdout_Wr );
 	CloseHandle( Stderr_Wr );
-	
+
 	host_status=CONN_CONNECTED;
 	host_type = STDIO;
 	tiny_Title( (char *)pv );
@@ -354,7 +354,7 @@ DWORD WINAPI stdio( void *pv)
 	while ( ReadFile( hStdioRead, buf, 1500, &dwCCH, NULL) > 0 ) {
 		if ( dwCCH > 0 ) {
 			buf[dwCCH] = 0;
-			term_Parse( buf, dwCCH ); 
+			term_Parse( buf, dwCCH );
 		}
 		else
 			Sleep(1);
@@ -369,7 +369,7 @@ stdio_close:
 	hReaderThread = NULL;
 	return 1;
 }
-void stdio_Close() 
+void stdio_Close()
 {
 	if ( WaitForSingleObject(piStd.hProcess, 100)==WAIT_TIMEOUT ) {
 		term_Disp("Terminating stdio process...\r\n");
@@ -384,7 +384,7 @@ const char HEADER[]="HTTP/1.1 200 Ok\
 					\nAccess-Control-Allow-Origin: *\
 					\nContent-Type: text/plain\
 					\nContent-length: %d\
-					\nCache-Control: no-cache\n\n";	
+					\nCache-Control: no-cache\n\n";
 DWORD WINAPI *httpd( void *pv )
 {
 	char buf[1024], *cmd, *reply;
@@ -405,7 +405,7 @@ DWORD WINAPI *httpd( void *pv )
 				send( http_s1, reply, replen, 0 );
 
 				if ( host_status==CONN_CONNECTED ) do {
-					replen = term_Recv( &reply ); 
+					replen = term_Recv( &reply );
 					if ( replen > 0 ) send(http_s1, reply, replen, 0);
 					FD_ZERO(&readset);
 					FD_SET(http_s1, &readset);
@@ -440,7 +440,7 @@ DWORD WINAPI *httpd( void *pv )
 	}
 	return 0;
 }
-int http_Svr( char *intf ) 
+int http_Svr( char *intf )
 {
 static SOCKET http_s0=INVALID_SOCKET;
 
@@ -464,7 +464,7 @@ static SOCKET http_s0=INVALID_SOCKET;
 		if ( bind(http_s0, (struct sockaddr*)&svraddr, addrsize)!=SOCKET_ERROR ) {
 			if ( listen(http_s0, 1)!=SOCKET_ERROR){
 				DWORD dwThreadId;
-				CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE)httpd, 
+				CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE)httpd,
 											&http_s0, 0, &dwThreadId);
 				return p;
 			}
