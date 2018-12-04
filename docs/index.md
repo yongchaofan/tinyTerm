@@ -64,8 +64,6 @@ The screen capture below shows the execution of scp_download.js from script menu
 
 ![Connection](tinyTerm-4.png)
 
-### Header 3
-
 ```js
 // Javascript to download a highlighted file via scp.
 var xml = new ActiveXObject("Microsoft.XMLHTTP");
