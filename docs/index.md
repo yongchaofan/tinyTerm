@@ -90,3 +90,45 @@ Similarly a built in TFTP server can be used for file transfer with simpler devi
 ![Connection](tinyTerm-5.png)
 
 
+# Appendix A. List of special command for editor line and scripting
+**Connection**
+!com3:9600,n,8,1		serial connection to port com3 using settings 9600,n,8,1
+!telnet 192.168.1.1		telnet to 192.168.1.1
+!ssh 192.168.1.1		ssh to host 192.168.1.1
+!sftp -l admin 192.168.1.1	sftp to host 192.168.1.1 with user admin
+!netconf -P 830 192.168.1.1	netconf to port 830 of host 192.168.1.1
+!disconn			disconnect from current connection
+!{DOS command}		execute command and display result, e.g. ping 192.168.1.1
+
+**Options**
+#TermSize 100x40		set terminal window size to 100 columns x 40 rows
+#Transparency 192		set window transparency level to 192/255
+#FontFace Consolas		set font face to “Consolas”
+#FontSize 18			set font size to 18
+
+**Scripting**
+#Clear				set clear scroll back buffer
+#Prompt $%20		set command prompt to “$ “, for batch command execution
+#Timeout 30			set time out to 30 seconds for batch command execution
+#Wait 10			wait 10 seconds during batch command execution
+#Waitfor 100%		wait for “100%” from during batch command execution
+#Loop 2			repeat two times from start of script
+#Log test.log			start/stop logging with log file test.log
+
+**Extending**
+#Disp test case #1		display “test case #1” in terminal window
+#Send ping 192.168.1.1	send “ping 192.168.1.1” to host
+#Recv				get all text received since last Disp/Send/Recv command
+#Echo				toggle local ech on/off
+#Selection			get current selected text
+
+#Ftpd c:/tmp			start/stop ftp server using c:/tmp as root directory
+#Tftpd c:/tmp			start/stop tftp server using c:/tmp as root directory
+
+#scp test.txt :test1.txt		secure copy local file test.txt to remote host as test1.txt
+#scp :test1.txt d:/ 		secure copy remote file test1.txt to local d:/test1.txt
+
+#tun				list all ssh2 tunnels 
+#tun 3256			terminal ssh2 tunnel number 3256
+#tun 127.0.0.1:2222 127.0.0.1:22
+				start ssh2 tunnel from localhost port 2222 to remote host port 22
