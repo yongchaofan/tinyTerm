@@ -57,7 +57,7 @@ tinyTerm will auto detect the prompt string used by remote host when user is typ
 tinyTerm has a xmlhttp interface built in at 127.0.0.1:8080 for advanced scripting. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. Files in the script folder will be listed in the script menu, select one to execute, or use "Run..." to choose a script file from the file system. 
 The screen capture below shows the execution of scp_download.js from script menu, which retrieves the selected filename “tinyTerm.exe” and uses “#scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. When multiple instance of tinyTerm are started, each instance will use a unique port number starting from 8080 and counting up, 8081, 8082...etc. Special commands supported on the xmlhttp interface:
 
- 	#Disp {str}	Display {str} in terminal window
+	#Disp {str}	Display {str} in terminal window
 	#Recv		Return scroll buffer content since last Disp/Recv/Send command
 	#Send {cmd}	Send command and return immediately
 	#Selection	Get current text selection
