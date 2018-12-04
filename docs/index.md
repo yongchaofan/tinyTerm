@@ -57,7 +57,7 @@ tinyTerm will auto detect the prompt string used by remote host when user is typ
 tinyTerm has a xmlhttp interface built in at 127.0.0.1:8080 for advanced scripting. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. Files in the script folder will be listed in the script menu, select one to execute, or use "Run..." to choose a script file from the file system. 
 The screen capture below shows the execution of scp_download.js from script menu, which retrieves the selected filename “tinyTerm.exe” and uses “#scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. When multiple instance of tinyTerm are started, each instance will use a unique port number starting from 8080 and counting up, 8081, 8082...etc. Special commands supported on the xmlhttp interface:
 
-  #Disp {str}	Display {str} in terminal window
+ 	#Disp {str}	Display {str} in terminal window
 	#Recv		Return scroll buffer content since last Disp/Recv/Send command
 	#Send {cmd}	Send command and return immediately
 	#Selection	Get current text selection
@@ -91,44 +91,49 @@ Similarly a built in TFTP server can be used for file transfer with simpler devi
 
 
 # Appendix A. List of special command for editor line and scripting
-**Connection**
-!com3:9600,n,8,1		serial connection to port com3 using settings 9600,n,8,1
-!telnet 192.168.1.1		telnet to 192.168.1.1
-!ssh 192.168.1.1		ssh to host 192.168.1.1
-!sftp -l admin 192.168.1.1	sftp to host 192.168.1.1 with user admin
-!netconf -P 830 192.168.1.1	netconf to port 830 of host 192.168.1.1
-!disconn			disconnect from current connection
-!{DOS command}		execute command and display result, e.g. ping 192.168.1.1
 
-**Options**
-#TermSize 100x40		set terminal window size to 100 columns x 40 rows
-#Transparency 192		set window transparency level to 192/255
-#FontFace Consolas		set font face to “Consolas”
-#FontSize 18			set font size to 18
+## Connection
+	
+	!com3:9600,n,8,1		serial connection to port com3 using settings 9600,n,8,1
+	!telnet 192.168.1.1		telnet to 192.168.1.1
+	!ssh 192.168.1.1		ssh to host 192.168.1.1
+	!sftp -l admin 192.168.1.1	sftp to host 192.168.1.1 with user admin
+	!netconf -P 830 192.168.1.1	netconf to port 830 of host 192.168.1.1
+	!disconn			disconnect from current connection
+	!{DOS command}		execute command and display result, e.g. ping 192.168.1.1
 
-**Scripting**
-#Clear				set clear scroll back buffer
-#Prompt $%20		set command prompt to “$ “, for batch command execution
-#Timeout 30			set time out to 30 seconds for batch command execution
-#Wait 10			wait 10 seconds during batch command execution
-#Waitfor 100%		wait for “100%” from during batch command execution
-#Loop 2			repeat two times from start of script
-#Log test.log			start/stop logging with log file test.log
+## Options
+	
+	#TermSize 100x40		set terminal window size to 100 columns x 40 rows
+	#Transparency 192		set window transparency level to 192/255
+	#FontFace Consolas		set font face to “Consolas”
+	#FontSize 18			set font size to 18
 
-**Extending**
-#Disp test case #1		display “test case #1” in terminal window
-#Send ping 192.168.1.1	send “ping 192.168.1.1” to host
-#Recv				get all text received since last Disp/Send/Recv command
-#Echo				toggle local ech on/off
-#Selection			get current selected text
+## Scripting
+	
+	#Clear				set clear scroll back buffer
+	#Prompt $%20		set command prompt to “$ “, for batch command execution
+	#Timeout 30			set time out to 30 seconds for batch command execution
+	#Wait 10			wait 10 seconds during batch command execution
+	#Waitfor 100%		wait for “100%” from during batch command execution
+	#Loop 2			repeat two times from start of script
+	#Log test.log			start/stop logging with log file test.log
 
-#Ftpd c:/tmp			start/stop ftp server using c:/tmp as root directory
-#Tftpd c:/tmp			start/stop tftp server using c:/tmp as root directory
+## Extending
+	
+	#Disp test case #1		display “test case #1” in terminal window
+	#Send ping 192.168.1.1	send “ping 192.168.1.1” to host
+	#Recv				get all text received since last Disp/Send/Recv command
+	#Echo				toggle local ech on/off
+	#Selection			get current selected text
 
-#scp test.txt :test1.txt		secure copy local file test.txt to remote host as test1.txt
-#scp :test1.txt d:/ 		secure copy remote file test1.txt to local d:/test1.txt
+	#Ftpd c:/tmp			start/stop ftp server using c:/tmp as root directory
+	#Tftpd c:/tmp			start/stop tftp server using c:/tmp as root directory
 
-#tun				list all ssh2 tunnels 
-#tun 3256			terminal ssh2 tunnel number 3256
-#tun 127.0.0.1:2222 127.0.0.1:22
-				start ssh2 tunnel from localhost port 2222 to remote host port 22
+	#scp test.txt :test1.txt		secure copy local file test.txt to remote host as test1.txt
+	#scp :test1.txt d:/ 		secure copy remote file test1.txt to local d:/test1.txt
+
+	#tun				list all ssh2 tunnels 
+	#tun 3256			terminal ssh2 tunnel number 3256
+	#tun 127.0.0.1:2222 127.0.0.1:22
+					start ssh2 tunnel from localhost port 2222 to remote host port 22
