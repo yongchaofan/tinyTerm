@@ -4,7 +4,7 @@
 
 *Minimalist terminal emulator, designed by network engineer for network engineers, with unique features for effeciency and effectiveness when managing network devices like routers, switches, transponders and ROADMs through command line interface.*
 
-![Thumbnail of minimal](thumbnail.png)
+![Thumbnail of minimal](tinyTerm-0.png)
 
 
 ## Project philosophy
