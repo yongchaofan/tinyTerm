@@ -1,11 +1,11 @@
 //
-// "$Id: resource.h 1252 2018-11-30 21:05:10 $"
+// "$Id: resource.h 1252 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // resource.h defines IDs for resources in tinyTerm.rc
 //
-// Copyright 2015-2018 by Yongchao Fan.
+// Copyright 2018-2019 by Yongchao Fan.
 //
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:

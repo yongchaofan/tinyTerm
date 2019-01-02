@@ -1,12 +1,12 @@
 //
-// "$Id: term.c 20882 2018-11-25 21:05:10 $"
+// "$Id: term.c 20902 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // term.c is the minimal xterm implementation, only common ESCAPE
 // control sequences are supported for apps like top, vi etc.
 //
-// Copyright 2015-2018 by Yongchao Fan.
+// Copyright 2018-2019 by Yongchao Fan.
 //
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
@@ -361,6 +361,8 @@ int term_Cmd( char *cmd, char **preply )
 		*p1 = 0;
 		iPrompt = p1-sPrompt;
 	}
+	else 
+		rc = -1;
 	return rc;
 }
 void term_Logg( char *fn )

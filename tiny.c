@@ -1,11 +1,11 @@
 //
-// "$Id: tiny.c 33085 2018-11-29 22:15:10 $"
+// "$Id: tiny.c 32978 2019-01-01 22:15:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // tiny.c is the GUI implementation using WIN32 API.
 //
-// Copyright 2015-2018 by Yongchao Fan.
+// Copyright 2018-2019 by Yongchao Fan.
 //
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
@@ -37,15 +37,14 @@ int iTitleHeight;
 #define ID_CONNECT0		2000
 
 const char WELCOME[]="\n\n\n\
-\ttinyTerm is a minimalist terminal emulator designed for network\n\n\
-\tengineers, a single executable in less than 360KB that features:\n\n\n\
-\t    * Serial/Telnet/SSH/SFTP/Netconf connections\n\n\
-\t    * FTP/TFTP server for file transfer\n\n\
+\ttinyTerm is an open source terminal emulator designed to be\n\n\
+\tsimple, small and scriptable, a single exe in 360KB that features:\n\n\n\
+\t    * Serial/Telnet/SSH/SFTP/Netconf client\n\n\
 \t    * Command history and autocompletion\n\n\
 \t    * Drag and Drop to run command batches\n\n\
 \t    * Scripting interface xmlhttp://127.0.0.1:%d\n\n\n\
-\tBy yongchaofan@gmail.com		11-30-2018\n\n\
-\thttps://zoudaokou.github.io/tinyTerm\n\n\n";
+\tVersion 1.0 ©2018-2019 Yongchao Fan, All rights reserved\n\n\
+\thttps://yongchaofan.github.io/tinyTerm\n\n\n";
 
 const COLORREF COLORS[9] ={ RGB(0,0,0), 	RGB(224,0,0), RGB(0,224,0),
 							RGB(224,224,0), RGB(0,0,224), RGB(224,0,224),
@@ -181,27 +180,18 @@ int tiny_Cmd( char *cmd, char **preply )
 	if ( preply ) *preply = buff+cursor_x;
 	if ( *cmd=='!' ) {
 		cmd_Disp_utf8(cmd++);
-		if ( host_Status()==CONN_IDLE )
-			host_Open(cmd);
-		else {
-			if ( strcmp(cmd, "disconn")==0 )
-				host_Close();
-		}
-	}
-	else if ( *cmd=='#' ) {
-		cmd_Disp_utf8(cmd++);
-		if (strncmp(cmd,"Transparency",12)==0) tiny_Transparency(atoi(cmd+13));
+		if (strncmp(cmd,"Transparency",12)==0)	tiny_Transparency(atoi(cmd+13));
 		else if ( strncmp(cmd, "FontSize", 8)==0 )	tiny_FontSize(atoi(cmd+9));
 		else if ( strncmp(cmd, "FontFace", 8)==0 )	tiny_FontFace(cmd+9);
 		else if ( strncmp(cmd, "TermSize", 8)==0 )	tiny_TermSize(cmd+9);
 		else if ( strncmp(cmd, "Tftpd",5)==0 )		tftp_Svr( cmd+6 );
 		else if ( strncmp(cmd, "Ftpd", 4)==0 ) 		ftp_Svr( cmd+5 );
-		else if ( strncmp(cmd, "scp ", 4)==0 && host_Type()==SSH )
-			rc = scp_cmd(cmd+4, preply);
-		else if ( strncmp(cmd, "tun",  3)==0 && host_Type()==SSH )
-			rc = tun_cmd(cmd+3, preply);
-		else
+		else if ( strncmp(cmd, "scp ", 4)==0 ) rc = scp_cmd(cmd+4, preply);
+		else if ( strncmp(cmd, "tun",  3)==0 ) rc = tun_cmd(cmd+3, preply);
+		else {
 			rc = term_Cmd(cmd, preply);
+			if ( rc==-1 ) host_Open(cmd);
+		}
 	}
 	else {
 		if ( host_Status()!=CONN_IDLE )
@@ -249,8 +239,7 @@ void cmd_Enter(void)
 		switch ( *cmd ) {
 		case '/': term_Srch(cmd+1); break;
 		case '^': cmd[1]-=64; host_Send(cmd+1, 1); break;
-		case '!':
-		case '#': if ( strncmp(cmd+1, "scp ", 4)==0 && host_Type()==SSH )
+		case '!': if ( strncmp(cmd+1, "scp ", 4)==0 && host_Type()==SSH )
 					CreateThread(NULL, 0, scper, strdup(cmd+5), 0, NULL);
 				  else if ( strncmp(cmd+1, "tun",  3)==0 && host_Type()==SSH )
 					CreateThread(NULL, 0, tuner, strdup(cmd+4), 0, NULL);
@@ -1013,9 +1002,13 @@ void LoadDict( WCHAR *wfn )
 			WCHAR wcmd[1024];
 			utf8_to_wchar(cmd, strlen(cmd)+1, wcmd, 1024);
 			autocomplete_Add(wcmd) ;
-			if ( *cmd=='!' )
-				InsertMenu( hTermMenu, -1, MF_BYPOSITION,
-							ID_CONNECT0+iConnectCount++, wcmd+1);
+			if ( *cmd=='!' ) {
+				if ( strncmp(cmd+1, "com", 3)==0 ||
+					 strncmp(cmd+1, "ssh", 3)==0 || 
+					 strncmp(cmd+1, "telnet",6)==0 )
+					InsertMenu( hTermMenu, -1, MF_BYPOSITION,
+								ID_CONNECT0+iConnectCount++, wcmd+1);
+			}
 		}
 		fclose( fp );
 	}
@@ -1094,8 +1087,8 @@ DWORD WINAPI scripter( void *cmds )
 
 		if ( p1>p0 ) {
 			cmd_Disp_utf8(p0);
-			if ( strncmp( p0, "#Wait ", 6)==0 ) Sleep(atoi(p0+6)*1000);
-			else if ( strncmp( p0, "#Loop ", 6)==0 ){
+			if ( strncmp( p0, "!Wait ", 6)==0 ) Sleep(atoi(p0+6)*1000);
+			else if ( strncmp( p0, "!Loop ", 6)==0 ){
 				if ( iRepCount<0 ) iRepCount = atoi( p0+6 );
 				if ( --iRepCount>0 ) {
 					*p1=0x0a;

@@ -1,11 +1,11 @@
 //
-// "$Id: ftpd.c 14462 2018-11-21 21:05:10 $"
+// "$Id: ftpd.c 14462 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // ftpd.c implements minimal ftp and tftp server using posix API.
 //
-// Copyright 2015-2018 by Yongchao Fan.
+// Copyright 2018-2019 by Yongchao Fan.
 //
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:

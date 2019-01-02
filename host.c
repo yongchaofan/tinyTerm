@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 13385 2018-11-25 21:05:10 $"
+// "$Id: host.c 13385 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -7,7 +7,7 @@
 // serial communication is based on WIN32 API.
 // telnet communication is based on posix socket API
 //
-// Copyright 2015-2018 by Yongchao Fan.
+// Copyright 2018-2019 by Yongchao Fan.
 //
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
@@ -52,27 +52,33 @@ void host_Open( char *port )
 {
 static char Port[256];
 
-	LPTHREAD_START_ROUTINE reader = stdio;
-	if ( strnicmp(port, "com",3)==0 ) reader = serial;
-	else if ( strncmp(port, "telnet", 6)==0 ) {
-		port+=7; reader = telnet;
-	}
-	else if ( strncmp(port, "ssh", 3)==0 ) {
-		port+=4; reader = ssh;
-	}
-	else if ( strncmp(port, "sftp", 4)==0 ){
-		port+=5; reader = sftp;
-	}
-	else if ( strncmp(port, "netconf", 7)==0 ) {
-		port+=8; reader = netconf;
-	}
 
 	if ( hReaderThread==NULL ) {
+		LPTHREAD_START_ROUTINE reader = stdio;
+		if ( strnicmp(port, "com",3)==0 ) 
+			reader = serial;
+		else if ( strncmp(port, "telnet", 6)==0 ) {
+			port+=7; reader = telnet;
+		}
+		else if ( strncmp(port, "ssh", 3)==0 ) {
+			port+=4; reader = ssh;
+		}
+		else if ( strncmp(port, "sftp", 4)==0 ){
+			port+=5; reader = sftp;
+		}
+		else if ( strncmp(port, "netconf", 7)==0 ) {
+			port+=8; reader = netconf;
+		}
 		strncpy(Port, port, 255); Port[255]=0;
 		host_status=CONN_CONNECTING;
 		tiny_Connecting();
 		hReaderThread = CreateThread(NULL, 0, reader, Port, 0, NULL);
 	}
+	else {
+		if ( strnicmp(port, "disconn", 7)==0 ) 
+			host_Close();
+	}
+	
 }
 void host_Send( char *buf, int len )
 {
@@ -426,6 +432,7 @@ DWORD WINAPI *httpd( void *pv )
 					}
 				}
 				replen = 0;
+		cmd_Disp_utf8( cmd );
 				if ( *cmd=='?' ) {
 					replen = tiny_Cmd( cmd+1, &reply );
 					int len = sprintf( buf, HEADER, replen );

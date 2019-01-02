@@ -1,11 +1,11 @@
 //
-// "$Id: tinyTerm.rc 2965 2018-11-30 21:05:10 $"
+// "$Id: tinyTerm.rc 2965 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // tinyTerm.rc is the resource file defining dialog, icon and menus.
 //
-// Copyright 2015-2018 by Yongchao Fan.
+// Copyright 2018-2019 by Yongchao Fan.
 //
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
