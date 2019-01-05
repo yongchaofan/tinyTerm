@@ -1,4 +1,4 @@
-# [tinyTerm](http://zoudaokou.github.io/tinyTerm)
+# [tinyTerm](http://yongchaofan.github.io/tinyTerm)
 
 [![Build Status](https://travis-ci.org/pages-themes/minimal.svg?branch=master)](https://travis-ci.org/pages-themes/minimal) 
 
