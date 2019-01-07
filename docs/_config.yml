@@ -2,4 +2,4 @@ theme: jekyll-theme-slate
 show_downloads: true
 github:
   zip_url: tinyTerm.zip
-description: tinyTerm is a terminal emulator designed to be simple, small and scriptable
+description: simple, small and scriptable terminal emulator
