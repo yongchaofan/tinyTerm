@@ -1,4 +1,4 @@
-# [tinyTerm](http://zoudaokou.github.io/tinyTerm)
+# [tinyTerm](http://yongchaofan.github.io/tinyTerm)
 
 [![Build Status](https://travis-ci.org/pages-themes/minimal.svg?branch=master)](https://travis-ci.org/pages-themes/minimal) 
 
@@ -8,7 +8,7 @@
 
 
 ## Project philosophy
-tinyTerm is intended to be small, simple and scriptable, WIN32 executable is only 345KB, source code is consist of 7 .c/.h files totaling 140KB, ~5000 sloc, only required external dependency is libssh2. 
+tinyTerm is intended to be small, simple and scriptable, WIN32 executable is only 345KB, source code is consist of 7 files totaling 140KB, ~5000 sloc, only required external dependency is libssh2. 
 
 User interface design is minimal too, there is one window, main menu shares title bar space, scrollbar hidden until user trys to scroll back, only one dialog for makeing connections, 
 
@@ -22,12 +22,12 @@ Makefiles are provided for building with MSYS2+MingW64/32
 
 ### Librarys
     libssh2 using any daily snapshot after March, 2018 for full support of WinCNG crypto functions
-            ./configure --with-crypto=wincng --disable-shared
+            ./configure --with-crypto=wincng
             make install
             
-            Since Windows XP doesn't have WinCNG support, external crypto library has to be used, 
-            download mbedtls build with default settings and install, then build libssh2
-            ./configure --with-crypto=mbedtls --disable-shared
+    mbedTLS Since Windows XP doesn't have WinCNG support, external crypto library has to be used, 
+            download mbedtls-2.7.9, "make WINDOWS_BUILD=1 no_test install", then build libssh2
+            ./configure --with-crypto=mbedtls
             make install
             
 ### Soruce files

@@ -1,5 +1,5 @@
 
-# Introduction
+## Introduction
 
 tinyTerm is a terminal emulator designed to be **small, simple** and **scriptable**, and with unique additional features to improve efficiency and effectiveness of command line interface user. 
 
@@ -7,7 +7,7 @@ It’s designed with the minimalist philosophy, which resulted clean user interf
 
 ![Introduction](tinyTerm-0.png)
 
-# Making Connection
+## Making Connection
 
 There are three ways to make a connection in tinyTerm, as shown in the screenshot below. 
 
@@ -23,7 +23,7 @@ Private key based authentication is supported too, key file should be stored in 
 
 ![Connection](tinyTerm-1.png)
 
-# Sending Command
+## Sending Command
 
 Like any other terminal program, key strokes in the terminal window is sent to host directly after connection has been established. 
 The **Editor Line** at bottom of the terminal window, is a unique feature of tinyTerm. Input in the edit line is not sent until user presses "Enter" key, plus the input is auto completed using command history, every command typed in the editor line is added to command history to complete future inputs, and the command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm from tinyTerm.hist.
@@ -38,7 +38,7 @@ Note1: since the command history file tinyTerm.hist is just a plain text file, u
 Note 2: connection command started with “!” in the history file will be added to “Term” menu at the start of tinyTerm, so that connections can be made easily through menu clicks
 
 
-# Running Script
+## Running Script
 
 Scripting is the way of choice to automate repetitive tasks, tinyTerm is designed to make scripting as easy as possible. 
 The simplest type of script is just a list of commands in plain text format, either drag&drop a block of text to the editor line, or drag&drop a text file to the terminal window, or “Run…” a text files from the “Script” menu, tinyTerm will send commands in the list one by one. 
@@ -49,7 +49,7 @@ tinyTerm will auto detect the prompt string used by remote host when user is typ
 
 ![Connection](tinyTerm-3.png)
 
-# Create Extension
+## Create Extension
 
 tinyTerm has a xmlhttp interface built in at 127.0.0.1:8080 for advanced scripting. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. Files in the script folder will be listed in the script menu, select one to execute, or use "Run..." to choose a script file from the file system. 
 The screen capture below shows the execution of scp_download.js from script menu, which retrieves the selected filename “tinyTerm.exe” and uses “!scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. When multiple instance of tinyTerm are started, each instance will use a unique port number starting from 8080 and counting up, 8081, 8082...etc. Special commands supported on the xmlhttp interface:
@@ -77,7 +77,7 @@ function term( cmd )
 }
 ```
 
-# Options
+## Options
 
 While the user interface is minimal, there are a few options to customize through Options menu, like font face and font size, window transparency for example. All of the options can be set with command through the editor line or scripts. See appendix A for list of all supported commands. 
 A built in FTP server can be used for simple file transfer tasks, like software download to network devices. Only one user name "tiny" is allowed to login, with password "term". For security, user session to the FTP server is timed out in 1 minute without action, and FTP server will time out in 15 minutes without active connection.
@@ -87,9 +87,9 @@ Similarly a built in TFTP server can be used for file transfer with simpler devi
 ![Connection](tinyTerm-5.png)
 
 
-# Appendix A. List of special command for editor line and scripting
+## Appendix A. List of special command for editor line and scripting
 
-## Connection
+### Connection
 	
 	!com3:9600,n,8,1		serial connection to port com3 using settings 9600,n,8,1
 	!telnet 192.168.1.1		telnet to 192.168.1.1
@@ -99,14 +99,14 @@ Similarly a built in TFTP server can be used for file transfer with simpler devi
 	!disconn			disconnect from current connection
 	!{DOS command}		execute command and display result, e.g. ping 192.168.1.1
 
-## Options
+### Options
 	
 	!TermSize 100x40		set terminal window size to 100 columns x 40 rows
 	!Transparency 192		set window transparency level to 192/255
 	!FontFace Consolas		set font face to “Consolas”
 	!FontSize 18			set font size to 18
 
-## Scripting
+### Scripting
 	
 	!Clear				set clear scroll back buffer
 	!Prompt $%20		set command prompt to “$ “, for batch command execution
@@ -116,7 +116,7 @@ Similarly a built in TFTP server can be used for file transfer with simpler devi
 	!Loop 2			repeat two times from start of script
 	!Log test.log			start/stop logging with log file test.log
 
-## Extending
+### Extending
 	
 	!Disp test case #1		display “test case #1” in terminal window
 	!Send ping 192.168.1.1	send “ping 192.168.1.1” to host

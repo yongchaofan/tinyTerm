@@ -1,1 +1,5 @@
-theme: jekyll-theme-minimal
+theme: jekyll-theme-modernist
+show_downloads: true
+github:
+  zip_url: tinyTerm.zip
+description: simple, small and scriptable terminal emulator
