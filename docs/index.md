@@ -1,13 +1,20 @@
 
 ## Introduction
 
-tinyTerm is a terminal emulator designed to be **small, simple** and **scriptable**, and with unique additional features to improve efficiency and effectiveness of command line interface user. 
+Many network engineers use terminal emulators for connection to network devices and type CLI commands, and frequently face challenges like: 
+	**what's the syntax of that magic command I used last time?**
+	**have to send 100 commands to 10 devices, that's a lot of typing!**
+	**scripting**
+	
+tinyTerm is an attempt to help network engineers with features like:
 
-It’s designed with the minimalist philosophy, which resulted clean user interface, single executable file smaller than 360KB, no installation needed, and no extra DLL required 
+	**command hsitory and autocompletion**
+	**command batch and automation**
+	**scripting interface for extension**
 
 ![Introduction](tinyTerm-0.png)
 
-## Making Connection
+## operation as a terminal
 
 There are three ways to make a connection in tinyTerm, as shown in the screenshot below. 
 
@@ -23,7 +30,7 @@ Private key based authentication is supported too, key file should be stored in 
 
 ![Connection](tinyTerm-1.png)
 
-## Sending Command
+## command history and autocompletion
 
 Like any other terminal program, key strokes in the terminal window is sent to host directly after connection has been established. 
 The **Editor Line** at bottom of the terminal window, is a unique feature of tinyTerm. Input in the edit line is not sent until user presses "Enter" key, plus the input is auto completed using command history, every command typed in the editor line is added to command history to complete future inputs, and the command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm from tinyTerm.hist.
@@ -38,7 +45,7 @@ Note1: since the command history file tinyTerm.hist is just a plain text file, u
 Note 2: connection command started with “!” in the history file will be added to “Term” menu at the start of tinyTerm, so that connections can be made easily through menu clicks
 
 
-## Running Script
+## command batch and scripting
 
 Scripting is the way of choice to automate repetitive tasks, tinyTerm is designed to make scripting as easy as possible. 
 The simplest type of script is just a list of commands in plain text format, either drag&drop a block of text to the editor line, or drag&drop a text file to the terminal window, or “Run…” a text files from the “Script” menu, tinyTerm will send commands in the list one by one. 
