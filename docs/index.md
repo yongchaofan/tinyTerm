@@ -1,10 +1,11 @@
 
 ## Introduction
 
-Many network engineers use terminal emulators for connection to network devices and type CLI commands, and frequently face challenges like: 
-	**what's the syntax of that magic command I used last time?**
-	**have to send 100 commands to 10 devices, that's a lot of typing!**
-	**scripting**
+Many network engineers use terminal emulators for connection to network devices and type CLI commands, and frequently face challenges like:
+
+	. what's the syntax of that magic command I used last time?
+	. have to send 100 commands to 10 devices, that's a lot of typing!
+	. scripting
 	
 tinyTerm is an attempt to help network engineers with features like:
 
