@@ -2,16 +2,14 @@
 ## Introduction
 
 Network engineers commonly use terminal emulator to send CLI commands to network devices, and frequently face challenges like:
-
-	. what's the syntax of that magic command I used last time?
-	. have to send 100 commands to 10 devices, that's a lot of typing!
-	. scripting
+	what's the syntax of that magic command I used last time?
+	have to send 100 commands to 10 devices, that's a lot of typing!
+	scripting
 	
 tinyTerm is an open source terminal emulator designed to network engineers with features like:
-
-	**command hsitory and autocompletion**
-	**command batch and automation**
-	**scripting interface for extension**
+	command hsitory and autocompletion
+	command batch and automation
+	scripting interface for extension
 
 ## Terminal Emulation
 
@@ -24,9 +22,7 @@ Making new connection will automatically add an entry to Term menu, simply selec
 ![operation](tinyTerm-1.gif)
 
 
-## command history and autocompletion
-
-**Autocomplete** is a unique feature of tinyTerm, which can be enabled through the Options menu or Alt-A, cursor changes from horizontal bar to vertical line when enabled. In autocomplete mode, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in autocomplete mode is added to command history to complete future inputs.
+**Command Autocompletion** is a unique feature of tinyTerm, which can be enabled through the Options menu or Alt-A, cursor changes from horizontal bar to vertical line when enabled. In autocomplete mode, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in autocomplete mode is added to command history to complete future inputs.
 
 Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. Since the command history file tinyTerm.hist is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
 
@@ -36,9 +32,7 @@ In autocomplete mode, when special characters “!,/” is typed at the beginnin
 See Appendix A for list of supported special commands.
 
 
-## command batch automation
-
-**Automation** is another unique feature of tinyTerm, which can take a list of commands, send to remote host one at a time. Contrary to popular terminal programs, tinyTerm will not send all commands at once, risking overflow of the input buffer at remote host or network device, instead tinyTerm will wait for the prompt string from remote host before sending each command. Most command line interface system uses a prompt string to tell user it’s ready for the next command, for example “> “or “$ “used by Cisco routers. 
+**Batch Automation** is another unique feature of tinyTerm, which can take a list of commands, send to remote host one at a time. Contrary to popular terminal programs, tinyTerm will not send all commands at once, risking overflow of the input buffer at remote host or network device, instead tinyTerm will wait for the prompt string from remote host before sending each command. Most command line interface system uses a prompt string to tell user it’s ready for the next command, for example “> “or “$ “used by Cisco routers. 
 
 tinyTerm will auto detect the prompt string used by remote host when user is typing commands interactively, and use the detected prompt string during scripting. Additionally, prompt string can be set in the script using special command “!Prompt {str}”, refer to appendix A for details and other special commands supported for scripting. 
 
@@ -46,15 +40,20 @@ tinyTerm will auto detect the prompt string used by remote host when user is typ
 
 To automate the execution of commands, simply drag and drop from text editor to the input line in autocomplete mode, or select "Run..." from Script menu and select a text file with all the commands need to be executed. 
 
-## Create Extension
 
-tinyTerm has a xmlhttp interface built in at 127.0.0.1:8080 for advanced scripting. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. Files in the script folder will be listed in the script menu, select one to execute, or use "Run..." to choose a script file from the file system. 
-The screen capture below shows the execution of scp_download.js from script menu, which retrieves the selected filename “tinyTerm.exe” and uses “!scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. When multiple instance of tinyTerm are started, each instance will use a unique port number starting from 8080 and counting up, 8081, 8082...etc. Special commands supported on the xmlhttp interface:
+**SCP integration** is a feature that maybe more attractive to server administrators than network engineers. When a SSH session is established in tinyTerm, simply drag and drop a file or multiple file to the terminal window will cause those files been transfered to remote host using SCP, remote files will be created in the current directory. Full featured scp command can be used in autocomplete mode like "!scp *.txt :" for upload and "!scp :*.log ." for download. 
+
+For simpler download operation, although not as simple as drag and drop, see the next section. 
+
+
+**Script Extension** is the third unique feature of tinyTerm. Built in xmlhttp interface at 127.0.0.1:8080 allows tinyTerm to be controled programmatically. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. Below are the commands most useful through xmlhttp interface: 
 
 	!Disp {str}	Display {str} in terminal window
 	!Recv		Return scroll buffer content since last Disp/Recv/Send command
 	!Send {cmd}	Send command and return immediately
 	!Selection	Get current text selection
+
+The screen capture below shows the execution of scp_download.js from script menu, which retrieves the selected filename “tinyTerm.exe” and uses “!scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. 
 
 ![extension](tinyTerm-4.gif)
 
@@ -74,24 +73,24 @@ function term( cmd )
 }
 ```
 
-## Options
 
-While the user interface is minimal, there are a few options to customize through Options menu, like font face and font size, window transparency for example. All of the options can be set with command through the editor line or scripts. See appendix A for list of all supported commands. 
+**Additional Options**, While the user interface is minimal, there are a few options to customize through Options menu, like font face and font size, window transparency for example. All of the options can be set with command through the editor line or scripts. See appendix A for list of all supported commands. 
+
 A built in FTP server can be used for simple file transfer tasks, like software download to network devices. Only one user name "tiny" is allowed to login, with password "term". For security, user session to the FTP server is timed out in 1 minute without action, and FTP server will time out in 15 minutes without active connection.
+
 Similarly a built in TFTP server can be used for file transfer with simpler devices like cable modems. TFTP server times out after 5 minutes. 
 
 For ssh/sftp/netconf connections, command line options are supported 
--l username, -pw password, -pp passphrase, -P destination port
+	-l username, -pw password, -pp passphrase, -P destination port
 Private key based authentication is supported too, key file should be stored in $USER/.ssh folder, as is the knownhost file for host verification. 
 
 
-![Connection](tinyTerm-5.png)
+![Options](tinyTerm-5.png)
 
 
 ## Appendix A. List of special command for editor line and scripting
 
-### Connection
-	
+	###Connection
 	!com3:9600,n,8,1		serial connection to port com3 using settings 9600,n,8,1
 	!telnet 192.168.1.1		telnet to 192.168.1.1
 	!ssh 192.168.1.1		ssh to host 192.168.1.1
@@ -100,15 +99,13 @@ Private key based authentication is supported too, key file should be stored in 
 	!disconn			disconnect from current connection
 	!{DOS command}		execute command and display result, e.g. ping 192.168.1.1
 
-### Options
-	
+	###Options
 	!TermSize 100x40		set terminal window size to 100 columns x 40 rows
 	!Transparency 192		set window transparency level to 192/255
 	!FontFace Consolas		set font face to “Consolas”
 	!FontSize 18			set font size to 18
 
-### Scripting
-	
+	###Scripting
 	!Clear				set clear scroll back buffer
 	!Prompt $%20		set command prompt to “$ “, for batch command execution
 	!Timeout 30			set time out to 30 seconds for batch command execution
@@ -117,8 +114,7 @@ Private key based authentication is supported too, key file should be stored in 
 	!Loop 2			repeat two times from start of script
 	!Log test.log			start/stop logging with log file test.log
 
-### Extending
-	
+	###Extending
 	!Disp test case #1		display “test case #1” in terminal window
 	!Send ping 192.168.1.1	send “ping 192.168.1.1” to host
 	!Recv				get all text received since last Disp/Send/Recv command
