@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 13385 2019-01-01 21:05:10 $"
+// "$Id: host.c 13389 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -12,11 +12,11 @@
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
 //
-//	   https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//	   https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
 //
 // Please report all bugs and problems on the following page:
 //
-//	   https://github.com/zoudaokou/tinyTerm/issues/new
+//	   https://github.com/yongchaofan/tinyTerm/issues/new
 //
 #include <winsock2.h>
 #include <ws2tcpip.h>

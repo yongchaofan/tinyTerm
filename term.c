@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 20902 2019-01-01 21:05:10 $"
+// "$Id: term.c 20906 2019-01-03 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -11,11 +11,11 @@
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
 //
-//     https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//     https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
 //
 // Please report all bugs and problems on the following page:
 //
-//     https://github.com/zoudaokou/tinyTerm/issues/new
+//     https://github.com/yongchaofan/tinyTerm/issues/new
 //
 #include <windows.h>
 #include "tiny.h"
@@ -26,19 +26,19 @@ int size_x=TERMCOLS, size_y=TERMLINES;
 int cursor_x, cursor_y;
 int screen_y, scroll_y;
 int sel_left, sel_right;
-BOOL bLogging=FALSE, bEcho=FALSE, bCursor;
+BOOL bLogging=FALSE, bEcho=FALSE, bCursor, bAlterScreen;
+static BOOL bAppCursor, bGraphic, bEscape, bTitle, bInsert;
+static int save_x, save_y;
+static int roll_top, roll_bot;
+
+static char title[256];
+static int title_idx = 0;
+static FILE *fpLogFile;
 
 static BOOL bPrompt=FALSE, bEnter=FALSE, bEnter1=FALSE;
 static char sPrompt[32]=";\n> ", *tl1text=NULL;
 static int  iPrompt=4, iTimeOut=30, tl1len=0;
 static HANDLE hTL1Event;
-
-static FILE *fpLogFile;
-static int save_x, save_y;
-static int roll_top, roll_bot;
-static BOOL bAppCursor, bAlterScreen, bGraphic, bEscape, bTitle, bInsert;
-static char title[256];
-static int title_idx = 0;
 unsigned char * vt100_Escape( unsigned char *sz, int cnt );
 
 void term_Init( )

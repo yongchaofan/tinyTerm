@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 38259 2019-01-01 21:05:10 $"
+// "$Id: ssh2.c 39588 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -11,11 +11,11 @@
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
 //
-//	   https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//	   https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
 //
 // Please report all bugs and problems on the following page:
 //
-//	   https://github.com/zoudaokou/tinyTerm/issues/new
+//	   https://github.com/yongchaofan/tinyTerm/issues/new
 //
 #include <libssh2.h>
 #include <libssh2_sftp.h>
@@ -54,24 +54,22 @@ int ssh_wait_socket()
 	if ( dir & LIBSSH2_SESSION_BLOCK_OUTBOUND ) wfd = &fds;
 	return select(sock+1, rfd, wfd, NULL, NULL );
 }
-static char *keys;
+static char keys[256];
 static int cursor, bReturn=TRUE, bPassword;
-int ssh2_Gets(char *buf, BOOL bPass, int seconds)
+char *ssh2_Gets(char *prompt, BOOL bEcho)
 {
-	bReturn=FALSE; bPassword=bPass;
-	keys=buf; keys[0]=0;
+	bReturn=FALSE; bPassword=!bEcho;
+	term_Disp(prompt);
+	keys[0]=0;
 	cursor=0;
 	int old_cursor=0;
-	for ( int i=0; i<seconds*10&&bReturn==FALSE; i++ ) {
+	for ( int i=0; i<1800&&bReturn==FALSE; i++ ) {
 		if ( cursor>old_cursor ) { old_cursor=cursor; i=0; }
 		Sleep(100);
 	}
-	if ( bReturn )
-		return cursor;
-	else {
-		bReturn = TRUE;
-		return -1; //timeout
-	}
+	char *res = bReturn ? keys : NULL;	//NULL is timed out
+	bReturn = TRUE;
+	return res;
 }
 void ssh2_Send( char *buf, int len )
 {
@@ -207,13 +205,13 @@ int ssh_knownhost()
 								LIBSSH2_KNOWNHOST_TYPE_PLAIN|
 								LIBSSH2_KNOWNHOST_KEYENC_RAW, &knownhost);
 	if ( check==LIBSSH2_KNOWNHOST_CHECK_MATCH ) {
-		term_Disp("\033[32mmatch found in .ssh/known_hosts\r\n\033[37m");
+		term_Disp("\033[32mmatch found in .ssh/known_hosts\n\033[37m");
 		goto Verified;
 	}
 	if ( check==LIBSSH2_KNOWNHOST_CHECK_MISMATCH ) {
 		if ( type==((knownhost->typemask&LIBSSH2_KNOWNHOST_KEY_MASK)
 								  >>LIBSSH2_KNOWNHOST_KEY_SHIFT) ) {
-			term_Disp("\033[31m!!!changed! proceed with care!!!\r\n\033[37m");
+			term_Disp("\033[31m!!!changed! proceed with care!!!\n\033[37m");
 		}
 		else
 			check=LIBSSH2_KNOWNHOST_CHECK_NOTFOUND;
@@ -238,50 +236,85 @@ int ssh_knownhost()
 								LIBSSH2_KNOWNHOST_FILE_OPENSSH);
 			fprintf(fp, "%s", buf );
 			fclose(fp);
-			term_Disp("\033[32madded to .ssh/known_hosts\r\n\033[37m");
+			term_Disp("\033[32madded to .ssh/known_hosts\n\033[37m");
 		}
 		else
-			term_Disp("\033[33mcouldn't add to .ssh/known_hosts\r\n\033[37m");
+			term_Disp("\033[33mcouldn't add to .ssh/known_hosts\n\033[37m");
 	}
 Verified:
 	libssh2_knownhost_free(nh);
 	return 0;
 }
+static void kbd_callback(const char *name, int name_len,
+                         const char *instruction, int instruction_len,
+                         int num_prompts,
+                         const LIBSSH2_USERAUTH_KBDINT_PROMPT *prompts,
+                         LIBSSH2_USERAUTH_KBDINT_RESPONSE *responses,
+                         void **abstract)
+{
+    for ( int i=0; i<num_prompts; i++) {
+		char *prompt = strdup(prompts[i].text);
+		prompt[prompts[i].length] = 0;
+		const char *p = ssh2_Gets(prompt, prompts[i].echo);
+		free(prompt);
+		if ( p!=NULL ) {
+			responses[i].text = strdup(p);
+			responses[i].length = strlen(p);
+		}
+    }
+} 
 int ssh_authentication(char *username, char *password, char *passphrase)
 {
-	char user[256], pass[256];
+	char user[256], pw[256];
 	if ( username==NULL ) {
-		term_Disp("\nusername:");
-		ssh2_Gets(user, FALSE, 30);
-		username = user;
+		char *p = ssh2_Gets("\nusername:", TRUE);
+		if ( p!=NULL ) {
+			strcpy(user, p); username = user;
+		}
+		else 
+			return -5;
 	}
-	if ( libssh2_userauth_list(sshSession, username, strlen(username))==NULL )
-		return 0;
-	if ( password==NULL) {	// try public key
+	char *authlist=libssh2_userauth_list(sshSession,username,strlen(username));
+	if ( authlist==NULL ) return 0;	//null authentication
+	
+	if ( strstr(authlist, "publickey")!=NULL ) {	// try public key
 		char pubkeyfile[MAX_PATH], privkeyfile[MAX_PATH];
 		strcpy(pubkeyfile, homedir);
 		strcat(pubkeyfile, ".ssh/id_rsa.pub");
 		strcpy(privkeyfile, homedir);
 		strcat(privkeyfile, ".ssh/id_rsa");
-		if ( !libssh2_userauth_publickey_fromfile(sshSession,
-				username, pubkeyfile, privkeyfile, passphrase) ) {
-			term_Disp("\n");
-			return 0;
+		struct stat buf;
+		if ( stat(pubkeyfile, &buf)==0 && stat(privkeyfile, &buf)==0 ) {
+			if ( !libssh2_userauth_publickey_fromfile(sshSession,
+					username, pubkeyfile, privkeyfile, passphrase) ) {
+				term_Disp("\033[32m\npublic key authentication passed\033[37m\n");
+				return 0;
+			}
 		}
 	}
-	for ( int rep=0; rep<3; rep++ ) {
-		if ( password==NULL ) {
-			term_Disp("\npassword:");
-			ssh2_Gets(pass, TRUE, 30);
-			password = pass;
+	if ( strstr(authlist, "password")!=NULL ) {
+		for ( int rep=0; rep<3; rep++ ) {
+			if ( password==NULL ) {
+				char *p = ssh2_Gets("\npassword:", FALSE);
+				if ( p!=NULL ) {
+					strcpy(pw, p);
+					password = pw;
+				}
+			}
+			if ( !libssh2_userauth_password(sshSession, username, password) ) {
+				term_Disp("\n");
+				return 0;
+			}
+			password=NULL;
 		}
-		if ( !libssh2_userauth_password(sshSession, username, password) ) {
-			term_Disp("\n");
-			return 0;
-		}
-		password=NULL;
 	}
-	term_Disp("too many tries!\n");
+	else if ( strstr(authlist, "keyboard-interactive")!=NULL ) {
+		for ( int i=0; i<3; i++ )
+			if (!libssh2_userauth_keyboard_interactive(sshSession, username,
+                                              			&kbd_callback) ) 
+				return 0;
+	}
+	term_Disp("\033[31m\ntoo many tries\033[37m\n");
 	return -5;
 }
 DWORD WINAPI ssh( void *pv )
@@ -1241,7 +1274,7 @@ int sftp_cmd(char *cmd)
 	else if ( strncmp(cmd, "get",3)==0 ) sftp_get(src, p2);
 	else if ( strncmp(cmd, "put",3)==0 ) sftp_put(p1, dst);
 	else if ( strncmp(cmd, "bye",3)==0 ) return -1;
-	else term_Print("\033[31m%s is not supported command, try %s\r\n\t%s\n",
+	else term_Print("\033[31m%s is not supported command, try %s\n\t%s\n",
 				cmd, "\033[37mlcd, lpwd, cd, pwd,",
 				"ls, dir, get, put, ren, rm, del, mkdir, rmdir, bye");
 	return 0;
@@ -1277,17 +1310,19 @@ DWORD WINAPI sftp( void *pv )
 	host_status=CONN_CONNECTED;
 	host_type=SFTP;
 	tiny_Title(hostname);
-	char cmd[256];
+	char prompt[4096], *cmd;
 	while ( rc!=-1 ) {
-		term_Print("sftp %s> ", realpath);
-		rc = ssh2_Gets(cmd, FALSE, 300);
-		if ( rc>0 ) {
+		sprintf(prompt, "sftp %s> ", realpath);
+		cmd = ssh2_Gets(prompt, TRUE);
+		if ( cmd!=NULL ) {
 			term_Disp("\n");
-			rc = sftp_cmd(cmd);
+			if ( *cmd ) 
+				if ( sftp_cmd(cmd)==-1 ) break;
 		}
-		else
-			if ( rc==-1 )
-				term_Disp("\033[31m\r\nTime Out\033[37m");
+		else {
+			term_Disp("\033[31m\nTime Out\033[37m");
+			break;
+		}
 	}
 
 	libssh2_sftp_shutdown(sftpSession);

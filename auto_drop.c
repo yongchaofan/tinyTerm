@@ -1,5 +1,5 @@
 //
-// "$Id: auto_drop.c 20184 2019-01-01 21:05:10 $"
+// "$Id: auto_drop.c 20188 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -11,11 +11,11 @@
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
 //
-//     https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//     https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
 //
 // Please report all bugs and problems on the following page:
 //
-//     https://github.com/zoudaokou/tinyTerm/issues/new
+//     https://github.com/yongchaofan/tinyTerm/issues/new
 //
 #define INITGUID
 #include <basetyps.h>

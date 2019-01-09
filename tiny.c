@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 32978 2019-01-01 22:15:10 $"
+// "$Id: tiny.c 33971 2019-01-03 14:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -10,11 +10,11 @@
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
 //
-//     https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//     https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
 //
 // Please report all bugs and problems on the following page:
 //
-//     https://github.com/zoudaokou/tinyTerm/issues/new
+//     https://github.com/yongchaofan/tinyTerm/issues/new
 //
 #include <windows.h>
 #include <windowsx.h>
@@ -29,7 +29,7 @@ extern int size_y, size_x;
 extern int screen_y;
 extern int scroll_y;
 extern int sel_left, sel_right;
-extern BOOL bCursor, bLogging;
+extern BOOL bCursor, bLogging, bAlterScreen;
 int iTitleHeight;
 #define iCmdHeight		18
 #define CONN_TIMER		64
@@ -38,17 +38,18 @@ int iTitleHeight;
 
 const char WELCOME[]="\n\n\n\
 \ttinyTerm is an open source terminal emulator designed to be\n\n\
-\tsimple, small and scriptable, a single exe in 360KB that features:\n\n\n\
+\tsimple, small and scriptable, release 1.0 features:\n\n\n\
+\t    * Single exe, no installation needed\n\n\
 \t    * Serial/Telnet/SSH/SFTP/Netconf client\n\n\
 \t    * Command history and autocompletion\n\n\
 \t    * Drag and Drop to run command batches\n\n\
 \t    * Scripting interface xmlhttp://127.0.0.1:%d\n\n\n\
-\tVersion 1.0 ©2018-2019 Yongchao Fan, All rights reserved\n\n\
+\t©2018-2019 Yongchao Fan, All rights reserved\n\n\
 \thttps://yongchaofan.github.io/tinyTerm\n\n\n";
 
-const COLORREF COLORS[9] ={ RGB(0,0,0), 	RGB(224,0,0), RGB(0,224,0),
+const COLORREF COLORS[8] ={ RGB(0,0,0), 	RGB(224,0,0), RGB(0,224,0),
 							RGB(224,224,0), RGB(0,0,224), RGB(224,0,224),
-							RGB(0,244,244), RGB(224,224,224), RGB(0, 64,0) };
+							RGB(0,244,244), RGB(224,224,224) };
 static HINSTANCE hInst;
 static RECT termRect, wndRect;
 static HWND hwndMain, hwndCmd;
@@ -64,7 +65,7 @@ static int iFontHeight, iFontWidth;
 static int iTransparency = 255;
 static int iConnectCount, iScriptCount, httport;
 static BOOL bScrollbar = FALSE;
-static BOOL bFocus = FALSE;
+static BOOL bFocus = FALSE, bEditor = FALSE;
 static BOOL bFTPd = FALSE, bTFTPd = FALSE;
 static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
 
@@ -174,6 +175,17 @@ BOOL fontDialog()
 	}
 	return rc;
 }
+void menu_Add(char *cmd, WCHAR *wcmd)
+{
+	if ( strnicmp(cmd,"com", 3)==0 ||
+		 strncmp(cmd, "ssh", 3)==0 || 
+		 strncmp(cmd, "sftp", 4)==0 || 
+		 strncmp(cmd, "telnet",6)==0 || 
+		 strncmp(cmd, "netconf",7)==0 )
+		InsertMenu( hTermMenu, -1, MF_BYPOSITION,
+					ID_CONNECT0+iConnectCount++, wcmd);
+}
+
 int tiny_Cmd( char *cmd, char **preply )
 {
 	int rc = 0;
@@ -233,12 +245,12 @@ void cmd_Enter(void)
 	int cch = SendMessage(hwndCmd, WM_GETTEXT, (WPARAM)255, (LPARAM)wcmd);
 	if ( cch >= 0 ) {
 		wcmd[cch] = 0;
-		autocomplete_Add(wcmd);
-		cch = wchar_to_utf8(wcmd,cch+1, cmd,255);
+		cch = wchar_to_utf8(wcmd, cch+1, cmd, 255);
 		cmd[cch] = 0;
+		if ( autocomplete_Add(wcmd) ) 
+			if ( *cmd=='!' ) menu_Add(cmd+1, wcmd+1);
 		switch ( *cmd ) {
 		case '/': term_Srch(cmd+1); break;
-		case '^': cmd[1]-=64; host_Send(cmd+1, 1); break;
 		case '!': if ( strncmp(cmd+1, "scp ", 4)==0 && host_Type()==SSH )
 					CreateThread(NULL, 0, scper, strdup(cmd+5), 0, NULL);
 				  else if ( strncmp(cmd+1, "tun",  3)==0 && host_Type()==SSH )
@@ -249,13 +261,21 @@ void cmd_Enter(void)
 		default:  cmd[cch]='\r'; host_Send(cmd, cch+1);
 		}
 	}
+	cmd_Disp(L"");
 }
 WNDPROC wpOrigCmdProc;
 LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 								WPARAM wParam, LPARAM lParam)
 {
 	if ( uMsg==WM_KEYDOWN ){
-		if ( (GetKeyState(VK_CONTROL)&0x8000) == 0) {
+		if ( GetKeyState(VK_CONTROL) & 0x8000 ) { 			//CTRL+
+			char cmd = 0;
+			if ( wParam==54 ) cmd = 30;						//^
+			if ( wParam>64 && wParam<91 ) cmd = wParam-64;	//A-Z
+			if ( wParam>218&&wParam<222 ) cmd = wParam-192;	//[\]
+			if ( cmd ) host_Send(&cmd, 1);
+		}
+		else {
 			switch ( wParam ) {
 			case VK_UP: cmd_Disp(autocomplete_Prev()); break;
 			case VK_DOWN: cmd_Disp(autocomplete_Next()); break;
@@ -313,7 +333,7 @@ void tiny_Font( HWND hwnd )
 	int x = wndRect.left;
 	int y = wndRect.top;
 	wndRect.right = x + iFontWidth*size_x;
-	wndRect.bottom = y + iFontHeight*size_y + iCmdHeight+1;
+	wndRect.bottom = y + iFontHeight*size_y + 1;
 	AdjustWindowRect(&wndRect, WS_TILEDWINDOW, FALSE);
 	MoveWindow( hwnd, x, y, wndRect.right-wndRect.left,
 							wndRect.bottom-wndRect.top, TRUE );
@@ -400,14 +420,27 @@ void tiny_Paint(HDC hDC)
 														slider_y+7 );
 	}
 	BitBlt(hDC,0,0,termRect.right,termRect.bottom, hBufDC,0,0,SRCCOPY);
+	if ( bEditor ) {
+		if ( bAlterScreen ) {
+			MoveWindow( hwndCmd, 0, 0, 1, 1, TRUE);
+			bEditor = FALSE;
+			check_Option( hOptionMenu, ID_EDITOR, bEditor );
+			SetFocus(hwndMain);
+		}
+		else
+			MoveWindow( hwndCmd, (cursor_x-line[cursor_y])*iFontWidth,
+							(cursor_y-screen_y)*iFontHeight, 
+							termRect.right,	iCmdHeight, TRUE );
+	}
 	if ( bFocus ) {
-		bCursor ? ShowCaret(hwndMain) : HideCaret(hwndMain);
 		int cch = utf8_to_wchar(buff+line[cursor_y],
 								cursor_x-line[cursor_y], wbuf, 1024);
 		DrawText(hBufDC, wbuf, cch, &text_rect, DT_CALCRECT);
 		SetCaretPos( text_rect.right+1,
 					(cursor_y-screen_y+1)*iFontHeight-iFontHeight/4);
+		bCursor ? ShowCaret(hwndMain) : HideCaret(hwndMain);
 	}
+
 }
 
 const WCHAR *PROTOCOLS[]={L"Serial", L"telnet", L"ssh", L"sftp", L"netconf"};
@@ -533,14 +566,27 @@ BOOL menu_Command( WPARAM wParam )
 		if ( host_Status()!=CONN_IDLE ) host_Close();
 		break;
 	case ID_EDITOR:
-		SetFocus(GetFocus()==hwndCmd ? hwndMain : hwndCmd);
+		bEditor = !bEditor;
+		check_Option( hOptionMenu, ID_EDITOR, bEditor );
+		if ( bEditor ) {
+			MoveWindow( hwndCmd, (cursor_x-line[cursor_y])*iFontWidth,
+								termRect.bottom-iCmdHeight, 
+								termRect.right,	iCmdHeight, TRUE );
+			SetFocus(hwndCmd);
+		}
+		else {
+			MoveWindow( hwndCmd, 0, termRect.bottom-1, 1, 1, TRUE );
+			SetFocus(hwndMain);
+		}
+		tiny_Redraw();
 		break;
 	case ID_PASTE:
 		PasteText();
 		break;
 	case ID_COPYALL:
 		sel_left=0; sel_right=cursor_x;
-		CopyText(); tiny_Redraw();
+		CopyText();
+		tiny_Redraw();
 		break;
 	case ID_LOGGING:
 		if ( !bLogging ) {
@@ -637,16 +683,12 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		SetLayeredWindowAttributes(hwnd,0,255,LWA_ALPHA);
 		DragAcceptFiles( hwnd, TRUE );
 		GetClientRect( hwnd, &termRect );
-		termRect.bottom -= iCmdHeight;
 		tiny_Font( hwnd );
 		break;
 	case WM_SIZE:
 		GetClientRect( hwnd, &termRect );
-		termRect.bottom -= iCmdHeight;
 		size_x = termRect.right / iFontWidth;
 		size_y = termRect.bottom / iFontHeight;
-		MoveWindow( hwndCmd, 0, termRect.bottom, termRect.right,
-												iCmdHeight, TRUE );
 		term_Size();
 		host_Size( size_x, size_y );
 		if ( hBufDC!=NULL ) DeleteDC(hBufDC);
@@ -703,7 +745,6 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 					}
 				}
 			}
-
 		break;
 	case WM_KEYDOWN:
 		term_Keydown(wParam);
@@ -718,7 +759,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		term_Scroll( GET_WHEEL_DELTA_WPARAM(wParam)/40 );
 		break;
 	case WM_ACTIVATE:
-		SetFocus( hwnd );
+		SetFocus( bEditor? hwndCmd : hwndMain );
 		tiny_Redraw( );
 		break;
 	case WM_LBUTTONDBLCLK: {
@@ -795,7 +836,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		}
 		ReleaseCapture();
 		bScrollbar = FALSE;
-		SetFocus( hwnd );
+		SetFocus( bEditor ? hwndCmd : hwndMain );
 		break;
 	case WM_MBUTTONUP:
 		if ( sel_right>sel_left )
@@ -811,7 +852,8 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		int y = GET_Y_LPARAM(lParam)-wndRect.top;
 		if ( y>0 && y<iTitleHeight ) for ( int i=0; i<3; i++ )
 			if ( x>menuX[i] && x<menuX[i+1] )
-				TrackPopupMenu( hMenu[i],TPM_LEFTBUTTON, wndRect.left+menuX[i],
+				TrackPopupMenu( hMenu[i],TPM_LEFTBUTTON, 
+									wndRect.left+menuX[i]-24,
 									wndRect.top+iTitleHeight, 0, hwnd, NULL );
 		}
 		return DefWindowProc(hwnd,msg,wParam,lParam);
@@ -820,7 +862,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		break;
 	case WM_CTLCOLOREDIT:
 		SetTextColor( (HDC)wParam, COLORS[3] );
-		SetBkColor( (HDC)wParam, COLORS[8] );
+		SetBkColor( (HDC)wParam, COLORS[0] );
 		return (LRESULT)dwBkBrush;		//must return brush for update
 	case WM_ERASEBKGND:
 		return 1;
@@ -852,7 +894,7 @@ void tiny_Menu( HWND hwnd )
 {
 	iTitleHeight = 	 GetSystemMetrics(SM_CYFRAME)
 					+GetSystemMetrics(SM_CYCAPTION)
-					+GetSystemMetrics(SM_CXPADDEDBORDER);
+					+GetSystemMetrics(92);	//SM_CXPADDEDBORDER
 	HDC wndDC = GetWindowDC(hwnd);
 	RECT menuRect;
 	DrawText(wndDC, L"  Term  ", 8, &menuRect, DT_CALCRECT);
@@ -909,10 +951,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	httport = host_Init();
 	term_Init( );
 
-	dwBkBrush = CreateSolidBrush( COLORS[8] );
+	dwBkBrush = CreateSolidBrush( COLORS[0] );
 	dwScrollBrush = CreateSolidBrush( RGB(64,64,64) );
 	dwSliderBrush = CreateSolidBrush( COLORS[1] );
-	hEditFont = CreateFont( 18,0,0,0,FW_MEDIUM, FALSE,FALSE,FALSE,
+	hEditFont = CreateFont( 18,0,0,0,FW_BOLD, FALSE,FALSE,FALSE,
 						DEFAULT_CHARSET,OUT_TT_PRECIS,CLIP_DEFAULT_PRECIS,
 						DEFAULT_QUALITY, VARIABLE_PITCH,L"Arial");
 	hTermFont = CreateFont( 18,0,0,0,FW_MEDIUM, FALSE,FALSE,FALSE,
@@ -1001,14 +1043,8 @@ void LoadDict( WCHAR *wfn )
 			while ( l>0 && cmd[l]<0x10 ) cmd[l--]=0;
 			WCHAR wcmd[1024];
 			utf8_to_wchar(cmd, strlen(cmd)+1, wcmd, 1024);
-			autocomplete_Add(wcmd) ;
-			if ( *cmd=='!' ) {
-				if ( strncmp(cmd+1, "com", 3)==0 ||
-					 strncmp(cmd+1, "ssh", 3)==0 || 
-					 strncmp(cmd+1, "telnet",6)==0 )
-					InsertMenu( hTermMenu, -1, MF_BYPOSITION,
-								ID_CONNECT0+iConnectCount++, wcmd+1);
-			}
+			if ( autocomplete_Add(wcmd) )
+				if ( *cmd=='!' ) menu_Add(cmd+1, wcmd+1);
 		}
 		fclose( fp );
 	}
