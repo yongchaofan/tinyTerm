@@ -3,18 +3,17 @@
 
 Network engineers commonly use terminal emulator to send CLI commands to network devices, and frequently face challenges like:
 	
-	* what's the syntax of that magic command I used last time?
-	* have to send 100 commands to 10 devices, that's a lot of typing!
-	* scripting
+	- what's the syntax of that magic command I used last time?
+	- have to send 100 commands to 10 devices, that's a lot of typing!
+	- Wish the terminal can send command intelligently based on server response
 	
 tinyTerm is an open source terminal emulator designed to network engineers with features like:
 	
-	* command hsitory and autocompletion
-	* command batch and automation
-	* scripting interface for extension
+	- command hsitory and autocompletion
+	- command batch and automation
+	- scripting interface for extension
 
 ## Terminal Emulation
-
 At first glance, tinyTerm is just another terminal emulator, operates just like any other emulators. User interface design takes minimallist philosophy like putty, and goes even further as to integrate munu bar into title bar, hide srollbar until scrolling back, only one dialog for connection making. 
 
 Five types of connections supported: serial, telnet, ssh, sftp and netconf. 
@@ -24,7 +23,8 @@ Making new connection will automatically add an entry to Term menu, simply selec
 ![operation](tinyTerm-1.gif)
 
 
-**Command Autocompletion** is a unique feature of tinyTerm, which can be enabled through the Options menu or Alt-A, cursor changes from horizontal bar to vertical line when enabled. In autocomplete mode, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in autocomplete mode is added to command history to complete future inputs.
+## Command Autocompletion
+is a unique feature of tinyTerm, which can be enabled through the Options menu or Alt-A, cursor changes from horizontal bar to vertical line when enabled. In autocomplete mode, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in autocomplete mode is added to command history to complete future inputs.
 
 Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. Since the command history file tinyTerm.hist is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
 
@@ -34,7 +34,8 @@ In autocomplete mode, when special characters “!,/” is typed at the beginnin
 See Appendix A for list of supported special commands.
 
 
-**Batch Automation** is another unique feature of tinyTerm, which can take a list of commands, send to remote host one at a time. Contrary to popular terminal programs, tinyTerm will not send all commands at once, risking overflow of the input buffer at remote host or network device, instead tinyTerm will wait for the prompt string from remote host before sending each command. Most command line interface system uses a prompt string to tell user it’s ready for the next command, for example “> “or “$ “used by Cisco routers. 
+## Batch Automation
+is another unique feature of tinyTerm, which can take a list of commands, send to remote host one at a time. Contrary to popular terminal programs, tinyTerm will not send all commands at once, risking overflow of the input buffer at remote host or network device, instead tinyTerm will wait for the prompt string from remote host before sending each command. Most command line interface system uses a prompt string to tell user it’s ready for the next command, for example “> “or “$ “used by Cisco routers. 
 
 tinyTerm will auto detect the prompt string used by remote host when user is typing commands interactively, and use the detected prompt string during scripting. Additionally, prompt string can be set in the script using special command “!Prompt {str}”, refer to appendix A for details and other special commands supported for scripting. 
 
@@ -43,14 +44,16 @@ tinyTerm will auto detect the prompt string used by remote host when user is typ
 To automate the execution of commands, simply drag and drop from text editor to the input line in autocomplete mode, or select "Run..." from Script menu and select a text file with all the commands need to be executed. 
 
 
-**SCP integration** is a feature that maybe more attractive to server administrators than network engineers. When a SSH session is established in tinyTerm, simply drag and drop a file or multiple file to the terminal window will cause those files been transfered to remote host using SCP, remote files will be created in the current directory. Full featured scp command can be used in autocomplete mode like "!scp *.txt :" for upload and "!scp :*.log ." for download. 
+## SCP integration
+is a feature that maybe more attractive to server administrators than network engineers. When a SSH session is established in tinyTerm, simply drag and drop a file or multiple file to the terminal window will cause those files been transfered to remote host using SCP, remote files will be created in the current directory. Full featured scp command can be used in autocomplete mode like "!scp *.txt :" for upload and "!scp :*.log ." for download. 
 
 ![integrasion](tinyTerm-4.gif)
 
 For simpler download operation, although not as simple as drag and drop, see the next section. 
 
 
-**Script Extension** is the third unique feature of tinyTerm. Built in xmlhttp interface at 127.0.0.1:8080 allows tinyTerm to be controled programmatically. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. Below are the commands most useful through xmlhttp interface: 
+## Script Extension
+is the third unique feature of tinyTerm. Built in xmlhttp interface at 127.0.0.1:8080 allows tinyTerm to be controled programmatically. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. Below are the commands most useful through xmlhttp interface: 
 
 	!Disp {str}	Display {str} in terminal window
 	!Recv		Return scroll buffer content since last Disp/Recv/Send command
@@ -78,7 +81,8 @@ function term( cmd )
 ```
 
 
-**Additional Options**, While the user interface is minimal, there are a few options to customize through Options menu, like font face and font size, window transparency for example. All of the options can be set with command through the editor line or scripts. See appendix A for list of all supported commands. 
+## Additional Options
+While the user interface is minimal, there are a few options to customize through Options menu, like font face and font size, window transparency for example. All of the options can be set with command through the editor line or scripts. See appendix A for list of all supported commands. 
 
 A built in FTP server can be used for simple file transfer tasks, like software download to network devices. Only one user name "tiny" is allowed to login, with password "term". For security, user session to the FTP server is timed out in 1 minute without action, and FTP server will time out in 15 minutes without active connection.
 
@@ -94,44 +98,44 @@ Private key based authentication is supported too, key file should be stored in 
 
 ## Appendix A. List of special command for editor line and scripting
 
-	###Connection
-	!com3:9600,n,8,1		serial connection to port com3 using settings 9600,n,8,1
-	!telnet 192.168.1.1		telnet to 192.168.1.1
-	!ssh 192.168.1.1		ssh to host 192.168.1.1
-	!sftp -l admin 192.168.1.1	sftp to host 192.168.1.1 with user admin
-	!netconf -P 830 192.168.1.1	netconf to port 830 of host 192.168.1.1
-	!disconn			disconnect from current connection
+### Connection
+	!com3:9600,n,8,1	serial connection to port com3 using settings 9600,n,8,1
+	!telnet 192.168.1.1	telnet to 192.168.1.1
+	!ssh 192.168.1.1	ssh to host 192.168.1.1
+	!sftp pi@192.168.1.1	sftp to host 192.168.1.1 with user admin
+	!netconf router1:830	netconf to port 830 of host 192.168.1.1
+	!disconn		disconnect from current connection
 	!{DOS command}		execute command and display result, e.g. ping 192.168.1.1
 
-	###Options
-	!TermSize 100x40		set terminal window size to 100 columns x 40 rows
-	!Transparency 192		set window transparency level to 192/255
-	!FontFace Consolas		set font face to “Consolas”
-	!FontSize 18			set font size to 18
-
-	###Scripting
-	!Clear				set clear scroll back buffer
+### Automation
+	!Clear			set clear scroll back buffer
 	!Prompt $%20		set command prompt to “$ “, for batch command execution
-	!Timeout 30			set time out to 30 seconds for batch command execution
-	!Wait 10			wait 10 seconds during batch command execution
+	!Timeout 30		set time out to 30 seconds for batch command execution
+	!Wait 10		wait 10 seconds during batch command execution
 	!Waitfor 100%		wait for “100%” from during batch command execution
 	!Loop 2			repeat two times from start of script
-	!Log test.log			start/stop logging with log file test.log
+	!Log test.log		start/stop logging with log file test.log
 
-	###Extending
-	!Disp test case #1		display “test case #1” in terminal window
+### Scripting
+	!Disp test case #1	display “test case #1” in terminal window
 	!Send ping 192.168.1.1	send “ping 192.168.1.1” to host
-	!Recv				get all text received since last Disp/Send/Recv command
-	!Echo				toggle local ech on/off
-	!Selection			get current selected text
+	!Recv			get all text received since last Disp/Send/Recv command
+	!Echo			toggle local ech on/off
+	!Selection		get current selected text
 
-	!Ftpd c:/tmp			start/stop ftp server using c:/tmp as root directory
-	!Tftpd c:/tmp			start/stop tftp server using c:/tmp as root directory
+### Options
+	!TermSize 100x40	set terminal window size to 100 columns x 40 rows
+	!Transparency 192	set window transparency level to 192/255
+	!FontFace Consolas	set font face to “Consolas”
+	!FontSize 18		set font size to 18
 
-	!scp test.txt :test1.txt		secure copy local file test.txt to remote host as test1.txt
-	!scp :test1.txt d:/ 		secure copy remote file test1.txt to local d:/test1.txt
+	!Ftpd c:/tmp		start/stop ftp server using c:/tmp as root directory
+	!Tftpd c:/tmp		start/stop tftp server using c:/tmp as root directory
 
-	!tun				list all ssh2 tunnels 
-	!tun 3256			terminal ssh2 tunnel number 3256
+	!scp test.txt :t1.txt	secure copy local file test.txt to remote host as test1.txt
+	!scp :t1.txt d:/ 	secure copy remote file test1.txt to local d:/test1.txt
+
+	!tun			list all ssh2 tunnels 
+	!tun 3256		close ssh2 tunnel number 3256
 	!tun 127.0.0.1:2222 127.0.0.1:22
-					start ssh2 tunnel from localhost port 2222 to remote host port 22
+				start ssh2 tunnel from localhost port 2222 to remote host port 22
