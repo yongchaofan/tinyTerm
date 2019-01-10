@@ -24,7 +24,7 @@ Making new connection will automatically add an entry to Term menu, simply selec
 
 
 ## Command Autocompletion
-is a unique feature of tinyTerm, which can be enabled through the Options menu or Alt-A, cursor changes from horizontal bar to vertical line when enabled. In autocomplete mode, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in autocomplete mode is added to command history to complete future inputs.
+is a unique feature of tinyTerm, which can be enabled through the Options menu or Alt-E, cursor changes from horizontal bar to vertical line when enabled. In autocomplete mode, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in autocomplete mode is added to command history to complete future inputs.
 
 Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. Since the command history file tinyTerm.hist is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
 
@@ -45,7 +45,7 @@ To automate the execution of commands, simply drag and drop from text editor to 
 
 
 ## SCP integration
-is a feature that maybe more attractive to server administrators than network engineers. When a SSH session is established in tinyTerm, simply drag and drop a file or multiple file to the terminal window will cause those files been transfered to remote host using SCP, remote files will be created in the current directory. Full featured scp command can be used in autocomplete mode like "!scp *.txt :" for upload and "!scp :*.log ." for download. 
+is a feature that maybe more attractive to server administrators than network engineers. When a SSH session is established in tinyTerm, simply drag and drop files to the terminal window will cause those files been transfered to remote host using SCP, remote files will be created in the current directory. Full featured scp command can be used in autocomplete mode like "!scp *.txt :" for upload and "!scp :*.log ." for download. 
 
 ![integrasion](tinyTerm-4.gif)
 
