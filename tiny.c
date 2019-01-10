@@ -580,13 +580,15 @@ BOOL menu_Command( WPARAM wParam )
 		}
 		tiny_Redraw();
 		break;
-	case ID_PASTE:
-		PasteText();
-		break;
 	case ID_COPYALL:
 		sel_left=0; sel_right=cursor_x;
-		CopyText();
 		tiny_Redraw();
+		//fall through
+	case ID_COPY:
+		CopyText();
+		break;
+	case ID_PASTE:
+		PasteText();
 		break;
 	case ID_LOGGING:
 		if ( !bLogging ) {
@@ -828,7 +830,6 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			int sel_max = max(sel_left, sel_right);
 			sel_left = sel_min;
 			sel_right = sel_max;
-			CopyText();
 		}
 		else {
 			sel_left = sel_right = 0;
@@ -845,7 +846,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	case WM_RBUTTONUP:
 		TrackPopupMenu(hContextMenu,TPM_RIGHTBUTTON,
 					GET_X_LPARAM(lParam)+wndRect.left,
-					GET_Y_LPARAM(lParam)+wndRect.top, 0, hwnd, NULL);
+					GET_Y_LPARAM(lParam)+wndRect.top+24, 0, hwnd, NULL);
 		break;
 	case WM_NCLBUTTONDOWN: {
 		int x = GET_X_LPARAM(lParam)-wndRect.left;
@@ -912,8 +913,8 @@ void tiny_Menu( HWND hwnd )
 	hContextMenu = CreatePopupMenu();
 	InsertMenu(hContextMenu, 0, MF_BYPOSITION|MF_POPUP,
 							(UINT_PTR)hScriptMenu, 		L"Script");
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_COPYALL, L"Copy All");
 	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_PASTE,L"Paste");
+	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_COPY, L"Copy");
 
 	WIN32_FIND_DATA FindFileData;
 	HANDLE hFind;

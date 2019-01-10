@@ -1,5 +1,5 @@
 //
-// "$Id: tinyTerm.rc 2965 2019-01-01 21:05:10 $"
+// "$Id: tinyTerm.rc 3008 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -10,11 +10,11 @@
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
 //
-//     https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//     https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
 //
 // Please report all bugs and problems on the following page:
 //
-//     https://github.com/zoudaokou/tinyTerm/issues/new
+//     https://github.com/yongchaofan/tinyTerm/issues/new
 //
 #include <windows.h>
 #include <commctrl.h>
@@ -27,10 +27,10 @@ IDMENU_MAIN MENU
 	POPUP "&Term"
 	{
 		MENUITEM "&Connect...\tAlt+C", 	ID_CONNECT
+		MENUITEM "Local &Echo\tAlt+E",	ID_ECHO
 		MENUITEM "&Logging...\tAlt+L", 	ID_LOGGING
-		MENUITEM "Copy &All\tAlt+A",	ID_COPYALL
-		MENUITEM "local echo", 			ID_ECHO
-		MENUITEM "About",				ID_ABOUT
+		MENUITEM "Copy All",			ID_COPYALL
+		MENUITEM "&About",				ID_ABOUT
 		MENUITEM SEPARATOR
 	}
 	POPUP "&Script"
@@ -42,30 +42,31 @@ IDMENU_MAIN MENU
 	}
 	POPUP "&Options"
 	{
+		MENUITEM "&Autocomplete\tAlt+A",ID_EDITOR
+		MENUITEM "&Transparent",		ID_TRANSPARENT
 		MENUITEM "&Font...",			ID_FONT
 		MENUITEM "Ftpd...", 			ID_FTPD
 		MENUITEM "Tftpd...", 			ID_TFTPD
-		MENUITEM "&Transparency",		ID_TRANSPARENT
 	}
 }
 IDACCEL_MAIN ACCELERATORS
 {
-  "a",	ID_COPYALL,	ALT
-  "b", 	ID_EDITOR, 	ALT
+  "a",	ID_EDITOR,	ALT
   "c",	ID_CONNECT, ALT
   "d",	ID_DISCONN, ALT
+  "e", 	ID_ECHO, 	ALT
   "l",	ID_LOGGING, ALT
   "r",	ID_SCRUN,	ALT
   "p", 	ID_SCPAUSE, ALT
   "q",	ID_SCQUIT,	ALT
   "o",	ID_OPTIONS, ALT
   "s", 	ID_SCRIPT, 	ALT
-  "t", 	ID_TERM, 	ALT
+  "t", 	ID_TERM,	ALT
  }
 
 IDD_CONNECT DIALOG 45, 30, 130, 90	// Connection Dialog
 CAPTION "Connect Dialog"
-FONT 10, "Ms Shell Dlg"
+FONT 8, "Ms Shell Dlg"
 {
     COMBOBOX IDPROTO, 40, 10, 70, 16, CBS_DROPDOWNLIST|CBS_HASSTRINGS|WS_TABSTOP
     LTEXT    "Protocol:", 	0,  4, 12, 32, 12, SS_RIGHT, WS_EX_LEFT
@@ -91,7 +92,7 @@ FONT 10, "Ms Shell Dlg"
         BLOCK "040904B0"
         {
             VALUE "FileDescription", "Tiny Terminal Emulator"
-            VALUE "LegalCopyright", "©2015-2018 Yongchao Fan"
+            VALUE "LegalCopyright", "©2018-2019 Yongchao Fan"
             VALUE "ProductName", "tinyTerm"
             VALUE "ProductVersion", "1.0.0"
         }

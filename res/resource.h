@@ -1,5 +1,5 @@
 //
-// "$Id: resource.h 1252 2019-01-01 21:05:10 $"
+// "$Id: resource.h 1234 2019-01-03 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -10,11 +10,11 @@
 // This library is free software distributed under GNU LGPL 3.0,
 // see the license at:
 //
-//     https://github.com/zoudaokou/tinyTerm/blob/master/LICENSE
+//     https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
 //
 // Please report all bugs and problems on the following page:
 //
-//     https://github.com/zoudaokou/tinyTerm/issues/new
+//     https://github.com/yongchaofan/tinyTerm/issues/new
 //
 #define ID_ABOUT		65
 #define ID_EDITOR		66	//B
@@ -23,8 +23,8 @@
 #define ID_ECHO			69
 #define ID_FONT			70
 #define ID_COPYALL		71
-#define ID_PASTE		72
-#define ID_TRANSPARENT	73
+#define ID_COPY			72
+#define ID_PASTE		73
 #define ID_LOGGING		76	//L
 #define ID_FTPD			77
 #define ID_TFTPD		78
@@ -33,7 +33,8 @@
 #define ID_SCQUIT		81	//Q
 #define ID_SCRUN		82	//R
 #define ID_SCRIPT 		83	//S
-#define ID_TERM			84	//T
+#define ID_TRANSPARENT	84	//T
+#define ID_TERM			85
 
 #define IDICON_TL1		5128
 #define IDMENU_MAIN		5129
