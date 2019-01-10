@@ -2,14 +2,16 @@
 ## Introduction
 
 Network engineers commonly use terminal emulator to send CLI commands to network devices, and frequently face challenges like:
-	what's the syntax of that magic command I used last time?
-	have to send 100 commands to 10 devices, that's a lot of typing!
-	scripting
+	
+	* what's the syntax of that magic command I used last time?
+	* have to send 100 commands to 10 devices, that's a lot of typing!
+	* scripting
 	
 tinyTerm is an open source terminal emulator designed to network engineers with features like:
-	command hsitory and autocompletion
-	command batch and automation
-	scripting interface for extension
+	
+	* command hsitory and autocompletion
+	* command batch and automation
+	* scripting interface for extension
 
 ## Terminal Emulation
 
