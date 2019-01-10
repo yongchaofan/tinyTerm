@@ -43,6 +43,8 @@ To automate the execution of commands, simply drag and drop from text editor to 
 
 **SCP integration** is a feature that maybe more attractive to server administrators than network engineers. When a SSH session is established in tinyTerm, simply drag and drop a file or multiple file to the terminal window will cause those files been transfered to remote host using SCP, remote files will be created in the current directory. Full featured scp command can be used in autocomplete mode like "!scp *.txt :" for upload and "!scp :*.log ." for download. 
 
+![integrasion](tinyTerm-4.gif)
+
 For simpler download operation, although not as simple as drag and drop, see the next section. 
 
 
@@ -55,7 +57,7 @@ For simpler download operation, although not as simple as drag and drop, see the
 
 The screen capture below shows the execution of scp_download.js from script menu, which retrieves the selected filename “tinyTerm.exe” and uses “!scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. 
 
-![extension](tinyTerm-4.gif)
+![extension](tinyTerm-5.gif)
 
 ```js
 // Javascript to download a highlighted file via scp.
