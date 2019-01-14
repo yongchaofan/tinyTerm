@@ -24,13 +24,13 @@ Making new connection will automatically add an entry to Term menu, simply selec
 
 
 ## Command Autocompletion
-is a unique feature of tinyTerm, which can be enabled through the Options menu or Alt-E, cursor changes from horizontal bar to vertical line when enabled. In autocomplete mode, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in autocomplete mode is added to command history to complete future inputs.
+is a unique feature of tinyTerm, when local edit mode is enabled, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs.
 
-Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. Since the command history file tinyTerm.hist is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
+Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
 
 ![completion](tinyTerm-2.gif)
 
-In autocomplete mode, when special characters “!,/” is typed at the beginning of a command, the command will be executed by tinyTerm instead of sending to remote host, for functions like making connection, search scroll buffer, set terminal options, scp file transfer or ssh tunnel setup etc. 
+In line edit mode, when special characters “!,/” is typed at the beginning of a command, the command will be executed by tinyTerm instead of sending to remote host, for functions like making connection, search scroll buffer, set terminal options, scp file transfer or ssh tunnel setup etc. 
 See Appendix A for list of supported special commands.
 
 
