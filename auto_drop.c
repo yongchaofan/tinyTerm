@@ -1,5 +1,5 @@
 //
-// "$Id: auto_drop.c 20188 2019-01-01 21:05:10 $"
+// "$Id: auto_drop.c 18552 2019-01-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -23,24 +23,15 @@
 #include <ole2.h>
 #include <shlwapi.h>
 #include <shldisp.h>
+DEFINE_GUID(CLSID_AutoComplete, 0x00bb2763, 0x6a77, 0x11d0, 
+								0xa5, 0x35, 0x00, 0xc0, 0x4f, 0xd7, 0xd0, 0x62);
 
-//DEFINE_GUID(IID_IDropSource,0x121,0,0,0xc0,0,0,0,0,0,0,0x46);
-//DEFINE_GUID(IID_IDropTarget,0x122,0,0,0xc0,0,0,0,0,0,0,0x46);
-DEFINE_GUID(CLSID_AutoComplete,  0x00bb2763, 0x6a77, 0x11d0, 0xa5, 0x35, 0x00, 0xc0, 0x4f, 0xd7, 0xd0, 0x62);
-#define ACO_NONE			 0x0
-#define ACO_AUTOSUGGEST		 0x1
-#define ACO_AUTOAPPEND		 0x2
-#define ACO_SEARCH			 0x4
-#define ACO_FILTERPREFIXES	 0x8
-#define ACO_USETAB			 0x10
-#define ACO_UPDOWNKEYDROPSLIST	0x20
 
 #define STRINGSIZE 256
-/**************************************************************************
-	class CAutoEnumString
-	Description: to impletement the IEnumString interface,
-	then provided to IAutoCompelte for command history
-**************************************************************************/
+//
+//impletemention of IEnumString interface,
+//provided to IAutoCompelte for command history
+//
 typedef struct CAutoEnumString {
     IEnumStringVtbl *lpVtbl;
 	LPOLESTR * m_arString;
@@ -193,14 +184,13 @@ LPOLESTR CAutoEnumString_nextString(CAutoEnumString* this)
 	else
 		return L"";
 }
-/************************************************************************
-	AutoComplete implementation
-************************************************************************/
-static CAutoEnumString cmdHistory;
-static IAutoComplete *pauto=NULL;
-static IAutoComplete2 *pauto2=NULL;
-static IEnumString *penum=NULL;
+//
+//	AutoComplete implementation
+//
 static HWND m_hwnd;
+static CAutoEnumString cmdHistory;
+static IEnumString *penum  =NULL;
+static IAutoComplete *pauto = NULL;
 
 void autocomplete_Init(HWND hwndCmd)
 {
@@ -209,14 +199,14 @@ void autocomplete_Init(HWND hwndCmd)
 		&IID_IAutoComplete,(LPVOID *) &pauto );
 
 	if ( pauto ) {
-		pauto->lpVtbl->QueryInterface(pauto, &IID_IAutoComplete2,
-															(PVOID*)&pauto2);
+		IAutoComplete2 *pauto2 = NULL;		
+		pauto->lpVtbl->QueryInterface(pauto,&IID_IAutoComplete2,(PVOID*)&pauto2);
 		if ( pauto2 ) {
 			pauto2->lpVtbl->SetOptions(pauto2, ACO_AUTOSUGGEST|ACO_AUTOAPPEND );
 			pauto2->lpVtbl->Release(pauto2);
 		}
 		CAutoEnumString_Construct( &cmdHistory );
-		cmdHistory.lpVtbl->QueryInterface((IEnumString *)&cmdHistory,
+		cmdHistory.lpVtbl->QueryInterface( (IEnumString *)&cmdHistory,
 											&IID_IEnumString, (PVOID*)&penum);
 		if ( penum )
 			pauto->lpVtbl->Init(pauto, m_hwnd, (IUnknown *)penum, NULL, NULL);
@@ -224,9 +214,11 @@ void autocomplete_Init(HWND hwndCmd)
 }
 int autocomplete_Add(LPOLESTR cmd)
 {
-	if ( cmd==NULL || pauto==NULL || penum==NULL ) return 0;
-	if ( *cmd==0 ) return 0;
-	return CAutoEnumString_AddString(&cmdHistory, cmd);
+	if ( pauto && penum && cmd ) {
+		if ( *cmd ) 
+			return CAutoEnumString_AddString(&cmdHistory, cmd);
+	}
+	return 0;
 }
 LPOLESTR autocomplete_First( void )
 {
@@ -247,12 +239,9 @@ void autocomplete_Destroy()
 	CAutoEnumString_Destruct(&cmdHistory);
 }
 
-void DropScript( char *cmds );
-
-/************************************************************************
-	DropTarget implementation
-************************************************************************/
-// data object:
+//
+//	DropTarget implementation
+//
 typedef struct {
 	IDataObject ido;
 	int ref_count;
@@ -267,9 +256,9 @@ typedef struct {
 	IEnumFORMATETC ief;
 	int ref_count;
 	int ix;
-	LONG		m_lRefCount;		// Reference count for this COM interface
-	ULONG		m_nIndex;			// current enumerator index
-	ULONG		m_nNumFormats;		// number of FORMATETC members
+	LONG		m_lRefCount;
+	ULONG		m_nIndex;
+	ULONG		m_nNumFormats;
 	FORMATETC * m_pFormatEtc;
 } WB_IEnumFORMATETC;
 
@@ -457,33 +446,19 @@ typedef WB_IDataObject* LPWBDATAOBJECT;
 typedef WB_IEnumFORMATETC* LPWBFORMATETC;
 WB_IEnumFORMATETC *WB_IEnumFORMATETC_new (UINT, FORMATETC *);
 
-static IDropTarget *pDropTarget;
-HRESULT CreateDropTarget(HWND hwnd, WB_IDropTarget **ppDropTarget);
-void DropData(HWND hwnd, IDataObject *pDataObject);
 //
 //	Position the edit control's caret under the mouse
 //
 void PositionCursor(HWND hwndEdit, POINTL pt)
 {
-	DWORD curpos;
+//	DWORD curpos;
 
 	// get the character position of mouse
-	ScreenToClient(hwndEdit, (POINT *)&pt);
-	curpos = SendMessage(hwndEdit, EM_CHARFROMPOS, 0, MAKELPARAM(pt.x, pt.y));
+//	ScreenToClient(hwndEdit, (POINT *)&pt);
+//	curpos = SendMessage(hwndEdit, EM_CHARFROMPOS, 0, MAKELPARAM(pt.x, pt.y));
 
 	// set cursor position
-	SendMessage(hwndEdit, EM_SETSEL, LOWORD(curpos), LOWORD(curpos));
-}
-
-//
-//	QueryDataObject private helper routine
-//
-static BOOL QueryDataObject (WB_IDataObject *pDataObject)
-{
-	FORMATETC fmtetc = { CF_TEXT, 0, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
-
-	// does the data object support CF_TEXT using a HGLOBAL?
-	return pDataObject->ido.lpVtbl->QueryGetData((LPDATAOBJECT)pDataObject, &fmtetc) == S_OK ? TRUE : FALSE;
+//	SendMessage(hwndEdit, EM_SETSEL, LOWORD(curpos), LOWORD(curpos));
 }
 
 //
@@ -493,25 +468,11 @@ static DWORD DropEffect(DWORD grfKeyState, POINTL pt, DWORD dwAllowed)
 {
 	DWORD dwEffect = 0;
 
-	// 1. check "pt" -> do we allow a drop at the specified coordinates?
+	if(dwAllowed & DROPEFFECT_MOVE) dwEffect = DROPEFFECT_MOVE;
+	if(dwAllowed & DROPEFFECT_COPY) dwEffect = DROPEFFECT_COPY;
 
-	// 2. work out that the drop-effect should be based on grfKeyState
-	if(grfKeyState & MK_CONTROL)
-	{
-		dwEffect = dwAllowed & DROPEFFECT_COPY;
-	}
-//	else if(grfKeyState & MK_SHIFT)
-//	{
-//		dwEffect = dwAllowed & DROPEFFECT_MOVE;
-//	}
-
-	// 3. no key-modifiers were specified (or drop effect not allowed), so
-	//    base the effect on those allowed by the dropsource
-	if(dwEffect == 0)
-	{
-		if(dwAllowed & DROPEFFECT_COPY) dwEffect = DROPEFFECT_COPY;
-//		if(dwAllowed & DROPEFFECT_MOVE) dwEffect = DROPEFFECT_MOVE;
-	}
+	if ( grfKeyState & MK_SHIFT ) 	dwEffect = dwAllowed & DROPEFFECT_MOVE;
+	if ( grfKeyState & MK_CONTROL ) dwEffect = dwAllowed & DROPEFFECT_COPY;
 
 	return dwEffect;
 }
@@ -570,10 +531,17 @@ idroptarget_release (WB_IDropTarget* This)
 //
 //
 //
-static HRESULT STDMETHODCALLTYPE idroptarget_dragenter(WB_IDropTarget* This, WB_IDataObject * pDataObject, DWORD grfKeyState, POINTL pt, DWORD * pdwEffect)
+static HRESULT STDMETHODCALLTYPE idroptarget_dragenter( WB_IDropTarget *This,
+													WB_IDataObject *pDataObject, 
+													DWORD grfKeyState,
+													POINTL pt, DWORD *pdwEffect)
 {
 	// does the dataobject contain data we want?
-	This->m_fAllowDrop = QueryDataObject(pDataObject);
+	FORMATETC fmtetc = { CF_TEXT, 0, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+	// does the data object support CF_TEXT using a HGLOBAL?
+	HRESULT rc=pDataObject->ido.lpVtbl->QueryGetData((LPDATAOBJECT)pDataObject,
+																	&fmtetc);
+	This->m_fAllowDrop = rc==S_OK ? TRUE : FALSE;
 
 	if(This->m_fAllowDrop)
 	{
@@ -597,7 +565,10 @@ static HRESULT STDMETHODCALLTYPE idroptarget_dragenter(WB_IDropTarget* This, WB_
 //
 //
 //
-static HRESULT STDMETHODCALLTYPE idroptarget_dragover(WB_IDropTarget* This, DWORD grfKeyState, POINTL pt, DWORD * pdwEffect)
+static HRESULT STDMETHODCALLTYPE idroptarget_dragover( WB_IDropTarget* This, 
+														DWORD grfKeyState,
+														POINTL pt,
+														DWORD *pdwEffect )
 {
 	if(This->m_fAllowDrop)
 	{
@@ -615,7 +586,7 @@ static HRESULT STDMETHODCALLTYPE idroptarget_dragover(WB_IDropTarget* This, DWOR
 //
 //	IDropTarget::DragLeave
 //
-static HRESULT STDMETHODCALLTYPE idroptarget_dragleave(WB_IDropTarget* This)
+static HRESULT STDMETHODCALLTYPE idroptarget_dragleave( WB_IDropTarget* This )
 {
 	return S_OK;
 }
@@ -624,21 +595,30 @@ static HRESULT STDMETHODCALLTYPE idroptarget_dragleave(WB_IDropTarget* This)
 //	IDropTarget::Drop
 //
 //
-static HRESULT STDMETHODCALLTYPE idroptarget_drop(WB_IDropTarget* This, IDataObject * pDataObject, DWORD grfKeyState, POINTL pt, DWORD * pdwEffect)
+void ( *dropHandler )(char *);
+static HRESULT STDMETHODCALLTYPE idroptarget_drop( WB_IDropTarget* This,
+													IDataObject * pDataObject,
+													DWORD grfKeyState,
+													POINTL pt, DWORD *pdwEffect)
 {
 	PositionCursor(This->m_hWnd, pt);
+	*pdwEffect = DROPEFFECT_NONE;
 
-	if(This->m_fAllowDrop)
-	{
-		DropData(This->m_hWnd, pDataObject);
-
+	if(This->m_fAllowDrop) {
 		*pdwEffect = DropEffect(grfKeyState, pt, *pdwEffect);
+		FORMATETC fmtetc = { CF_TEXT, 0, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+		// See if the dataobject contains any TEXT stored as a HGLOBAL
+		if(pDataObject->lpVtbl->QueryGetData(pDataObject, &fmtetc) == S_OK)	{
+			STGMEDIUM stgmed;
+			if(pDataObject->lpVtbl->GetData(pDataObject,&fmtetc,&stgmed)==S_OK)
+			{
+				PVOID data = GlobalLock(stgmed.hGlobal);//lock to access HGLOBAL
+				dropHandler(strdup((char *)data));
+				GlobalUnlock(stgmed.hGlobal);
+				ReleaseStgMedium(&stgmed);
+			}
+		}
 	}
-	else
-	{
-		*pdwEffect = DROPEFFECT_NONE;
-	}
-
 	return S_OK;
 }
 
@@ -652,29 +632,32 @@ static WB_IDropTargetVtbl idt_vtbl = {
   idroptarget_drop
 };
 
-void DropData(HWND hwnd, IDataObject *pDataObject)
+//
+//	Constructor for the CDropTarget class
+//
+WB_IDropTarget * WB_IDropTarget_new(HWND hwnd)
 {
-	// construct a FORMATETC object
-	FORMATETC fmtetc = { CF_TEXT, 0, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
-	STGMEDIUM stgmed;
+  WB_IDropTarget *result;
 
-	// See if the dataobject contains any TEXT stored as a HGLOBAL
-	if(pDataObject->lpVtbl->QueryGetData(pDataObject, &fmtetc) == S_OK)
-	{
-		// Yippie! the data is there, so go get it!
-		if(pDataObject->lpVtbl->GetData(pDataObject, &fmtetc, &stgmed) == S_OK)
-		{
-			// we asked for the data as a HGLOBAL, so access it appropriately
-			PVOID data = GlobalLock(stgmed.hGlobal);
+  result = (WB_IDropTarget *)LocalAlloc(LPTR, sizeof(WB_IDropTarget));
 
-			DropScript(strdup((char *)data));
+  result->idt.lpVtbl = (IDropTargetVtbl*)&idt_vtbl;
 
-			GlobalUnlock(stgmed.hGlobal);
+  result->m_lRefCount  = 1;
+  result->m_hWnd = hwnd;
+  result->m_fAllowDrop = FALSE;
 
-			// release the data using the COM API
-			ReleaseStgMedium(&stgmed);
-		}
-	}
+  return result;
+}
+HRESULT CreateDropTarget(HWND hwnd, WB_IDropTarget **ppDropTarget)
+{
+	if(ppDropTarget == 0)
+		return E_INVALIDARG;
+
+	*ppDropTarget = WB_IDropTarget_new(hwnd);
+
+	return (*ppDropTarget) ? S_OK : E_OUTOFMEMORY;
+
 }
 
 void RegisterDropWindow(HWND hwnd, WB_IDropTarget **ppDropTarget)
@@ -704,36 +687,10 @@ void UnregisterDropWindow(HWND hwnd, IDropTarget *pDropTarget)
 	pDropTarget->lpVtbl->Release(pDropTarget);
 }
 
-//	Constructor for the CDropTarget class
-//
-
-WB_IDropTarget * WB_IDropTarget_new(HWND hwnd)
+static IDropTarget *pDropTarget;
+void drop_Init( HWND hwnd, void (*handler)(char*) )
 {
-  WB_IDropTarget *result;
-
-  result = (WB_IDropTarget *)LocalAlloc(LPTR, sizeof(WB_IDropTarget));
-
-  result->idt.lpVtbl = (IDropTargetVtbl*)&idt_vtbl;
-
-  result->m_lRefCount  = 1;
-  result->m_hWnd = hwnd;
-  result->m_fAllowDrop = FALSE;
-
-  return result;
-}
-
-HRESULT CreateDropTarget(HWND hwnd, WB_IDropTarget **ppDropTarget)
-{
-	if(ppDropTarget == 0)
-		return E_INVALIDARG;
-
-	*ppDropTarget = WB_IDropTarget_new(hwnd);
-
-	return (*ppDropTarget) ? S_OK : E_OUTOFMEMORY;
-
-}
-void drop_Init( HWND hwnd )
-{
+  dropHandler = handler;
   RegisterDropWindow(hwnd, (WB_IDropTarget **)&pDropTarget);
 }
 void drop_Destroy( HWND hwnd )

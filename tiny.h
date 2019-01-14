@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 3282 2019-01-01 21:05:10 $"
+// "$Id: tiny.h 3295 2019-01-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -23,10 +23,10 @@
 #define MAXLINES	8192
 #define BUFFERSIZE	8192*64
 
-#define CONN_IDLE			0
-#define CONN_CONNECTING 	1
-#define CONN_AUTHENTICATING	2
-#define CONN_CONNECTED		4
+#define HOST_IDLE			0
+#define HOST_CONNECTING 	1
+#define HOST_AUTHENTICATING	2
+#define HOST_CONNECTED		4
 
 #define STDIO  	1
 #define SERIAL 	2
@@ -35,17 +35,12 @@
 #define SFTP	5
 #define NETCONF	6
 
-#define MODE_A	0
-#define MODE_R	1
-#define MODE_W	2
-#define MODE_RB	3
-#define MODE_WB	4
-FILE *fopen_utf8(const char *fn, int mode);
-int stat_utf8(const char *fn, struct _stat *buffer);
 BOOL isUTF8c(char c);	//check if a byte is a UTF8 continuation byte
+FILE *fopen_utf8(const char *fn, const char *mode);
+int stat_utf8(const char *fn, struct _stat *buffer);
 
 /****************auto_drop.c*************/
-void drop_Init( HWND hwnd );
+void drop_Init( HWND hwnd, void (*handler)(char *) );
 void drop_Destroy( HWND hwnd );
 int autocomplete_Init( HWND hWnd );
 int autocomplete_Destroy( );
@@ -99,7 +94,7 @@ void term_Logg( char *fn );
 void term_Srch( char *sstr );
 void term_Disp( char *buf );
 void term_Send( char *buf, int len );
-int term_Recv( char **preply );		//get new text since last Disp/Send/Recv
+int term_Recv( char **preply );	//get new text since last Disp/Send/Recv
 int term_Cmd( char *cmd, char **preply );
 int term_TL1( char *cmd, char **preply);
 int term_Waitfor_Prompt();
@@ -107,9 +102,10 @@ char *term_Mark_Prompt();
 BOOL term_Echo();
 
 /****************tiny.c****************/
+void cmd_Disp_utf8(char *buf);
 int tiny_Cmd( char *cmd, char **preply );
 void tiny_Beep();
 void tiny_Redraw();
 void tiny_Connecting();
 void tiny_Title( char *buf );
-void cmd_Disp_utf8(char *buf);
+BOOL tiny_Edit(BOOL e);			//return BOOL to indicate if status changed

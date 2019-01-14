@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 20906 2019-01-03 21:05:10 $"
+// "$Id: term.c 21258 2019-01-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -26,7 +26,7 @@ int size_x=TERMCOLS, size_y=TERMLINES;
 int cursor_x, cursor_y;
 int screen_y, scroll_y;
 int sel_left, sel_right;
-BOOL bLogging=FALSE, bEcho=FALSE, bCursor, bAlterScreen;
+BOOL bLogging=FALSE, bEcho=FALSE, bCursor, bAlterScreen, save_edit=FALSE;
 static BOOL bAppCursor, bGraphic, bEscape, bTitle, bInsert;
 static int save_x, save_y;
 static int roll_top, roll_bot;
@@ -108,13 +108,14 @@ void term_Scroll(int lines)
 void term_Keydown(DWORD key)
 {
 	switch( key ) {
-	case VK_HOME:	term_Scroll(screen_y); break;
 	case VK_PRIOR:  term_Scroll(size_y-1); break;
 	case VK_NEXT:   term_Scroll(1-size_y); break;
 	case VK_UP:    	term_Send(bAppCursor?"\033OA":"\033[A",3); break;
 	case VK_DOWN:  	term_Send(bAppCursor?"\033OB":"\033[B",3); break;
 	case VK_RIGHT: 	term_Send(bAppCursor?"\033OC":"\033[C",3); break;
 	case VK_LEFT:  	term_Send(bAppCursor?"\033OD":"\033[D",3); break;
+	case VK_HOME:	term_Send(bAppCursor?"\033OH":"\033[H",3); break;
+	case VK_END:	term_Send(bAppCursor?"\033OF":"\033[F",3); break;
 	case VK_DELETE:	term_Send("\177",1); break;
 	case VK_RETURN:	bEnter = TRUE; break;
 	default:	if ( bEnter ) {	bEnter = FALSE;	bEnter1 = TRUE; }
@@ -256,7 +257,10 @@ void term_Disp( char *msg )
 void term_Send( char *buf, int len )
 {
 	if ( bEcho ) term_Parse( buf, len );
-	host_Send( buf, len );
+	if ( host_Status()==HOST_IDLE ) {
+	}
+	else
+		host_Send( buf, len );
 }
 BOOL term_Echo()
 {
@@ -291,7 +295,7 @@ int term_Waitfor_Prompt()
 int term_TL1( char *cmd, char **pTl1Text )
 {
 	tl1len = 0;
-	if ( host_Status()==CONN_CONNECTED ) {	//retrieve from NE
+	if ( host_Status()==HOST_CONNECTED ) {	//retrieve from NE
 		bPrompt = FALSE;
 		int cmdlen = strlen(cmd);
 		tl1text = buff+cursor_x;
@@ -374,7 +378,7 @@ void term_Logg( char *fn )
 	}
 	else if ( fn!=NULL ) {
 		if ( *fn==' ' ) fn++;
-		fpLogFile = fopen_utf8( fn, MODE_WB );
+		fpLogFile = fopen_utf8( fn, "wb" );
 		if ( fpLogFile != NULL ) {
 			bLogging = TRUE;
 			term_Print("\n\033[33m%s logging started\n", fn);
@@ -598,6 +602,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 						if ( n0==25 ) bCursor = TRUE;
 						if ( n0==1049 ) { 	//?1049h alternate screen,
 							bAlterScreen = TRUE;
+							save_edit = tiny_Edit(FALSE);
 							screen_y = cursor_y;
 							cursor_x = line[cursor_y];
 						}
@@ -611,6 +616,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 						if ( n0==25 ) bCursor = FALSE;
 						if ( n0==1049 ) { 	//?1049l exit alternate screen,
 							bAlterScreen = FALSE;
+							if ( save_edit ) tiny_Edit(TRUE);
 							cursor_y = screen_y;
 							cursor_x = line[cursor_y];
 							for ( int i=1; i<=size_y+1; i++ )
@@ -623,13 +629,14 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 			case 'm':
 					if ( n0==0 ) n0 = n2; 	//ESC[0;0m	ESC[01;34m
 					switch ( (int)(n0/10) ) {		//ESC[34m
-					case 0: if ( n0%10==7 ) {c_attr = 0x70; break;}
-					case 1:
-					case 2: c_attr = 7; break;
-					case 3: if ( n0==39 ) n0 = 37;	//39 default foreground
-							c_attr = (c_attr&0xf0)+n0%10; break;
-					case 4: if ( n0==49 ) n0 = 40;	//49 default background
-							c_attr = (c_attr&0x0f)+((n0%10)<<4); break;
+					case 0: c_attr = (n0%10==7) ? 0x70 : 7; break;
+					case 2: if ( n0%10==7 ) {c_attr = 7; break; }
+					case 3: if ( n0==39 ) n0 = 7;	//39 default foreground
+							c_attr = (c_attr&0xf0) + n0%10; break;
+					case 4: if ( n0==49 ) n0 = 0;	//49 default background
+							c_attr = (c_attr&0x0f) + ((n0%10)<<4); break;
+					case 9: c_attr = (c_attr&0xf0) + n0%10 + 8; break;
+					case 10:c_attr = (c_attr&0x0f) + ((n0%10+8)<<4); break;
 					}
 					break;
 			case 'r':

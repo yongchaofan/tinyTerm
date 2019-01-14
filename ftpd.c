@@ -1,5 +1,5 @@
 //
-// "$Id: ftpd.c 14466 2019-01-01 21:05:10 $"
+// "$Id: ftpd.c 14454 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -219,7 +219,7 @@ DWORD WINAPI ftpd(LPVOID p)
 			else if(stricmp("stor", szBuf) == 0){
 				fp = NULL;
 				if ( strstr(param, ".." )==NULL )
-					fp = fopen_utf8(fn, MODE_WB);
+					fp = fopen_utf8(fn, "wb");
 				if(fp == NULL){
 					sock_send( "550 Unable to create file\n");
 					continue;
@@ -254,7 +254,7 @@ DWORD WINAPI ftpd(LPVOID p)
 			else if(stricmp("retr", szBuf) == 0){
 				fp = NULL;
 				if ( strstr(param, ".." )==NULL )
-					fp = fopen_utf8(fn, MODE_RB);
+					fp = fopen_utf8(fn, "rb");
 				if(fp == NULL) {
 					sock_send( "550 No such file or directory\n");
 					continue;
@@ -435,7 +435,7 @@ DWORD WINAPI tftpd(LPVOID p)
 									inet_ntoa(clientaddr.sin_addr) );
 			strcpy(fn, svrRoot);
 			strcat(fn, dataBuf+2);
-			FILE *fp = fopen_utf8(fn,  bRead?MODE_RB:MODE_WB);
+			FILE *fp = fopen_utf8(fn,  bRead?"rb":"wb");
 			if ( fp == NULL ) {
 				dataBuf[3]=dataBuf[1]; dataBuf[0]=0;
 				dataBuf[1]=5; dataBuf[2]=0;

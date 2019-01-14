@@ -25,7 +25,7 @@
 #include "tiny.h"
 
 int host_type = 0;
-int host_status=CONN_IDLE;
+int host_status=HOST_IDLE;
 SOCKET sock;					//for tcp connection used by telnet/ssh reader
 HANDLE hReaderThread = NULL;			//reader thread handle
 static HANDLE hExitEvent, hSerial;		//for serial reader
@@ -48,10 +48,14 @@ int host_Init( void )
 	ssh2_Init();
 	return http_Svr("127.0.0.1");
 }
+static char Port[256]="";
 void host_Open( char *port )
 {
-static char Port[256];
-
+	if ( port!=NULL ) {
+		strncpy(Port, port, 255);
+		Port[255] = 0; 
+	}
+	port = Port;
 
 	if ( hReaderThread==NULL ) {
 		LPTHREAD_START_ROUTINE reader = stdio;
@@ -69,10 +73,12 @@ static char Port[256];
 		else if ( strncmp(port, "netconf", 7)==0 ) {
 			port+=8; reader = netconf;
 		}
-		strncpy(Port, port, 255); Port[255]=0;
-		host_status=CONN_CONNECTING;
+
+		static char params[256];
+		strcpy(params, port);
 		tiny_Connecting();
-		hReaderThread = CreateThread(NULL, 0, reader, Port, 0, NULL);
+		host_status=HOST_CONNECTING;
+		hReaderThread = CreateThread(NULL, 0, reader, params, 0, NULL);
 	}
 	else {
 		if ( strnicmp(port, "disconn", 7)==0 ) 
@@ -162,7 +168,7 @@ DWORD WINAPI serial(void *pv)
 		goto comm_close;
 	}
 
-	host_status=CONN_CONNECTED;
+	host_status=HOST_CONNECTED;
 	host_type = SERIAL;
 	tiny_Title( (char *)pv );
 	hExitEvent = CreateEventA( NULL, TRUE, FALSE, "COM exit" );
@@ -186,7 +192,7 @@ DWORD WINAPI serial(void *pv)
 	CloseHandle(hSerial);
 
 comm_close:
-	host_status=CONN_IDLE;
+	host_status=HOST_IDLE;
 	hReaderThread = NULL;
 	return 1;
 }
@@ -217,7 +223,7 @@ DWORD WINAPI telnet( void *pv )
 
 	int cch;
 	char buf[1536];
-	host_status=CONN_CONNECTED;
+	host_status=HOST_CONNECTED;
 	host_type=TELNET;
 	tiny_Title(port);
 	while ( (cch=recv(sock, buf, 1500, 0)) > 0 ) {
@@ -236,7 +242,7 @@ DWORD WINAPI telnet( void *pv )
 	closesocket(sock);
 
 socket_close:
-	host_status=CONN_IDLE;
+	host_status=HOST_IDLE;
 	hReaderThread = NULL;
 
 	return 1;
@@ -352,7 +358,7 @@ DWORD WINAPI stdio( void *pv)
 	CloseHandle( Stdout_Wr );
 	CloseHandle( Stderr_Wr );
 
-	host_status=CONN_CONNECTED;
+	host_status=HOST_CONNECTED;
 	host_type = STDIO;
 	tiny_Title( (char *)pv );
 	DWORD dwCCH;
@@ -371,7 +377,7 @@ DWORD WINAPI stdio( void *pv)
 stdio_close:
 	CloseHandle( hStdioRead );
 	CloseHandle( hStdioWrite );
-	host_status=CONN_IDLE;
+	host_status=HOST_IDLE;
 	hReaderThread = NULL;
 	return 1;
 }
@@ -410,7 +416,7 @@ DWORD WINAPI *httpd( void *pv )
 				replen = term_TL1( buf, &reply );
 				send( http_s1, reply, replen, 0 );
 
-				if ( host_status==CONN_CONNECTED ) do {
+				if ( host_status==HOST_CONNECTED ) do {
 					replen = term_Recv( &reply );
 					if ( replen > 0 ) send(http_s1, reply, replen, 0);
 					FD_ZERO(&readset);

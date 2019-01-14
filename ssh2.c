@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 39588 2019-01-01 21:05:10 $"
+// "$Id: ssh2.c 40088 2019-01-13 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -58,8 +58,11 @@ static char keys[256];
 static int cursor, bReturn=TRUE, bPassword;
 char *ssh2_Gets(char *prompt, BOOL bEcho)
 {
-	bReturn=FALSE; bPassword=!bEcho;
+	BOOL save_edit = FALSE;		//save local edit mode, disable it for password
+	if ( (bPassword=!bEcho) ) save_edit = tiny_Edit(FALSE);
+
 	term_Disp(prompt);
+	bReturn=FALSE;
 	keys[0]=0;
 	cursor=0;
 	int old_cursor=0;
@@ -69,6 +72,9 @@ char *ssh2_Gets(char *prompt, BOOL bEcho)
 	}
 	char *res = bReturn ? keys : NULL;	//NULL is timed out
 	bReturn = TRUE;
+	term_Disp("\n");
+
+	if ( bPassword && save_edit ) tiny_Edit(TRUE);	//restore local edit mode
 	return res;
 }
 void ssh2_Send( char *buf, int len )
@@ -168,6 +174,10 @@ int ssh_parameters(char *p)
 }
 int ssh_knownhost()
 {
+	int type, check, buff_len;
+	size_t len;
+	char knownhostfile[MAX_PATH];
+
 	const char *dir = getenv("USERPROFILE");
 	if ( dir!=NULL ) {
 		strncpy(homedir, dir, MAX_PATH-64);
@@ -175,75 +185,87 @@ int ssh_knownhost()
 	}
 	else
 		homedir[0]=0;
-	strcat(homedir, "/");
 
-	int type, check, buff_len;
-	size_t len;
-	char knownhostfile[MAX_PATH];
 	strcpy(knownhostfile, homedir);
-	strcat(knownhostfile, ".ssh/known_hosts");
+	strcat(knownhostfile, "/.ssh");
+	struct stat sb;
+	if ( stat(knownhostfile, &sb)!=0 ) mkdir(knownhostfile);
+	strcat(knownhostfile, "/known_hosts");
 
 	char buf[256];
 	const char *key = libssh2_session_hostkey(sshSession, &len, &type);
-	if ( key==NULL ) return -4;
-	buff_len=sprintf(buf, "host key fingerprint(%s):\n", keytypes[type]);
+	if ( key==NULL ) {
+		term_Disp("hostkey failure!");
+		return -4;
+	}
+	buff_len=sprintf(buf, "hostkey type %s\nfingerprint", keytypes[type]);
 	if ( type>0 ) type++;
 
 	const char *fingerprint;
 	fingerprint = libssh2_hostkey_hash(sshSession, LIBSSH2_HOSTKEY_HASH_SHA1);
 	for(int i = 0; i < 20; i++) {
-		sprintf(buf+buff_len+i*3, "%02X:", (unsigned char)fingerprint[i]);
+		sprintf(buf+buff_len+i*3, ":%02X", (unsigned char)fingerprint[i]);
 	}
 	term_Disp( buf ); term_Disp("\n");
 
 	LIBSSH2_KNOWNHOSTS *nh = libssh2_knownhost_init(sshSession);
-	if ( nh==NULL ) return -4;
-	struct libssh2_knownhost *knownhost;
+	if ( nh==NULL ) {
+		term_Disp("known hosts failure!\n");
+		return -4;
+	}
 	libssh2_knownhost_readfile(nh, knownhostfile,
 							   LIBSSH2_KNOWNHOST_FILE_OPENSSH);
+	struct libssh2_knownhost *knownhost;
 	check = libssh2_knownhost_check(nh, hostname, key, len,
 								LIBSSH2_KNOWNHOST_TYPE_PLAIN|
 								LIBSSH2_KNOWNHOST_KEYENC_RAW, &knownhost);
-	if ( check==LIBSSH2_KNOWNHOST_CHECK_MATCH ) {
-		term_Disp("\033[32mmatch found in .ssh/known_hosts\n\033[37m");
-		goto Verified;
-	}
-	if ( check==LIBSSH2_KNOWNHOST_CHECK_MISMATCH ) {
+	int rc = 0;
+	char *p = NULL;
+	switch ( check ) {
+	case LIBSSH2_KNOWNHOST_CHECK_MATCH:
+		break;
+	case LIBSSH2_KNOWNHOST_CHECK_MISMATCH:
 		if ( type==((knownhost->typemask&LIBSSH2_KNOWNHOST_KEY_MASK)
 								  >>LIBSSH2_KNOWNHOST_KEY_SHIFT) ) {
-			term_Disp("\033[31m!!!changed! proceed with care!!!\n\033[37m");
+			term_Print("\033[31m!!!Danger, hostkey changed!!!\n");
+			p=ssh2_Gets("Update hostkey and continue with the risk?(Yes/No):",
+						TRUE);
+			if ( p!=NULL ) {
+				if ( strcmp(p, "Yes")==0 ) 
+					libssh2_knownhost_del(nh, knownhost);
+				else { 
+					rc = -4; 
+					term_Print("\033[32mDisconnected, stay safe\n");
+					break; 
+				}
+			}
 		}
-		else
-			check=LIBSSH2_KNOWNHOST_CHECK_NOTFOUND;
+		//fall through if hostkey type mismatch, or hostkey deleted for update
+	case LIBSSH2_KNOWNHOST_CHECK_NOTFOUND:
+		if ( p == NULL ) {
+			term_Print("\033[33munknown hostkey!\n");
+			p = ssh2_Gets("Add entry to .ssh/known_hosts?(Yes/No):", TRUE);
+		}
+		if ( p!=NULL ) {
+			if ( strcmp(p, "Yes")==0 ) {
+				libssh2_knownhost_addc(nh, hostname, "", key, 
+										len,"**tinyTerm**", 12,
+										LIBSSH2_KNOWNHOST_TYPE_PLAIN|
+										LIBSSH2_KNOWNHOST_KEYENC_RAW|
+										(type<<LIBSSH2_KNOWNHOST_KEY_SHIFT), 
+										&knownhost);
+				if ( libssh2_knownhost_writefile(nh, knownhostfile,
+										LIBSSH2_KNOWNHOST_FILE_OPENSSH)==0 )
+					term_Print("\033[32mhostkey added/updated\n");
+				else
+					term_Print("\033[33mcouldn't write hostkey file\n");
+			}
+		}
 	}
 
-	if ( check==LIBSSH2_KNOWNHOST_CHECK_NOTFOUND ) {
-		libssh2_knownhost_addc(nh, hostname, "", key, len, "**tinyTerm**", 12,
-								LIBSSH2_KNOWNHOST_TYPE_PLAIN|
-								LIBSSH2_KNOWNHOST_KEYENC_RAW|
-								(type<<LIBSSH2_KNOWNHOST_KEY_SHIFT), &knownhost);
-		FILE *fp = fopen_utf8(knownhostfile, MODE_A);
-		if ( fp==NULL ) {
-			int len = strlen(knownhostfile);
-			knownhostfile[len-12]=0;
-			mkdir(knownhostfile);
-			knownhostfile[len-12]='/';
-			fp = fopen_utf8(knownhostfile, MODE_A);
-		}
-		if ( fp ) {
-			char buf[2048];
-			libssh2_knownhost_writeline(nh, knownhost, buf, 2048, &len,
-								LIBSSH2_KNOWNHOST_FILE_OPENSSH);
-			fprintf(fp, "%s", buf );
-			fclose(fp);
-			term_Disp("\033[32madded to .ssh/known_hosts\n\033[37m");
-		}
-		else
-			term_Disp("\033[33mcouldn't add to .ssh/known_hosts\n\033[37m");
-	}
-Verified:
+	term_Disp("\n");
 	libssh2_knownhost_free(nh);
-	return 0;
+	return rc;
 }
 static void kbd_callback(const char *name, int name_len,
                          const char *instruction, int instruction_len,
@@ -267,7 +289,7 @@ int ssh_authentication(char *username, char *password, char *passphrase)
 {
 	char user[256], pw[256];
 	if ( username==NULL ) {
-		char *p = ssh2_Gets("\nusername:", TRUE);
+		char *p = ssh2_Gets("username:", TRUE);
 		if ( p!=NULL ) {
 			strcpy(user, p); username = user;
 		}
@@ -280,14 +302,14 @@ int ssh_authentication(char *username, char *password, char *passphrase)
 	if ( strstr(authlist, "publickey")!=NULL ) {	// try public key
 		char pubkeyfile[MAX_PATH], privkeyfile[MAX_PATH];
 		strcpy(pubkeyfile, homedir);
-		strcat(pubkeyfile, ".ssh/id_rsa.pub");
+		strcat(pubkeyfile, "/.ssh/id_rsa.pub");
 		strcpy(privkeyfile, homedir);
-		strcat(privkeyfile, ".ssh/id_rsa");
+		strcat(privkeyfile, "/.ssh/id_rsa");
 		struct stat buf;
 		if ( stat(pubkeyfile, &buf)==0 && stat(privkeyfile, &buf)==0 ) {
 			if ( !libssh2_userauth_publickey_fromfile(sshSession,
 					username, pubkeyfile, privkeyfile, passphrase) ) {
-				term_Disp("\033[32m\npublic key authentication passed\033[37m\n");
+				term_Print("\033[32mpublic key authentication passed\n");
 				return 0;
 			}
 		}
@@ -295,7 +317,7 @@ int ssh_authentication(char *username, char *password, char *passphrase)
 	if ( strstr(authlist, "password")!=NULL ) {
 		for ( int rep=0; rep<3; rep++ ) {
 			if ( password==NULL ) {
-				char *p = ssh2_Gets("\npassword:", FALSE);
+				char *p = ssh2_Gets("password:", FALSE);
 				if ( p!=NULL ) {
 					strcpy(pw, p);
 					password = pw;
@@ -311,10 +333,12 @@ int ssh_authentication(char *username, char *password, char *passphrase)
 	else if ( strstr(authlist, "keyboard-interactive")!=NULL ) {
 		for ( int i=0; i<3; i++ )
 			if (!libssh2_userauth_keyboard_interactive(sshSession, username,
-                                              			&kbd_callback) ) 
+                                              			&kbd_callback) ) {
+				term_Print("\033[32minteractive authentication passed\n");
 				return 0;
+			}
 	}
-	term_Disp("\033[31m\ntoo many tries\033[37m\n");
+	term_Print("\033[31mAuthentication failure!\n");
 	return -5;
 }
 DWORD WINAPI ssh( void *pv )
@@ -333,35 +357,38 @@ DWORD WINAPI ssh( void *pv )
 		goto Session_Close;
 	}
 
-	if ( ssh_knownhost()<0 ) goto Session_Close;
-	host_status=CONN_AUTHENTICATING;
-	if ( ssh_authentication(username, password, passphrase)<0 )
+	host_status=HOST_AUTHENTICATING;
+	if ( ssh_knownhost()<0 )
+		goto Session_Close;
+	
+	if ( ssh_authentication(username, password, passphrase)<0 ) 
 		goto Session_Close;
 
+
 	if (!(sshChannel = libssh2_channel_open_session(sshSession))) {
-		term_Disp("sshChannel failed!\n");
+		term_Disp("sshChannel failure!\n");
 		goto Session_Close;
 	}
 	if ( subsystem == NULL ) {
 		if (libssh2_channel_request_pty(sshChannel, "xterm")) {
-			term_Disp("pty failed!\n");
+			term_Disp("pty failure!\n");
 			goto Channel_Close;
 		}
 		if (libssh2_channel_shell(sshChannel)) {
-			term_Disp("shell failed!\n");
+			term_Disp("shell failure!\n");
 			goto Channel_Close;
 		}
 	}
 	else {
 		if (libssh2_channel_subsystem(sshChannel, subsystem)) {
-			term_Disp("subsystem failed!\n");
+			term_Disp("subsystem failure!\n");
 			goto Channel_Close;
 		}
 	}
 	libssh2_session_set_blocking(sshSession, 0);
 //	libssh2_keepalive_config(sshSession, FALSE, 60);
 
-	host_status=CONN_CONNECTED;
+	host_status=HOST_CONNECTED;
 	host_type=SSH;
 	tiny_Title(hostname);
 	while ( libssh2_channel_eof(sshChannel) == 0 ) {
@@ -395,7 +422,7 @@ Session_Close:
 	closesocket(sock);
 
 TCP_Close:
-	host_status=CONN_IDLE;
+	host_status=HOST_IDLE;
 	hReaderThread = NULL;
 
 	return 1;
@@ -418,7 +445,7 @@ int scp_read_one(const char *rpath, const char *lpath)
 		}
 	} while (!scp_channel);
 
-	FILE *fp = fopen_utf8(lpath, MODE_WB);
+	FILE *fp = fopen_utf8(lpath, "wb");
 	if ( fp==NULL ) {
 		term_Print("\n\033[31mSCP: couldn't write to \033[32m%s", lpath);
 		goto Close;
@@ -466,7 +493,7 @@ int scp_write_one(const char *lpath, const char *rpath)
 {
 	LIBSSH2_CHANNEL *scp_channel;
 	struct _stat fileinfo;
-	FILE *fp =fopen_utf8(lpath, MODE_RB);
+	FILE *fp =fopen_utf8(lpath, "rb");
 	if ( !fp ) {
 		term_Print("\n\033[31mSCP: couldn't read from \033[32m%s", lpath);
 		return -1;
@@ -940,19 +967,15 @@ int sftp_lcd(char *cmd)
 {
 	if ( cmd==NULL || *cmd==0 ) {
 		char buf[4096];
-		if ( getcwd(buf, 4096)!=NULL ) {
-			term_Print("\033[32m%s \033[37mis local directory\n", cmd);
-		}
-		else {
-			term_Print("\033[31mCouldn't get local directory\n");
-		}
+		if ( getcwd(buf, 4096)!=NULL ) 
+			term_Print("\033[32m%s ", buf);
+		term_Print("is local directory\n");
 	}
 	else {
 		while ( *cmd==' ' ) cmd++;
-		if ( chdir(cmd)==0 )
-			term_Print("\033[32m%s\033[37m is now local directory!\n", cmd);
-		else
-			term_Print("\033[31mCouldn't change directory \033[32m%s\n", cmd);
+		term_Print("\033[32m%s ", cmd);
+		term_Print( chdir(cmd)==0 ?	"is now local directory!\n"
+								  : "\033[31m is not accessible!\n");
 	}
 	return 0;
 }
@@ -980,7 +1003,7 @@ int sftp_ls(char *path, int ll)
 	LIBSSH2_SFTP_HANDLE *sftp_handle = libssh2_sftp_opendir(sftpSession, path);
 	if (!sftp_handle) {
 		if ( strchr(path, '*')==NULL && strchr(path, '?')==NULL ) {
-			term_Print("\033[31mUnable to open dir\033[32m%s\n", path);
+			term_Print("\033[31mUnable to open dir \033[32m%s\n", path);
 			return 0;
 		}
 		pattern = strrchr(path, '/');
@@ -1072,7 +1095,7 @@ int sftp_get_one(char *src, char *dst)
 		term_Print("\033[31mUnable to read file\033[32m%s\n", src);
 		return 0;
 	}
-	FILE *fp = fopen_utf8(dst, MODE_WB);
+	FILE *fp = fopen_utf8(dst, "wb");
 	if ( fp==NULL ) {
 		term_Print("\033[31munable to create local file\033[32m%s\n", dst);
 		libssh2_sftp_close(sftp_handle);
@@ -1105,7 +1128,7 @@ int sftp_put_one(char *src, char *dst)
 		term_Print("\033[31mcouldn't open remote file\033[32m%s\n", dst);
 		return 0;
 	}
-	FILE *fp = fopen_utf8(src, MODE_RB);
+	FILE *fp = fopen_utf8(src, "rb");
 	if ( fp==NULL ) {
 		term_Print("\033[31mcouldn't open local file\033[32m%s\n", src);
 		return 0;
@@ -1296,7 +1319,7 @@ DWORD WINAPI sftp( void *pv )
 	}
 
 	if ( ssh_knownhost()<0 ) goto sftp_Close;
-	host_status=CONN_AUTHENTICATING;
+	host_status=HOST_AUTHENTICATING;
 	if ( ssh_authentication(username, password, passphrase)<0 )
 		goto sftp_Close;
 
@@ -1307,7 +1330,7 @@ DWORD WINAPI sftp( void *pv )
 		*realpath=0;
 	strcpy( homepath, realpath );
 
-	host_status=CONN_CONNECTED;
+	host_status=HOST_CONNECTED;
 	host_type=SFTP;
 	tiny_Title(hostname);
 	char prompt[4096], *cmd;
@@ -1335,7 +1358,7 @@ sftp_Close:
 	closesocket(sock);
 
 TCP_Close:
-	host_status=CONN_IDLE;
+	host_status=HOST_IDLE;
 	hReaderThread = NULL;
 	return 1;
 }
@@ -1365,7 +1388,7 @@ DWORD WINAPI netconf( void *pv )
 	}
 
 	if ( ssh_knownhost()<0 ) goto Session_Close;
-	host_status=CONN_AUTHENTICATING;
+	host_status=HOST_AUTHENTICATING;
 	if ( ssh_authentication(username, password, passphrase)<0 )
 		goto Session_Close;
 
@@ -1382,7 +1405,7 @@ DWORD WINAPI netconf( void *pv )
 	libssh2_channel_write( sshChannel, IETF_HELLO, strlen(IETF_HELLO) );
 	msg_id = 0;
 
-	host_status=CONN_CONNECTED;
+	host_status=HOST_CONNECTED;
 	host_type=NETCONF;
 	tiny_Title(hostname);
 
@@ -1429,7 +1452,7 @@ Session_Close:
 	closesocket(sock);
 
 TCP_Close:
-	host_status=CONN_IDLE;
+	host_status=HOST_IDLE;
 	hReaderThread = NULL;
 
 	return 1;

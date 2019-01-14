@@ -1,5 +1,5 @@
 //
-// "$Id: tinyTerm.rc 3008 2019-01-01 21:05:10 $"
+// "$Id: tinyTerm.rc 2882 2019-01-10 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -26,39 +26,34 @@ IDMENU_MAIN MENU
 {
 	POPUP "&Term"
 	{
-		MENUITEM "&Connect...\tAlt+C", 	ID_CONNECT
-		MENUITEM "Local &Echo\tAlt+E",	ID_ECHO
-		MENUITEM "&Logging...\tAlt+L", 	ID_LOGGING
-		MENUITEM "Copy All",			ID_COPYALL
-		MENUITEM "&About",				ID_ABOUT
+		MENUITEM "&Connect...", ID_CONNECT
+		MENUITEM "&Logging...", ID_LOGGING
+		MENUITEM "Local Echo",	ID_ECHO
+		MENUITEM "Local Editing\tAlt+E",	ID_EDIT
+		MENUITEM "&About",		ID_ABOUT
 		MENUITEM SEPARATOR
 	}
 	POPUP "&Script"
 	{
-		MENUITEM "&Run...\tAlt+R", 		ID_SCRUN
-		MENUITEM "&Pause\tAlt+P", 		ID_SCPAUSE
-		MENUITEM "&Stop\tAlt+Q", 		ID_SCQUIT
+		MENUITEM "&Run...", 	ID_SCRUN
+		MENUITEM "&Pause", 		ID_SCPAUSE
+		MENUITEM "&Stop", 		ID_SCQUIT
 		MENUITEM SEPARATOR
 	}
 	POPUP "&Options"
 	{
-		MENUITEM "&Autocomplete\tAlt+A",ID_EDITOR
-		MENUITEM "&Transparent",		ID_TRANSPARENT
-		MENUITEM "&Font...",			ID_FONT
-		MENUITEM "Ftpd...", 			ID_FTPD
-		MENUITEM "Tftpd...", 			ID_TFTPD
+		MENUITEM "&Tranparency",ID_TRANSP
+		MENUITEM "&Font...",	ID_FONT
+		MENUITEM "Ftp&d...", 	ID_FTPD
+		MENUITEM "&Tftpd...", 	ID_TFTPD
 	}
 }
 IDACCEL_MAIN ACCELERATORS
 {
-  "a",	ID_EDITOR,	ALT
-  "c",	ID_CONNECT, ALT
-  "d",	ID_DISCONN, ALT
-  "e", 	ID_ECHO, 	ALT
-  "l",	ID_LOGGING, ALT
-  "r",	ID_SCRUN,	ALT
-  "p", 	ID_SCPAUSE, ALT
-  "q",	ID_SCQUIT,	ALT
+  "a",	ID_SELALL,	ALT
+  "c",	ID_COPY, 	ALT
+  "v",	ID_PASTE,	ALT
+  "e", 	ID_EDIT, 	ALT
   "o",	ID_OPTIONS, ALT
   "s", 	ID_SCRIPT, 	ALT
   "t", 	ID_TERM,	ALT
@@ -66,7 +61,6 @@ IDACCEL_MAIN ACCELERATORS
 
 IDD_CONNECT DIALOG 45, 30, 130, 90	// Connection Dialog
 CAPTION "Connect Dialog"
-FONT 8, "Ms Shell Dlg"
 {
     COMBOBOX IDPROTO, 40, 10, 70, 16, CBS_DROPDOWNLIST|CBS_HASSTRINGS|WS_TABSTOP
     LTEXT    "Protocol:", 	0,  4, 12, 32, 12, SS_RIGHT, WS_EX_LEFT
@@ -75,7 +69,7 @@ FONT 8, "Ms Shell Dlg"
     COMBOBOX IDHOST,  40, 50, 70, 16, CBS_DROPDOWN|CBS_HASSTRINGS|WS_TABSTOP
     LTEXT    "Host:", IDSTATIC,	4, 52, 32, 12, SS_RIGHT, WS_EX_LEFT
     DEFPUSHBUTTON "Connect", IDCONNECT, 70, 70, 40, 12, 0, WS_EX_LEFT
-    PUSHBUTTON    "Cancel",  IDCANCELC, 20, 70, 40, 12, 0, WS_EX_LEFT
+    PUSHBUTTON    "Cancel",  IDCANCEL,  20, 70, 40, 12, 0, WS_EX_LEFT
 }
 
 1 VERSIONINFO						// Version Information
