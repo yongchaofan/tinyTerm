@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 21258 2019-01-12 21:05:10 $"
+// "$Id: term.c 23516 2019-01-15 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -26,16 +26,16 @@ int size_x=TERMCOLS, size_y=TERMLINES;
 int cursor_x, cursor_y;
 int screen_y, scroll_y;
 int sel_left, sel_right;
-BOOL bLogging=FALSE, bEcho=FALSE, bCursor, bAlterScreen, save_edit=FALSE;
+BOOL bLogging=FALSE, bEcho=FALSE, bCursor, bAlterScreen;
 static BOOL bAppCursor, bGraphic, bEscape, bTitle, bInsert;
 static int save_x, save_y;
 static int roll_top, roll_bot;
 
-static char title[256];
+static char title[64];
 static int title_idx = 0;
 static FILE *fpLogFile;
 
-static BOOL bPrompt=FALSE, bEnter=FALSE, bEnter1=FALSE;
+static BOOL bPrompt=FALSE;
 static char sPrompt[32]=";\n> ", *tl1text=NULL;
 static int  iPrompt=4, iTimeOut=30, tl1len=0;
 static HANDLE hTL1Event;
@@ -117,9 +117,7 @@ void term_Keydown(DWORD key)
 	case VK_HOME:	term_Send(bAppCursor?"\033OH":"\033[H",3); break;
 	case VK_END:	term_Send(bAppCursor?"\033OF":"\033[F",3); break;
 	case VK_DELETE:	term_Send("\177",1); break;
-	case VK_RETURN:	bEnter = TRUE; break;
-	default:	if ( bEnter ) {	bEnter = FALSE;	bEnter1 = TRUE; }
-				if ( scroll_y!=0 ) term_Scroll(scroll_y);
+	default:		if ( scroll_y!=0 ) term_Scroll(scroll_y);
 	}
 }
 void term_Parse( char *buf, int len )
@@ -127,14 +125,6 @@ void term_Parse( char *buf, int len )
 	unsigned char *p=(unsigned char *)buf;
 	unsigned char *zz = p+len;
 
-	if ( bEnter1 ) { //capture prompt for scripting after Enter key pressed
-		if ( len==1 ) {//and the echo is just one letter
-			sPrompt[0] = buff[cursor_x-2];
-			sPrompt[1] = buff[cursor_x-1];
-			iPrompt = 2;
-		}
-		bEnter1 = FALSE;
-	}
 	if ( bLogging ) fwrite( buf, 1, len, fpLogFile );
 	if ( bEscape ) p = vt100_Escape( p, zz-p );
 	while ( p < zz ) {
@@ -146,7 +136,7 @@ void term_Parse( char *buf, int len )
 				tiny_Title(title);
 			}
 			else
-				title[title_idx++] = c;
+				if ( title_idx<63 ) title[title_idx++] = c;
 			continue;
 		}
 		switch ( c ) {
@@ -275,6 +265,12 @@ int term_Recv( char **pTL1text )
 	tl1text = buff+cursor_x;
 	return len;
 }
+void term_Learn_Prompt()
+{//capture prompt for scripting after Enter key pressed
+	sPrompt[0] = buff[cursor_x-2];
+	sPrompt[1] = buff[cursor_x-1];
+	iPrompt = 2;
+}
 char *term_Mark_Prompt()
 {
 	bPrompt = FALSE;
@@ -291,83 +287,6 @@ int term_Waitfor_Prompt()
 		if ( tl1len>oldlen ) { i=0; oldlen=tl1len; }
 	}
 	return tl1len;
-}
-int term_TL1( char *cmd, char **pTl1Text )
-{
-	tl1len = 0;
-	if ( host_Status()==HOST_CONNECTED ) {	//retrieve from NE
-		bPrompt = FALSE;
-		int cmdlen = strlen(cmd);
-		tl1text = buff+cursor_x;
-		term_Send(cmd, cmdlen);
-		if ( cmd[cmdlen-1]!='\r' ) term_Send("\r", 1);
-		term_Waitfor_Prompt();
-	}
-	else {									//retrieve from buffer
-		static char *pcursor=buff;			//only when retrieve from buffer
-		buff[cursor_x]=0;
-		char *p = strstr( pcursor, cmd );
-		if ( p==NULL ) { pcursor = buff; p = strstr( pcursor, cmd ); }
-		if ( p!=NULL ) { p = strstr( p, "\r\n" );
-			if ( p!=NULL ) {
-				tl1text = p+2;
-				p = strstr( p, "\nM " );
-				p = strstr( p, sPrompt );
-				if ( p!=NULL ) {
-					pcursor = ++p;
-					tl1len = pcursor - tl1text;
-				}
-			}
-		}
-		if ( tl1len == 0 ) { tl1text = buff+cursor_x; }
-	}
-
-	if ( pTl1Text!=NULL ) *pTl1Text = tl1text;
-	return tl1len;
-}
-int term_Cmd( char *cmd, char **preply )
-{
-	int rc = 0;
-	if ( strncmp(cmd, "Clear",5)==0 ) 	term_Clear();
-	else if ( strncmp(cmd, "Log", 3)==0 ) 	term_Logg( cmd+3 );
-	else if ( strncmp(cmd, "Disp ",5)==0 )  term_Disp(cmd+5);
-	else if ( strncmp(cmd, "Recv" ,4)==0 )  rc=term_Recv(preply);
-	else if ( strncmp(cmd, "Send ",5)==0 )  term_Send(cmd+5,strlen(cmd+5));
-	else if ( strncmp(cmd, "Echo", 4)==0 )  rc = term_Echo() ? 1 : 0;
-	else if ( strncmp(cmd, "Timeout",7)==0 )iTimeOut = atoi( cmd+8 );
-	else if ( strncmp(cmd,"Selection",9)==0) {
-		if ( preply!=NULL ) *preply = buff+sel_left;
-		rc = sel_right-sel_left;
-	}
-	else if ( strncmp(cmd, "Waitfor",7)==0) {
-		for ( int i=iTimeOut; i>0; i-- ) {
-			buff[cursor_x] = 0;
-			if ( strstr(tl1text, cmd+8)!=NULL ) {
-				if ( preply!=NULL ) *preply = tl1text;
-				rc = buff+cursor_x-tl1text;
-				break;
-			}
-			Sleep(1000);
-		}
-	}
-	else if ( strncmp(cmd, "Prompt ",7)==0 ) {
-		char *p=cmd+7, *p1 = sPrompt;
-		while ( *p && p1-sPrompt<31) {
-			if ( *p=='%' && isdigit(p[1]) ) {
-				int a;
-				sscanf(p+1, "%02x", &a);
-				*p1++ = a;
-				p+=3;
-			}
-			else
-				*p1++ = *p++;
-		}
-		*p1 = 0;
-		iPrompt = p1-sPrompt;
-	}
-	else 
-		rc = -1;
-	return rc;
 }
 void term_Logg( char *fn )
 {
@@ -406,6 +325,7 @@ void term_Srch( char *sstr )
 }
 unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 {
+	static BOOL save_edit = FALSE;
 	static char code[20];
 	static int idx=0;
 	unsigned char *zz = sz+cnt;
@@ -553,7 +473,7 @@ unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 						memset(attr+line[cursor_y+1],   0, n0);
 					}
 					break;
-			case '@':
+			case '@':	//insert n0 spaces
 					for ( int i=line[cursor_y+1]; i>=cursor_x; i-- ) {
 						buff[i+n0]=buff[i];
 						attr[i+n0]=attr[i];
@@ -745,22 +665,196 @@ static BOOL previousIsOpen = TRUE;
 				if ( q[-1]=='/' ) previousIsOpen = FALSE;
 				p = q+1;
 			}
-			else {	//incomplete pair of '<' and '>'
+			else {								//incomplete pair of '<' and '>'
 				term_Parse(p, strlen(p));
 				break;
 			}
 		}
-		else {			//data
+		else {									//data
 			term_Parse("\033[33m",5);
 			q = strchr(p, '<');
 			if ( q!=NULL ) {
 				term_Parse(p, q-p);
 				p = q;
 			}
-			else { //not xml or incomplete xml
+			else { 								//not xml or incomplete xml
 				term_Parse(p, strlen(p));
 				break;
 			}
 		}
 	}
+}
+int term_Pwd(char *pwd, int len)
+{
+	char *p1, *p2;
+	term_TL1("pwd\r", &p2);
+	p1 = strchr(p2, 0x0a);
+	if ( p1!=NULL ) {
+		p2 = p1+1;
+		p1 = strchr(p2, 0x0a);
+		if ( p1!=NULL ) {
+			if ( len>p1-p2 ) len = p1-p2;
+			strncpy(pwd, p2, len);
+			pwd[len]=0;
+		}
+	}
+	else
+		len = 0;
+	return len;
+}
+int term_Scp(char *cmd, char **preply)
+{
+	for ( char *q=cmd; *q; q++ ) if ( *q=='\\' ) *q='/';
+	char *p = strchr(cmd, ' ');
+	if ( p==NULL ) return 0;
+	*p++ = 0;
+
+	char *lpath, *rpath, *reply = term_Mark_Prompt();
+	term_Learn_Prompt();
+	if ( *cmd==':' ) {	//scp_read
+		lpath = p; rpath = cmd+1;
+		char ls_1[1024]="ls -1 ";
+		if ( *rpath!='/' && *rpath!='~' ) {
+			term_Pwd(ls_1+6, 1018);
+			strcat(ls_1, "/");
+		}
+		strcat(ls_1, rpath);
+		
+		if ( strchr(rpath, '*')==NULL 
+		  && strchr(rpath, '?')==NULL ) {		//rpath is a single file
+			reply = term_Mark_Prompt();	
+			strcat(ls_1, "\012");
+			scp_read(lpath, ls_1+6);
+		}
+		else {									//rpath is a filename pattern
+			char *rlist, *rfiles;
+			int len = term_TL1(ls_1, &rlist );
+			if ( len>0 ) {
+				rlist[len] = 0;
+				p = strchr(rlist, 0x0a);
+				if ( p!=NULL ) {
+					rfiles = strdup(p+1);
+					reply = term_Mark_Prompt();
+					scp_read(lpath, rfiles);
+					free(rfiles);
+				}
+			}
+		}
+	}
+	else {//scp_write
+		lpath = cmd; rpath = p+1;				//*p is expected to be ':' here
+		char lsld[1024]="ls -ld ";
+		if ( *rpath!='/' && *rpath!='~' ) {		//rpath is relative
+			term_Pwd(lsld+7, 1017);
+			strcat(lsld, "/");
+		}
+		strcat(lsld, rpath);
+
+		if ( lsld[strlen(lsld)-1]!='/' )  {
+			char *rlist;			 
+			if ( term_TL1(lsld, &rlist )>0 ) {	//check if rpath is a dir
+				p = strchr(rlist, 0x0a);
+				if ( p!=NULL ) {				//append '/' if yes
+					if ( p[1]=='d' ) strcat(lsld, "/");
+				}
+			}
+		}
+		reply = term_Mark_Prompt();
+		scp_write(lpath, lsld+7);
+	}
+	ssh2_Send("\r", 1);
+	if ( preply!=NULL ) *preply = reply;
+	return term_Waitfor_Prompt();
+}
+
+
+int term_Tun(char *cmd, char **preply)
+{
+	char *reply = term_Mark_Prompt();
+	if ( preply!=NULL ) *preply = reply;
+	ssh2_Tun(cmd);
+	return term_Waitfor_Prompt();
+}
+int term_Cmd( char *cmd, char **preply )
+{
+	int rc = 0;
+	if ( strncmp(cmd, "Clear",5)==0 ) 		term_Clear();
+	else if ( strncmp(cmd, "Log", 3)==0 ) 	term_Logg(cmd+3);
+	else if ( strncmp(cmd, "Find ",5)==0 ) 	term_Srch(cmd+5);
+	else if ( strncmp(cmd, "Disp ",5)==0 )  term_Disp(cmd+5);
+	else if ( strncmp(cmd, "Recv" ,4)==0 )  rc=term_Recv(preply);
+	else if ( strncmp(cmd, "Send ",5)==0 )  term_Send(cmd+5,strlen(cmd+5));
+	else if ( strncmp(cmd, "Echo", 4)==0 )  rc = term_Echo() ? 1 : 0;
+	else if ( strncmp(cmd, "Timeout",7)==0 )iTimeOut = atoi( cmd+8 );
+	else if ( strncmp(cmd, "tun",  3)==0 ) rc = term_Tun(cmd+3, preply);
+	else if ( strncmp(cmd, "scp ", 4)==0 ) {
+		term_Learn_Prompt();
+		rc = term_Scp(cmd+4, preply);
+	}
+	else if ( strncmp(cmd,"Selection",9)==0) {
+		if ( preply!=NULL ) *preply = buff+sel_left;
+		rc = sel_right-sel_left;
+	}
+	else if ( strncmp(cmd, "Waitfor",7)==0) {
+		for ( int i=iTimeOut; i>0; i-- ) {
+			buff[cursor_x] = 0;
+			if ( strstr(tl1text, cmd+8)!=NULL ) {
+				if ( preply!=NULL ) *preply = tl1text;
+				rc = buff+cursor_x-tl1text;
+				break;
+			}
+			Sleep(1000);
+		}
+	}
+	else if ( strncmp(cmd, "Prompt ",7)==0 ) {
+		char *p=cmd+7, *p1 = sPrompt;
+		while ( *p && p1-sPrompt<31) {
+			if ( *p=='%' && isdigit(p[1]) ) {
+				int a;
+				sscanf(p+1, "%02x", &a);
+				*p1++ = a;
+				p+=3;
+			}
+			else
+				*p1++ = *p++;
+		}
+		*p1 = 0;
+		iPrompt = p1-sPrompt;
+	}
+	else 
+		rc = -1;
+	return rc;
+}
+int term_TL1( char *cmd, char **pTl1Text )
+{
+	tl1len = 0;
+	if ( host_Status()==HOST_CONNECTED ) {	//retrieve from NE
+		bPrompt = FALSE;
+		int cmdlen = strlen(cmd);
+		tl1text = buff+cursor_x;
+		term_Send(cmd, cmdlen);
+		if ( cmd[cmdlen-1]!='\r' ) term_Send("\r", 1);
+		term_Waitfor_Prompt();
+	}
+	else {									//retrieve from buffer
+		static char *pcursor=buff;			//only when retrieve from buffer
+		buff[cursor_x]=0;
+		char *p = strstr( pcursor, cmd );
+		if ( p==NULL ) { pcursor = buff; p = strstr( pcursor, cmd ); }
+		if ( p!=NULL ) { p = strstr( p, "\r\n" );
+			if ( p!=NULL ) {
+				tl1text = p+2;
+				p = strstr( p, "\nM " );
+				p = strstr( p, sPrompt );
+				if ( p!=NULL ) {
+					pcursor = ++p;
+					tl1len = pcursor - tl1text;
+				}
+			}
+		}
+		if ( tl1len == 0 ) { tl1text = buff+cursor_x; }
+	}
+
+	if ( pTl1Text!=NULL ) *pTl1Text = tl1text;
+	return tl1len;
 }

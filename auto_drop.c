@@ -164,24 +164,24 @@ int CAutoEnumString_AddString(CAutoEnumString* this, LPOLESTR lpszStr)
 }
 LPOLESTR CAutoEnumString_prevString(CAutoEnumString* this)
 {
-    if ( this->m_rtrvCur > 0 )
+    if ( this->m_addCur>0 && this->m_rtrvCur>0)
 		return this->m_arString[--this->m_rtrvCur];
-	else
+    else
 		return L"";
 }
 LPOLESTR CAutoEnumString_firstString(CAutoEnumString* this)
 {
     this->m_rtrvCur = 0;
-	if ( this->m_addCur>0 )
-		return this->m_arString[this->m_rtrvCur];
+	if ( this->m_addCur>0 ) 
+		return this->m_arString[0];
 	else
 		return L"";
 }
 LPOLESTR CAutoEnumString_nextString(CAutoEnumString* this)
 {
-    if ( this->m_rtrvCur < this->m_addCur-1 )
+	if ( this->m_rtrvCur < this->m_addCur-1 )
 		return this->m_arString[++this->m_rtrvCur];
-	else
+	else 
 		return L"";
 }
 //

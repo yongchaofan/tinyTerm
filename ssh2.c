@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40088 2019-01-13 21:05:10 $"
+// "$Id: ssh2.c 38103 2019-01-15 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -568,161 +568,76 @@ int scp_write_one(const char *lpath, const char *rpath)
 	ReleaseMutex(mtx);
 	return 0;
 }
-void scp_pwd(char *pwd)
+void scp_read( char *lpath, char *rfiles )
 {
-	char *p1, *p2;
-	term_TL1("pwd\r", &p2);
-	p1 = strchr(p2, 0x0a);
-	if ( p1!=NULL ) {
-		p2 = p1+1;
-		p1 = strchr(p2, 0x0a);
-		if ( p1!=NULL ) {
-			int len = p1-p2;
-			strncpy(pwd, p2, len);
-			pwd[len]=0;
-		}
-	}
-}
-char *scp_read( char *lpath, char *rpath )
-{
-	char rnames[4096]="ls -1 ", *rdir=rnames+6, *rlist;
-	if ( *rpath!='/' && *rpath!='~' ) {
-		scp_pwd(rdir);
-		strcat(rnames, "/");
-	}
-	strcat(rnames, rpath);
+	char lfile[4096];
+	strncpy(lfile, lpath, 1024);
+	lfile[1024] = 0;
 
-	char *reply = term_Mark_Prompt();
-	if ( strchr(rpath,'*')==NULL && strchr(rpath, '?')==NULL ) {
-		char lfile[1024];
-		strcpy(lfile, lpath);
-		struct _stat statbuf;
-		if ( stat_utf8(lpath, &statbuf)!=-1 ) {
-			if ( S_ISDIR(statbuf.st_mode) ) {
-				strcat(lfile, "/");
-				const char *p = strrchr(rpath, '/');
-				if ( p!=NULL ) p++; else p=rpath;
-				strcat(lfile, p);
-			}
-		}
-		scp_read_one(rdir, lfile);
+	struct _stat statbuf;
+	if ( stat_utf8(lpath, &statbuf)!=-1 ) {
+		if ( S_ISDIR(statbuf.st_mode) ) 
+			strcat(lfile, "/");
 	}
-	else {
-		strcat(rnames, "\r");
-		int len = term_TL1(rnames, &rlist );
-		reply = term_Mark_Prompt();
-		if ( len>0 ) {
-			char rfile[1024], lfile[1024];
-			char *p1, *p2, *p = strrchr(rdir, '/');
-			if ( p!=NULL ) *p=0;
-			p = strchr(rlist, '\012');
-			if ( p==NULL ) return 0;
-			while ( (p1=strchr(++p, '\012'))!=NULL ) {
-				if ( p1-rlist>=len ) break;
-				strncpy(rfile, p, p1-p);
-				rfile[p1-p] = 0;
-				p2 = strrchr(rfile, '/');
-				if ( p2==NULL ) p2=rfile; else p2++;
-				strcpy(lfile, lpath);
-				strcat(lfile, "/");
-				strcat(lfile, p2);
-				scp_read_one(rfile, lfile);
-				p = p1;
-			}
+	char *ldir = lfile+strlen(lfile);
+
+	char *p1, *p2, *p = rfiles;
+	while ( (p1=strchr(p, '\012'))!=NULL ) {
+		*p1++ = 0;
+		if ( ldir[-1]=='/' ) {		//lpath is a directory
+			p2 = strrchr(p, '/');
+			if ( p2==NULL ) p2=p; else p2++;
+			strcpy(ldir, p2);
 		}
+		scp_read_one(p, lfile);
+		p = p1;
+		*ldir = 0;
 	}
-	return reply;
 }
-char *scp_write( char *lpath, char *rpath )
+void scp_write( char *lpath, char *rpath )
 {
 	DIR *dir;
 	struct dirent *dp;
 	struct _stat statbuf;
 
-	char rnames[1024]="ls -ld ";
-	if ( *rpath!='/' && *rpath!='~' ) {
-		scp_pwd(rnames+7);
-		if ( *rpath ) {
-			strcat(rnames, "/");
-			strcat(rnames, rpath);
-		}
-	}
-	else
-		strcpy(rnames+7, rpath);
-
-	char *reply = term_Mark_Prompt();
-	if ( stat_utf8(lpath, &statbuf)!=-1 ) {
-		char rfile[1024];
-		strcpy(rfile, rnames+7);
-
-		char *p = strrchr(rnames, '/');
-		int rpath_is_dir = (p[1]==0);
-		if ( !rpath_is_dir ) {
-			strcat(rnames, "\r");
-			char *rlist;
-			if ( term_TL1(rnames, &rlist )>0 ) {
-				p = strchr(rlist, 0x0a);
-				if ( p!=NULL ) {
-					if ( p[1]=='d' ) {
-						rpath_is_dir = TRUE;
-						strcat(rfile, "/");
-					}
-				}
-			}
-		}
-		reply = term_Mark_Prompt();
-		if ( rpath_is_dir ) {
-			char *p = strrchr(lpath, '/');
+	if ( stat_utf8(lpath, &statbuf)!=-1 ) {	//lpath exist
+		char rfile[4096];
+		strncpy(rfile, rpath, 1024);
+		rfile[1024] = 0;
+		if ( rpath[strlen(rpath)-1]=='/' ) {//rpath specifies a directory
+			char *p = strrchr(lpath, '/');	//build rfile
 			if ( p==NULL ) p=lpath; else p++;
 			strcat(rfile, p);
 		}
 		scp_write_one(lpath, rfile);
 	}
-	else {
-		const char *lname=lpath;
-		char ldir[1024]=".";
-		char *p = (char *)strrchr(lpath, '/');
-		if ( p!=NULL ) {
-			*p++ = 0;
-			lname = p;
-			strcpy(ldir, lpath);
+	else {									//lpath specifies a pattern
+		char *ldir=".";
+		char *lpattern = strrchr(lpath, '/');
+		if ( lpattern!=NULL ) {
+			*lpattern++ = 0;
+			if ( *lpath ) ldir = lpath;
 		}
+		else 
+			lpattern = lpath;
 
-		if ( (dir=opendir(ldir) ) == NULL ){
-			term_Print("\n\033[31mSCP: couldn't open \033[32m%s\n", ldir);
-			return 0;
-		}
-		while ( (dp=readdir(dir)) != NULL ) {
-			if ( fnmatch(lname, dp->d_name, 0)==0 ) {
-				char lfile[1024], rfile[1024];
-				strcpy(lfile, ldir);
-				strcat(lfile, "/");
-				strcat(lfile, dp->d_name);
-				strcpy(rfile, rnames+7);
-				strcat(rfile, "/");
-				strcat(rfile, dp->d_name);
-				scp_write_one(lfile, rfile);
+		if ( (dir=opendir(ldir) ) != NULL ) {
+			while ( (dp=readdir(dir)) != NULL ) {
+				if ( fnmatch(lpattern, dp->d_name, 0)==0 ) {
+					char lfile[1024], rfile[1024];
+					strcpy(lfile, ldir);
+					strcat(lfile, "/");
+					strcat(lfile, dp->d_name);
+					strcpy(rfile, rpath);
+					if ( rpath[strlen(rpath)-1]=='/' )
+						strcat(rfile, dp->d_name);
+					scp_write_one(lfile, rfile);
+				}
 			}
 		}
+		else 
+			term_Print("\n\033[31mSCP: couldn't open \033[32m%s\n", ldir);	
 	}
-	return reply;
-}
-int scp_cmd(char *cmd, char **preply)
-{
-	char *p = strchr(cmd, ' ');
-	if ( p==NULL ) return 0;
-	for ( char *q=cmd; *q; q++ ) if ( *q=='\\' ) *q='/';
-
-	char *reply =term_Mark_Prompt();
-	*p++ = 0;
-	if ( *cmd==':' )
-		reply = scp_read(p, cmd+1);
-	else
-		reply = scp_write(cmd, p+1);	//*p is expected to be ':' here
-
-	if ( preply!=NULL ) *preply = reply;
-	ssh2_Send("\r", 1);
-	return term_Waitfor_Prompt();
 }
 
 struct Tunnel
@@ -927,10 +842,8 @@ shutdown:
 	tun_del(listensock);
 	return 0;
 }
-int tun_cmd(char *cmd, char **preply)
+void ssh2_Tun(char *cmd)
 {
-	char *reply = term_Mark_Prompt();
-	if ( preply!=NULL ) *preply = reply;
 	if ( *cmd==' ' ) {
 		char *p = strchr(++cmd, ' ');
 		if ( p==NULL )
@@ -958,9 +871,7 @@ int tun_cmd(char *cmd, char **preply)
 		term_Print("\t%d listenning, %d active\n", listen_cnt, active_cnt);
 	}
 	ssh2_Send("\r", 1);
-	return term_Waitfor_Prompt();
 }
-
 /*******************sftpHost*******************************/
 static char homepath[MAX_PATH], realpath[MAX_PATH];
 int sftp_lcd(char *cmd)
@@ -1199,7 +1110,7 @@ int sftp_get(char *src, char *dst)
 	}
 	return 0;
 }
-int sftp_put(char *src, char *dst)
+void sftp_put(char *src, char *dst)
 {
 	DIR *dir;
 	struct dirent *dp;
@@ -1229,24 +1140,23 @@ int sftp_put(char *src, char *dst)
 			strcpy(lfile, src);
 		}
 
-		if ( (dir=opendir(lfile) ) == NULL ){
-			term_Print("\033[31mcouldn't open \033[32m%s\n",lfile);
-			return 0;
-		}
-		strcat(lfile, "/");
-		int llen = strlen(lfile);
-		strcpy(rfile, dst);
-		if ( *rfile!='/' || strlen(rfile)>1 ) strcat(rfile, "/");
-		int rlen = strlen(rfile);
-		while ( (dp=readdir(dir)) != NULL ) {
-			if ( fnmatch(pattern, dp->d_name, 0)==0 ) {
-				strcpy(lfile+llen, dp->d_name);
-				strcpy(rfile+rlen, dp->d_name);
-				sftp_put_one(lfile, rfile);
+		if ( (dir=opendir(lfile) )!=NULL ) {
+			strcat(lfile, "/");
+			int llen = strlen(lfile);
+			strcpy(rfile, dst);
+			if ( *rfile!='/' || strlen(rfile)>1 ) strcat(rfile, "/");
+			int rlen = strlen(rfile);
+			while ( (dp=readdir(dir)) != NULL ) {
+				if ( fnmatch(pattern, dp->d_name, 0)==0 ) {
+					strcpy(lfile+llen, dp->d_name);
+					strcpy(rfile+rlen, dp->d_name);
+					sftp_put_one(lfile, rfile);
+				}
 			}
 		}
+		else
+			term_Print("\033[31mcouldn't open \033[32m%s\n",lfile);
 	}
-	return 0;
 }
 int sftp_cmd(char *cmd)
 {

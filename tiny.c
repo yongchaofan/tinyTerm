@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 34548 2019-01-12 14:35:10 $"
+// "$Id: tiny.c 34610 2019-01-15 14:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -65,9 +65,9 @@ static int menuX[4] = {32, 0, 0, 0};	//menuX[0]=32 leave space for icon
 static WCHAR wsFontFace[256]=L"Consolas";
 static int iFontHeight, iFontWidth;
 static int iTransparency = 255;
+static int iScriptDelay = 250;
 static int iConnectCount, iScriptCount, httport;
-static BOOL bScrollbar = FALSE;
-static BOOL bFocus = FALSE, bEdit = FALSE;
+static BOOL bScrollbar = FALSE, bFocus = FALSE, bEdit = FALSE;
 static BOOL bFTPd = FALSE, bTFTPd = FALSE;
 static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
 
@@ -197,21 +197,21 @@ int tiny_Cmd( char *cmd, char **preply )
 	if ( *cmd=='!' ) {
 		cmd_Disp_utf8(cmd++);
 		if (strncmp(cmd,"Transparency",12)==0)	tiny_Transparency(atoi(cmd+13));
+		else if ( strncmp(cmd,"ScriptDelay",11)==0 )iScriptDelay = atoi(cmd+12);
 		else if ( strncmp(cmd, "FontSize", 8)==0 )	tiny_FontSize(atoi(cmd+9));
 		else if ( strncmp(cmd, "FontFace", 8)==0 )	tiny_FontFace(cmd+9);
 		else if ( strncmp(cmd, "TermSize", 8)==0 )	tiny_TermSize(cmd+9);
 		else if ( strncmp(cmd, "Tftpd",5)==0 )		tftp_Svr( cmd+6 );
 		else if ( strncmp(cmd, "Ftpd", 4)==0 ) 		ftp_Svr( cmd+5 );
-		else if ( strncmp(cmd, "scp ", 4)==0 ) rc = scp_cmd(cmd+4, preply);
-		else if ( strncmp(cmd, "tun",  3)==0 ) rc = tun_cmd(cmd+3, preply);
 		else {
 			rc = term_Cmd(cmd, preply);
 			if ( rc==-1 ) host_Open(cmd);
 		}
 	}
 	else {
-		if ( host_Status()!=HOST_IDLE )
+		if ( host_Status()!=HOST_IDLE ) {
 			rc = term_TL1(cmd, preply);
+		}
 		else {
 			term_Disp(cmd);
 			term_Disp("\n");
@@ -221,13 +221,13 @@ int tiny_Cmd( char *cmd, char **preply )
 }
 DWORD WINAPI scper(void *pv)
 {
-	scp_cmd((char *)pv, NULL);
+	term_Scp((char *)pv, NULL);
 	free(pv);
 	return 0;
 }
 DWORD WINAPI tuner(void *pv)
 {
-	tun_cmd((char *)pv, NULL);
+	term_Tun((char *)pv, NULL);
 	free(pv);
 	return 0;
 }
@@ -253,19 +253,20 @@ void cmd_Enter(void)
 		cmd[cch] = 0;
 		if ( autocomplete_Add(wcmd) ) 
 			if ( *cmd=='!' ) menu_Add(cmd+1, wcmd+1);
-		switch ( *cmd ) {
-		case '/': term_Srch(cmd+1); break;
-		case '!': if ( strncmp(cmd+1, "scp ", 4)==0 && host_Type()==SSH )
-					CreateThread(NULL, 0, scper, strdup(cmd+5), 0, NULL);
-				  else if ( strncmp(cmd+1, "tun",  3)==0 && host_Type()==SSH )
-					CreateThread(NULL, 0, tuner, strdup(cmd+4), 0, NULL);
-				  else
-					tiny_Cmd(cmd, NULL);
-				  break;
-		default:  cmd[cch]='\r'; host_Send(cmd, cch+1);
+		if ( *cmd=='!' ) {
+			if ( strncmp(cmd+1, "scp ", 4)==0 && host_Type()==SSH )
+				CreateThread(NULL, 0, scper, strdup(cmd+5), 0, NULL);
+			  else if ( strncmp(cmd+1, "tun",  3)==0 && host_Type()==SSH )
+				CreateThread(NULL, 0, tuner, strdup(cmd+4), 0, NULL);
+			  else
+				tiny_Cmd(cmd, NULL);
+		}
+		else{
+			cmd[cch]='\r'; 
+			host_Send(cmd, cch+1);
 		}
 	}
-	cmd_Disp(L"");
+	PostMessage(hwndCmd, EM_SETSEL, 0, -1);
 }
 WNDPROC wpOrigCmdProc;
 LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
@@ -281,8 +282,8 @@ LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 		}
 		else {
 			switch ( wParam ) {
-			case VK_UP: cmd_Disp(autocomplete_Prev()); break;
-			case VK_DOWN: cmd_Disp(autocomplete_Next()); break;
+			case VK_UP: 	cmd_Disp(autocomplete_Prev()); break;
+			case VK_DOWN: 	cmd_Disp(autocomplete_Next()); break;
 			case VK_RETURN: cmd_Enter(); break;
 			}
 		}
@@ -423,17 +424,16 @@ void tiny_Paint(HDC hDC)
 														slider_y+7 );
 	}
 	BitBlt(hDC,0,0,termRect.right,termRect.bottom, hBufDC,0,0,SRCCOPY);
+	int cch = utf8_to_wchar(buff+line[cursor_y],
+								cursor_x-line[cursor_y], wbuf, 1024);
+	DrawText(hBufDC, wbuf, cch, &text_rect, DT_CALCRECT);
 	if ( bEdit ) {
-		MoveWindow( hwndCmd, (cursor_x-line[cursor_y])*iFontWidth,
-							(cursor_y-screen_y)*iFontHeight, 
-							termRect.right,	iFontHeight, TRUE );
+		MoveWindow( hwndCmd, text_rect.right, (cursor_y-screen_y)*iFontHeight,
+						termRect.right-text_rect.right, iFontHeight, TRUE );
 	}
 	if ( bFocus ) {
-		int cch = utf8_to_wchar(buff+line[cursor_y],
-								cursor_x-line[cursor_y], wbuf, 1024);
-		DrawText(hBufDC, wbuf, cch, &text_rect, DT_CALCRECT);
 		SetCaretPos( text_rect.right+1,
-					(cursor_y-screen_y+1)*iFontHeight-iFontHeight/4);
+					(cursor_y-screen_y)*iFontHeight+iFontHeight*3/4);
 		bCursor ? ShowCaret(hwndMain) : HideCaret(hwndMain);
 	}
 
@@ -609,9 +609,9 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		break;
 	case ID_EDIT:	//toggle local edit
 		if ( (bEdit=!bEdit) ) {
-			MoveWindow( hwndCmd, (cursor_x-line[cursor_y])*iFontWidth,
-								termRect.bottom-iFontHeight, 
-								termRect.right,	iFontHeight, TRUE );
+			int edit_left = (cursor_x-line[cursor_y])*iFontWidth;
+			MoveWindow( hwndCmd, edit_left,	termRect.bottom-iFontHeight, 
+								termRect.right-edit_left, iFontHeight, TRUE );
 			SetFocus(hwndCmd);
 		}
 		else {
@@ -1083,8 +1083,10 @@ void SaveDict( WCHAR *wfn )
 DWORD WINAPI uploader( void *files )	//upload files through scp or sftp
 {
 	for ( char *q=files; *q; q++ ) if ( *q=='\\' ) *q='/';
+	term_Learn_Prompt();
+	
 	char rdir[1024];
-	scp_pwd(rdir);
+	term_Pwd(rdir, 1024);
 	strcat(rdir, "/");
 
 	char *p=(char *)files, *p1;
@@ -1149,11 +1151,12 @@ DWORD WINAPI scripter( void *cmds )
 			else {
 				if ( p1[-1]==0x0d ) p1[-1] = 0;
 				tiny_Cmd( p0, NULL );
+				Sleep(iScriptDelay);
 				if ( p1[-1]==0 ) p1[-1] = 0x0d;
 			}
 		}
 		if ( p0!=p1 ) { p0 = p1+1; *p1 = 0x0a; }
-		while ( bScriptPause && bScriptRun ) Sleep(1000);
+		while ( bScriptPause && bScriptRun ) Sleep(500);
 	}
 	while ( p2!=NULL && bScriptRun );
 	cmd_Disp( bScriptRun ? L"script completed" : L"script stopped");
@@ -1172,8 +1175,10 @@ void DropScript( char *cmds )
 			cmd_Disp(L"a script is still running");
 			free(cmds);
 		}
-		else 
+		else {
+			term_Learn_Prompt();
 			CreateThread( NULL, 0, scripter, (void *)cmds, 0, NULL);
+		}
 	}
 }
 void OpenScript( WCHAR *wfn )
@@ -1182,6 +1187,7 @@ void OpenScript( WCHAR *wfn )
 	int len = wcslen(wfn);
 	if ( wcscmp(wfn+len-3, L".js")==0 || wcscmp(wfn+len-4, L".vbs")==0 ) {
 		WCHAR port[256];
+		term_Learn_Prompt();
 		wsprintf(port, L"%d", httport);
 		_wspawnlp( _P_NOWAIT, L"WScript.exe", L"WScript.exe", wfn, port, NULL );
 		return;

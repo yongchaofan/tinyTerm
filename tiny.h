@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 3295 2019-01-12 21:05:10 $"
+// "$Id: tiny.h 3299 2019-01-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -67,12 +67,10 @@ void ssh2_Size( int w, int h );
 void ssh2_Send( char *buf, int len );
 void ssh2_Close( );
 void ssh2_Exit( void );
-void scp_pwd(char *pwd);
-char *scp_read(char *lpath, char *rpath);
-char *scp_write(char *lpath, char *rpath);
-int scp_cmd(char *cmd, char **preply);
-int tun_cmd(char *cmd, char **preply);
-int sftp_put(char *src, char *dest);
+void ssh2_Tun(char *cmd);
+void scp_read(char *lpath, char *rfiles);
+void scp_write(char *lpath, char *rpath);
+void sftp_put(char *src, char *dest);
 void netconf_Send( char *msg, int len );
 
 /****************ftpd.c****************/
@@ -88,18 +86,22 @@ void term_Parse_XML( char *xml, int len );
 void term_Print( const char *fmt, ... );
 void term_Scroll(int lines);
 void term_Keydown(DWORD key);
-void term_Prompt( char *cmd );
-void term_Waitfor( char *cmd );
+
+BOOL term_Echo();
 void term_Logg( char *fn );
 void term_Srch( char *sstr );
 void term_Disp( char *buf );
 void term_Send( char *buf, int len );
 int term_Recv( char **preply );	//get new text since last Disp/Send/Recv
+
+void term_Learn_Prompt();
+char *term_Mark_Prompt();
+int term_Waitfor_Prompt();
+int term_Pwd(char *buf, int len);
+int term_Scp(char *cmd, char **preply);
+int term_Tun(char *cmd, char **preply);
 int term_Cmd( char *cmd, char **preply );
 int term_TL1( char *cmd, char **preply);
-int term_Waitfor_Prompt();
-char *term_Mark_Prompt();
-BOOL term_Echo();
 
 /****************tiny.c****************/
 void cmd_Disp_utf8(char *buf);
