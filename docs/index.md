@@ -30,7 +30,7 @@ Command history is saved to tinyTerm.hist at exit, then loaded into memory at th
 
 ![completion](tinyTerm-2.gif)
 
-In line edit mode, when special characters “!,/” is typed at the beginning of a command, the command will be executed by tinyTerm instead of sending to remote host, for functions like making connection, search scroll buffer, set terminal options, scp file transfer or ssh tunnel setup etc. 
+In line edit mode, when special characters “!” is typed at the beginning of a command, the command will be executed by tinyTerm instead of sending to remote host, for functions like making connection, search scroll buffer, set terminal options, scp file transfer or ssh tunnel setup etc. 
 See Appendix A for list of supported special commands.
 
 
@@ -99,32 +99,33 @@ Private key based authentication is supported too, key file should be stored in 
 ## Appendix A. List of special command for editor line and scripting
 
 ### Connection
-	!com3:9600,n,8,1	serial connection to port com3 using settings 9600,n,8,1
+	!com3:9600,n,8,1	connect to serial port com3 with 9600,n,8,1
 	!telnet 192.168.1.1	telnet to 192.168.1.1
-	!ssh 192.168.1.1	ssh to host 192.168.1.1
-	!sftp pi@192.168.1.1	sftp to host 192.168.1.1 with user admin
-	!netconf router1:830	netconf to port 830 of host 192.168.1.1
-	!disconn		disconnect from current connection
-	!{DOS command}		execute command and display result, e.g. ping 192.168.1.1
+	!ssh pi@192.168.1.1	ssh to host 192.168.1.1
+	!sftp 192.168.1.1	sftp to host 192.168.1.1 with user admin
+	!netconf rtr1:830	netconf to port 830 of host 192.168.1.1
+	!disconn			disconnect from current connection
+	!{DOS command}	execute command and display result, e.g. ping 192.168.1.1
+	!Find {string}	search for {string} in current scroll buffer
 
 ### Automation
 	!Clear			set clear scroll back buffer
-	!Prompt $%20		set command prompt to “$ “, for batch command execution
+	!Prompt $%20	set command prompt to “$ “, for batch command execution
 	!Timeout 30		set time out to 30 seconds for batch command execution
 	!Wait 10		wait 10 seconds during batch command execution
-	!Waitfor 100%		wait for “100%” from during batch command execution
+	!Waitfor 100%	wait for “100%” from during batch command execution
 	!Loop 2			repeat two times from start of script
-	!Log test.log		start/stop logging with log file test.log
+	!Log test.log	start/stop logging with log file test.log
 
 ### Scripting
 	!Disp test case #1	display “test case #1” in terminal window
-	!Send ping 192.168.1.1	send “ping 192.168.1.1” to host
-	!Recv			get all text received since last Disp/Send/Recv command
+	!Send exit		send “exit” to host
+	!Recv			get all text received since last Send/Recv
 	!Echo			toggle local ech on/off
 	!Selection		get current selected text
 
 ### Options
-	!TermSize 100x40	set terminal window size to 100 columns x 40 rows
+	!TermSize 100x40	set terminal size to 100 cols x 40 rows
 	!Transparency 192	set window transparency level to 192/255
 	!FontFace Consolas	set font face to “Consolas”
 	!FontSize 18		set font size to 18
