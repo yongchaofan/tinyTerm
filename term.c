@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 23516 2019-01-15 21:05:10 $"
+// "$Id: term.c 23743 2019-01-15 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -36,8 +36,8 @@ static int title_idx = 0;
 static FILE *fpLogFile;
 
 static BOOL bPrompt=FALSE;
-static char sPrompt[32]=";\n> ", *tl1text=NULL;
-static int  iPrompt=4, iTimeOut=30, tl1len=0;
+static char sPrompt[32]="> ", *tl1text=NULL;
+static int  iPrompt=2, iTimeOut=30, tl1len=0;
 static HANDLE hTL1Event;
 unsigned char * vt100_Escape( unsigned char *sz, int cnt );
 
@@ -83,6 +83,10 @@ void term_nextLine()
 	if ( cursor_x>=BUFFERSIZE-1024 || cursor_y==MAXLINES-2 ) {
 		int i, len = line[1024];
 		tl1text -= len;
+		if ( tl1text<buff ) {
+			tl1len -= buff-tl1text;
+			tl1text = buff;
+		}
 		cursor_x -= len;
 		cursor_y -= 1024;
 		memmove( buff, buff+len, BUFFERSIZE-len );
@@ -229,6 +233,12 @@ void term_Parse( char *buf, int len )
 	}
 	tiny_Redraw();
 }
+BOOL term_Echo()
+{
+	bEcho=!bEcho;
+	term_Print("\n\033[32mEcho %s\n", bEcho?"On":"Off");
+	return bEcho;
+}
 void term_Print( const char *fmt, ... )
 {
 	char buff[4096];
@@ -247,16 +257,7 @@ void term_Disp( char *msg )
 void term_Send( char *buf, int len )
 {
 	if ( bEcho ) term_Parse( buf, len );
-	if ( host_Status()==HOST_IDLE ) {
-	}
-	else
-		host_Send( buf, len );
-}
-BOOL term_Echo()
-{
-	bEcho=!bEcho;
-	term_Print("\n\033[32mEcho %s\n", bEcho?"On":"Off");
-	return bEcho;
+	host_Send( buf, len );
 }
 int term_Recv( char **pTL1text )
 {
@@ -266,7 +267,7 @@ int term_Recv( char **pTL1text )
 	return len;
 }
 void term_Learn_Prompt()
-{//capture prompt for scripting after Enter key pressed
+{//capture prompt for scripting
 	sPrompt[0] = buff[cursor_x-2];
 	sPrompt[1] = buff[cursor_x-1];
 	iPrompt = 2;
@@ -322,6 +323,181 @@ void term_Srch( char *sstr )
 	}
 	if ( p<buff+l ) sel_left = sel_right = scroll_y = 0;
 	tiny_Redraw();
+}
+int term_TL1( char *cmd, char **pTl1Text )
+{
+	if ( host_Status()==HOST_CONNECTED ) {	//retrieve from NE
+		term_Mark_Prompt();
+		int cmdlen = strlen(cmd);
+		term_Send(cmd, cmdlen);
+		if ( cmd[cmdlen-1]!='\r' ) term_Send("\r", 1);
+		term_Waitfor_Prompt();
+	}
+	else {									//retrieve from buffer
+		static char *pcursor=buff;			//only when retrieve from buffer
+		tl1len = 0;
+		buff[cursor_x]=0;
+		char *p = strstr( pcursor, cmd );
+		if ( p==NULL ) { pcursor = buff; p = strstr( pcursor, cmd ); }
+		if ( p!=NULL ) { p = strstr( p, "\r\n" );
+			if ( p!=NULL ) {
+				tl1text = p+2;
+				p = strstr( p, "\nM " );
+				p = strstr( p, sPrompt );
+				if ( p!=NULL ) {
+					pcursor = ++p;
+					tl1len = pcursor - tl1text;
+				}
+			}
+		}
+		if ( tl1len == 0 ) { tl1text = buff+cursor_x; }
+	}
+
+	if ( pTl1Text!=NULL ) *pTl1Text = tl1text;
+	return tl1len;
+}
+int term_Pwd(char *pwd, int len)
+{
+	char *p1, *p2;
+	term_TL1("pwd\r", &p2);
+	p1 = strchr(p2, 0x0a);
+	if ( p1!=NULL ) {
+		p2 = p1+1;
+		p1 = strchr(p2, 0x0a);
+		if ( p1!=NULL ) {
+			if ( len>p1-p2 ) len = p1-p2;
+			strncpy(pwd, p2, len);
+			pwd[len]=0;
+		}
+	}
+	else
+		len = 0;
+	return len;
+}
+int term_Scp(char *cmd, char **preply)
+{
+	for ( char *q=cmd; *q; q++ ) if ( *q=='\\' ) *q='/';
+	char *p = strchr(cmd, ' ');
+	if ( p==NULL ) return 0;
+	*p++ = 0;
+
+	char *lpath, *rpath, *reply = term_Mark_Prompt();
+	term_Learn_Prompt();
+	if ( *cmd==':' ) {	//scp_read
+		lpath = p; rpath = cmd+1;
+		char ls_1[1024]="ls -1 ";
+		if ( *rpath!='/' && *rpath!='~' ) {
+			term_Pwd(ls_1+6, 1016);
+			strcat(ls_1, "/");
+		}
+		strcat(ls_1, rpath);
+		
+		if ( strchr(rpath, '*')==NULL 
+		  && strchr(rpath, '?')==NULL ) {		//rpath is a single file
+			reply = term_Mark_Prompt();	
+			strcat(ls_1, "\012");
+			scp_read(lpath, ls_1+6);
+		}
+		else {									//rpath is a filename pattern
+			char *rlist, *rfiles;
+			strcat(ls_1, "\r");
+			int len = term_TL1(ls_1, &rlist );
+			if ( len>0 ) {
+				rlist[len] = 0;
+				p = strchr(rlist, 0x0a);
+				if ( p!=NULL ) {
+					rfiles = strdup(p+1);
+					reply = term_Mark_Prompt();
+					scp_read(lpath, rfiles);
+					free(rfiles);
+				}
+			}
+		}
+	}
+	else {//scp_write
+		lpath = cmd; rpath = p+1;				//*p is expected to be ':' here
+		char lsld[1024]="ls -ld ";
+		if ( *rpath!='/' && *rpath!='~' ) {		//rpath is relative
+			term_Pwd(lsld+7, 1017);
+			strcat(lsld, "/");
+		}
+		strcat(lsld, rpath);
+		strcat(lsld, "\r");
+
+		if ( lsld[strlen(lsld)-1]!='/' )  {
+			char *rlist;			 
+			if ( term_TL1(lsld, &rlist )>0 ) {	//check if rpath is a dir
+				lsld[strlen(lsld)-1] = 0;
+				p = strchr(rlist, 0x0a);
+				if ( p!=NULL ) {				//append '/' if yes
+					if ( p[1]=='d' ) strcat(lsld, "/");
+				}
+			}
+		}
+		reply = term_Mark_Prompt();
+		scp_write(lpath, lsld+7);
+	}
+	ssh2_Send("\r", 1);
+	if ( preply!=NULL ) *preply = reply;
+	return term_Waitfor_Prompt();
+}
+int term_Tun(char *cmd, char **preply)
+{
+	char *reply = term_Mark_Prompt();
+	if ( preply!=NULL ) *preply = reply;
+	ssh2_Tun(cmd);
+	return term_Waitfor_Prompt();
+}
+int term_Cmd( char *cmd, char **preply )
+{
+	if ( *cmd!='!' ) return term_TL1(cmd, preply);
+
+	int rc = 0;
+	if ( strncmp(++cmd, "Clear",5)==0 )		term_Clear();
+	else if ( strncmp(cmd, "Log", 3)==0 ) 	term_Logg(cmd+3);
+	else if ( strncmp(cmd, "Find ",5)==0 ) 	term_Srch(cmd+5);
+	else if ( strncmp(cmd, "Disp ",5)==0 )  term_Disp(cmd+5);
+	else if ( strncmp(cmd, "Send ",5)==0 )  {
+		term_Mark_Prompt();
+		term_Send(cmd+5,strlen(cmd+5));
+	}
+	else if ( strncmp(cmd, "Hostname",8)==0) {
+		if ( preply!=NULL ) {
+			*preply = tiny_Hostname();
+			rc = strlen(*preply);
+		}
+	}
+	else if ( strncmp(cmd,"Selection",9)==0) {
+		if ( preply!=NULL ) *preply = buff+sel_left;
+		rc = sel_right-sel_left;
+	}
+	else if ( strncmp(cmd, "Recv" ,4)==0 )  rc = term_Recv(preply);
+	else if ( strncmp(cmd, "Echo", 4)==0 )  rc = term_Echo() ? 1 : 0;
+	else if ( strncmp(cmd, "Timeout",7)==0 )iTimeOut = atoi( cmd+8 );
+	else if ( strncmp(cmd, "Prompt ",7)==0 ) {
+		strncpy(sPrompt, cmd+7, 31);
+		sPrompt[31] = 0;
+		url_decode(sPrompt);
+		iPrompt = strlen(sPrompt);
+	}
+	else if ( strncmp(cmd, "Tftpd",5)==0 )	tftp_Svr( cmd+5 );
+	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 	ftp_Svr( cmd+4 );
+	else if ( strncmp(cmd, "tun",  3)==0 ) 	rc = term_Tun(cmd+3, preply);
+	else if ( strncmp(cmd, "scp ", 4)==0 ) 	rc = term_Scp(cmd+4, preply);
+	else if ( strncmp(cmd, "Waitfor",7)==0) {
+		for ( int i=iTimeOut; i>0; i-- ) {
+			buff[cursor_x] = 0;
+			if ( strstr(tl1text, cmd+8)!=NULL ) {
+				if ( preply!=NULL ) *preply = tl1text;
+				rc = buff+cursor_x-tl1text;
+				break;
+			}
+			Sleep(1000);
+		}
+	}
+	else 
+		host_Open(cmd);
+	return rc;
 }
 unsigned char *vt100_Escape( unsigned char *sz, int cnt )
 {
@@ -683,178 +859,4 @@ static BOOL previousIsOpen = TRUE;
 			}
 		}
 	}
-}
-int term_Pwd(char *pwd, int len)
-{
-	char *p1, *p2;
-	term_TL1("pwd\r", &p2);
-	p1 = strchr(p2, 0x0a);
-	if ( p1!=NULL ) {
-		p2 = p1+1;
-		p1 = strchr(p2, 0x0a);
-		if ( p1!=NULL ) {
-			if ( len>p1-p2 ) len = p1-p2;
-			strncpy(pwd, p2, len);
-			pwd[len]=0;
-		}
-	}
-	else
-		len = 0;
-	return len;
-}
-int term_Scp(char *cmd, char **preply)
-{
-	for ( char *q=cmd; *q; q++ ) if ( *q=='\\' ) *q='/';
-	char *p = strchr(cmd, ' ');
-	if ( p==NULL ) return 0;
-	*p++ = 0;
-
-	char *lpath, *rpath, *reply = term_Mark_Prompt();
-	term_Learn_Prompt();
-	if ( *cmd==':' ) {	//scp_read
-		lpath = p; rpath = cmd+1;
-		char ls_1[1024]="ls -1 ";
-		if ( *rpath!='/' && *rpath!='~' ) {
-			term_Pwd(ls_1+6, 1018);
-			strcat(ls_1, "/");
-		}
-		strcat(ls_1, rpath);
-		
-		if ( strchr(rpath, '*')==NULL 
-		  && strchr(rpath, '?')==NULL ) {		//rpath is a single file
-			reply = term_Mark_Prompt();	
-			strcat(ls_1, "\012");
-			scp_read(lpath, ls_1+6);
-		}
-		else {									//rpath is a filename pattern
-			char *rlist, *rfiles;
-			int len = term_TL1(ls_1, &rlist );
-			if ( len>0 ) {
-				rlist[len] = 0;
-				p = strchr(rlist, 0x0a);
-				if ( p!=NULL ) {
-					rfiles = strdup(p+1);
-					reply = term_Mark_Prompt();
-					scp_read(lpath, rfiles);
-					free(rfiles);
-				}
-			}
-		}
-	}
-	else {//scp_write
-		lpath = cmd; rpath = p+1;				//*p is expected to be ':' here
-		char lsld[1024]="ls -ld ";
-		if ( *rpath!='/' && *rpath!='~' ) {		//rpath is relative
-			term_Pwd(lsld+7, 1017);
-			strcat(lsld, "/");
-		}
-		strcat(lsld, rpath);
-
-		if ( lsld[strlen(lsld)-1]!='/' )  {
-			char *rlist;			 
-			if ( term_TL1(lsld, &rlist )>0 ) {	//check if rpath is a dir
-				p = strchr(rlist, 0x0a);
-				if ( p!=NULL ) {				//append '/' if yes
-					if ( p[1]=='d' ) strcat(lsld, "/");
-				}
-			}
-		}
-		reply = term_Mark_Prompt();
-		scp_write(lpath, lsld+7);
-	}
-	ssh2_Send("\r", 1);
-	if ( preply!=NULL ) *preply = reply;
-	return term_Waitfor_Prompt();
-}
-
-
-int term_Tun(char *cmd, char **preply)
-{
-	char *reply = term_Mark_Prompt();
-	if ( preply!=NULL ) *preply = reply;
-	ssh2_Tun(cmd);
-	return term_Waitfor_Prompt();
-}
-int term_Cmd( char *cmd, char **preply )
-{
-	int rc = 0;
-	if ( strncmp(cmd, "Clear",5)==0 ) 		term_Clear();
-	else if ( strncmp(cmd, "Log", 3)==0 ) 	term_Logg(cmd+3);
-	else if ( strncmp(cmd, "Find ",5)==0 ) 	term_Srch(cmd+5);
-	else if ( strncmp(cmd, "Disp ",5)==0 )  term_Disp(cmd+5);
-	else if ( strncmp(cmd, "Recv" ,4)==0 )  rc=term_Recv(preply);
-	else if ( strncmp(cmd, "Send ",5)==0 )  term_Send(cmd+5,strlen(cmd+5));
-	else if ( strncmp(cmd, "Echo", 4)==0 )  rc = term_Echo() ? 1 : 0;
-	else if ( strncmp(cmd, "Timeout",7)==0 )iTimeOut = atoi( cmd+8 );
-	else if ( strncmp(cmd, "tun",  3)==0 ) rc = term_Tun(cmd+3, preply);
-	else if ( strncmp(cmd, "scp ", 4)==0 ) {
-		term_Learn_Prompt();
-		rc = term_Scp(cmd+4, preply);
-	}
-	else if ( strncmp(cmd,"Selection",9)==0) {
-		if ( preply!=NULL ) *preply = buff+sel_left;
-		rc = sel_right-sel_left;
-	}
-	else if ( strncmp(cmd, "Waitfor",7)==0) {
-		for ( int i=iTimeOut; i>0; i-- ) {
-			buff[cursor_x] = 0;
-			if ( strstr(tl1text, cmd+8)!=NULL ) {
-				if ( preply!=NULL ) *preply = tl1text;
-				rc = buff+cursor_x-tl1text;
-				break;
-			}
-			Sleep(1000);
-		}
-	}
-	else if ( strncmp(cmd, "Prompt ",7)==0 ) {
-		char *p=cmd+7, *p1 = sPrompt;
-		while ( *p && p1-sPrompt<31) {
-			if ( *p=='%' && isdigit(p[1]) ) {
-				int a;
-				sscanf(p+1, "%02x", &a);
-				*p1++ = a;
-				p+=3;
-			}
-			else
-				*p1++ = *p++;
-		}
-		*p1 = 0;
-		iPrompt = p1-sPrompt;
-	}
-	else 
-		rc = -1;
-	return rc;
-}
-int term_TL1( char *cmd, char **pTl1Text )
-{
-	tl1len = 0;
-	if ( host_Status()==HOST_CONNECTED ) {	//retrieve from NE
-		bPrompt = FALSE;
-		int cmdlen = strlen(cmd);
-		tl1text = buff+cursor_x;
-		term_Send(cmd, cmdlen);
-		if ( cmd[cmdlen-1]!='\r' ) term_Send("\r", 1);
-		term_Waitfor_Prompt();
-	}
-	else {									//retrieve from buffer
-		static char *pcursor=buff;			//only when retrieve from buffer
-		buff[cursor_x]=0;
-		char *p = strstr( pcursor, cmd );
-		if ( p==NULL ) { pcursor = buff; p = strstr( pcursor, cmd ); }
-		if ( p!=NULL ) { p = strstr( p, "\r\n" );
-			if ( p!=NULL ) {
-				tl1text = p+2;
-				p = strstr( p, "\nM " );
-				p = strstr( p, sPrompt );
-				if ( p!=NULL ) {
-					pcursor = ++p;
-					tl1len = pcursor - tl1text;
-				}
-			}
-		}
-		if ( tl1len == 0 ) { tl1text = buff+cursor_x; }
-	}
-
-	if ( pTl1Text!=NULL ) *pTl1Text = tl1text;
-	return tl1len;
 }

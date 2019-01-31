@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 13389 2019-01-01 21:05:10 $"
+// "$Id: host.c 15660 2019-01-01 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -22,6 +22,7 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 #include <fcntl.h>
+#include <time.h>
 #include "tiny.h"
 
 int host_type = 0;
@@ -97,7 +98,7 @@ void host_Send( char *buf, int len )
 	case SSH:
 	case SFTP:
 	case NETCONF:
-	default:	ssh2_Send(buf, len); break;
+	default:	if ( host_Status()!=HOST_IDLE )	ssh2_Send(buf, len);
 	}
 }
 void host_Size( int w, int h )
@@ -391,64 +392,137 @@ void stdio_Close()
 	CloseHandle(piStd.hProcess);
 }
 /**********************************HTTPd*******************************/
+const char *RFC1123FMT="%a, %d %b %Y %H:%M:%S GMT";
+const char *exts[]={".txt",
+					".htm", ".html",
+					".js",
+					".jpg", ".jpeg",
+					".png",
+					".css"
+					};
+const char *mime[]={"text/plain",
+					"text/html", "text/html",
+					"text/javascript",
+					"image/jpeg", "image/jpeg",
+					"image/png",
+					"text/css"
+					};
 const char HEADER[]="HTTP/1.1 200 Ok\
 					\nServer: tinyTerm-httpd\
 					\nAccess-Control-Allow-Origin: *\
 					\nContent-Type: text/plain\
 					\nContent-length: %d\
 					\nCache-Control: no-cache\n\n";
+void httpFile( int s1, char *file)
+{
+	char reply[4096], timebuf[128];
+	int len, i, j;
+	time_t now;
+
+	now = time( NULL );
+	strftime( timebuf, sizeof(timebuf), RFC1123FMT, gmtime( &now ) );
+
+    struct stat sb;
+	if ( stat( file, &sb ) ==-1 ) {
+		len=sprintf(reply, "HTTP/1.1 404 not found\nDate: %s\nServer: tinyTerm_httpd\n", timebuf);
+		len+=sprintf(reply+len, "Content-Type: text/html\nContent-Length: 14\n\n");
+	    send(s1, reply, len, 0);
+	    len=sprintf(reply, "file not found");
+		send(s1, reply, len, 0);
+		return;
+	}
+
+	FILE *fp = fopen( file, "rb" );	
+	if ( fp!=NULL ) {
+		len=sprintf(reply, "HTTP/1.1 200 Ok\nDate: %s\nServer: tinyTerm_httpd\n", timebuf);
+
+		const char *filext=file+strlen(file)-1;
+		while ( *filext!='.' ) filext--;
+		for ( i=0, j=0; j<8; j++ ) if ( strcmp(filext, exts[j])==0 ) i=j;
+		len+=sprintf(reply+len, "Content-Type: %s\n", mime[i]);
+
+		long filesize = sb.st_size;
+		len+=sprintf(reply+len, "Content-Length: %ld\n", filesize );
+		strftime(timebuf, sizeof(timebuf), RFC1123FMT, gmtime( &sb.st_mtime ));
+		len+=sprintf(reply+len, "Last-Modified: %s\n\n", timebuf );
+
+		send(s1, reply, len, 0);
+		while ( (len=fread(reply, 1, 4096, fp))>0 )
+			if ( send(s1, reply, len, 0)==-1)	break;
+		fclose(fp);
+	}
+}
+void url_decode(char *url)
+{
+	char *p = url, *q = url;
+	while ( *p ) {
+		if ( *p=='%' && isdigit(p[1]) ) {
+			int a;
+			sscanf( ++p, "%02x", &a);
+			*(++p) = a;
+		}
+		*q++ = *p++;
+	}
+	*q = 0;
+}
 DWORD WINAPI *httpd( void *pv )
 {
-	char buf[1024], *cmd, *reply;
+	char buf[4096], *cmd, *reply;
 	struct sockaddr_in cltaddr;
 	int addrsize=sizeof(cltaddr), cmdlen, replen;
-	SOCKET http_s1, http_s0 = *(SOCKET *)pv;
+	SOCKET http_s0 = *(SOCKET *)pv;
 
-	while ( (http_s1=accept(http_s0, (struct sockaddr*)&cltaddr, &addrsize))!= INVALID_SOCKET ) {
-		cmd_Disp_utf8( "xmlhttp connected" );
-		cmdlen=recv(http_s1,buf,1023,0);
-		while ( cmdlen>4 ) {
-			buf[cmdlen] = 0;
+	while ( TRUE ) {
+		SOCKET http_s1 = accept(http_s0, (struct sockaddr*)&cltaddr, &addrsize);
+		if ( http_s1 == INVALID_SOCKET ) {
+			cmd_Disp_utf8("httpd terminated");
+			break;
+		}
+		cmd_Disp_utf8( "http connected" );
+		cmdlen=recv(http_s1, buf, 4095, 0);
+		if ( cmdlen>0 ) {
 			if ( strncmp(buf, "GET /", 5)!=0 ) {//TCP connection
 				FD_SET readset;
-				struct timeval tv = { 0, 300 };	//tv_sec=0, tv_usec=300
-
-				replen = term_TL1( buf, &reply );
-				send( http_s1, reply, replen, 0 );
-
-				if ( host_status==HOST_CONNECTED ) do {
-					replen = term_Recv( &reply );
-					if ( replen > 0 ) send(http_s1, reply, replen, 0);
+				struct timeval tv = { 0, 100 };	//tv_sec=0, tv_usec=300
+				term_Send(buf, cmdlen);
+				do {
+					if ( host_status==HOST_CONNECTED ) {
+						replen = term_Recv( &reply );
+						if ( replen > 0 ) send(http_s1, reply, replen, 0);
+					}
 					FD_ZERO(&readset);
 					FD_SET(http_s1, &readset);
-				} while ( select(1, &readset, NULL, NULL, &tv) == 0 );
-			}
-			else {											//HTTP connection
-				cmd = buf+5;
-				char *p=strchr(cmd, ' ');
-				if ( p!=NULL ) *p = 0;
-				p = cmd-1;
-				for ( int i=0; cmd[i]!=0; i++ ) {
-					cmd[i] = *(++p);
-					if ( *p=='%' && isdigit(p[1])) {
-						int a;
-						sscanf( p+1, "%02x", &a);
-						cmd[i] = a;
-						p+=2;
+					if ( select(1, &readset, NULL, NULL, &tv)>0 ) {
+						cmdlen = recv(http_s1, buf, 4095, 0);
+						if ( cmdlen>0 ) 
+							term_Send(buf, cmdlen);
 					}
-				}
-				replen = 0;
-		cmd_Disp_utf8( cmd );
-				if ( *cmd=='?' ) {
-					replen = tiny_Cmd( cmd+1, &reply );
-					int len = sprintf( buf, HEADER, replen );
-					send( http_s1, buf, len, 0 );
-					if ( replen>0 ) send( http_s1, reply, replen, 0 );
-				}
+				} while ( cmdlen>0 );
 			}
-			cmdlen = recv( http_s1, buf, 1023, 0 );
+			else {								//HTTP connection
+				do {
+					buf[cmdlen] = 0;
+					cmd = buf+5;
+					char *p=strchr(cmd, ' ');
+					if ( p!=NULL ) *p = 0;
+					url_decode(cmd);
+					cmd_Disp_utf8(cmd);
+
+					if ( *cmd=='?' ) {	//get CGI, cmd+1 points to command
+						replen = term_Cmd( cmd+1, &reply );
+						int len = sprintf( buf, HEADER, replen );
+						send( http_s1, buf, len, 0 );
+						if ( replen>0 ) send( http_s1, reply, replen, 0 );
+					}
+					else {				//get file, cmd points to filename
+						httpFile(http_s1, cmd);
+					}
+					cmdlen = recv(http_s1, buf, 4095, 0);
+				} while ( cmdlen>0 );
+			}
 		}
-		cmd_Disp_utf8( "xmlhttp disconnected" );
+		cmd_Disp_utf8( "http disconnected" );
+		shutdown(http_s1, SD_SEND);
 		closesocket(http_s1);
 	}
 	return 0;

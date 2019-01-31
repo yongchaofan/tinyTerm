@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 34610 2019-01-15 14:35:10 $"
+// "$Id: tiny.c 34530 2019-01-30 14:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -194,29 +194,15 @@ int tiny_Cmd( char *cmd, char **preply )
 {
 	int rc = 0;
 	if ( preply ) *preply = buff+cursor_x;
-	if ( *cmd=='!' ) {
-		cmd_Disp_utf8(cmd++);
-		if (strncmp(cmd,"Transparency",12)==0)	tiny_Transparency(atoi(cmd+13));
-		else if ( strncmp(cmd,"ScriptDelay",11)==0 )iScriptDelay = atoi(cmd+12);
-		else if ( strncmp(cmd, "FontSize", 8)==0 )	tiny_FontSize(atoi(cmd+9));
-		else if ( strncmp(cmd, "FontFace", 8)==0 )	tiny_FontFace(cmd+9);
-		else if ( strncmp(cmd, "TermSize", 8)==0 )	tiny_TermSize(cmd+9);
-		else if ( strncmp(cmd, "Tftpd",5)==0 )		tftp_Svr( cmd+6 );
-		else if ( strncmp(cmd, "Ftpd", 4)==0 ) 		ftp_Svr( cmd+5 );
-		else {
-			rc = term_Cmd(cmd, preply);
-			if ( rc==-1 ) host_Open(cmd);
-		}
-	}
-	else {
-		if ( host_Status()!=HOST_IDLE ) {
-			rc = term_TL1(cmd, preply);
-		}
-		else {
-			term_Disp(cmd);
-			term_Disp("\n");
-		}
-	}
+	cmd_Disp_utf8(cmd);
+	if (strncmp(cmd,"!Transparency",13)==0)		tiny_Transparency(atoi(cmd+13));
+	else if ( strncmp(cmd,"!ScriptDelay",12)==0)iScriptDelay = atoi(cmd+12);
+	else if ( strncmp(cmd, "!FontSize", 9)==0 )	tiny_FontSize(atoi(cmd+9));
+	else if ( strncmp(cmd, "!FontFace", 9)==0 )	tiny_FontFace(cmd+9);
+	else if ( strncmp(cmd, "!TermSize", 9)==0 )	tiny_TermSize(cmd+9);
+	else
+		rc = term_Cmd(cmd, preply);
+
 	return rc;
 }
 DWORD WINAPI scper(void *pv)
@@ -291,12 +277,18 @@ LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 	return CallWindowProc(wpOrigCmdProc, hwnd, uMsg, wParam, lParam);
 }
 WCHAR Title[256] = L"   Term      Script      Options               ";
+char hostname[256]="";
+char *tiny_Hostname()
+{
+	return hostname;
+}
 void tiny_Title( char *buf )
 {
+	strncpy(hostname, buf, 200);
+	hostname[200] = 0;
 	utf8_to_wchar(buf, strlen(buf)+1, Title+47, 208);
-	Title[255] = 0;
 	SetWindowText(hwndMain, Title);
-
+	
 	if ( *buf ) {
 		host_Size(size_x, size_y);
 		ModifyMenu(hTermMenu,ID_CONNECT,MF_BYCOMMAND,ID_DISCONN,L"&Disconnect");
@@ -306,6 +298,7 @@ void tiny_Title( char *buf )
 		ModifyMenu(hTermMenu,ID_DISCONN,MF_BYCOMMAND,ID_CONNECT,L"&Connect...");
 	}
 }
+
 void tiny_Redraw()
 {
 	InvalidateRect( hwndMain, &termRect, TRUE );
@@ -499,7 +492,7 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 					for ( int i=0; i<host_cnt; i++ )
 						ComboBox_AddString(hwndHost,HOSTS[i]);
 					ComboBox_SetCurSel(hwndHost, host_cnt-1);
-					Static_SetText(hwndStatic, L"Host:");
+					Static_SetText(hwndStatic, L"Address:");
 				}
 				proto = new_proto;
 				ComboBox_SetCurSel(hwndPort, proto);
@@ -693,7 +686,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	switch (msg) {
 	case WM_CREATE:
 		hwndCmd = CreateWindow(L"EDIT", NULL,
-							WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
+							WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL|ES_NOHIDESEL,
 							0, 0, 1, 1, hwnd, (HMENU)0, hInst, NULL);
 		wpOrigCmdProc = (WNDPROC)SetWindowLongPtr(hwndCmd,
 							GWLP_WNDPROC, (LONG_PTR)CmdEditProc);
@@ -967,8 +960,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	wc.cbWndExtra	= 0;
 	wc.lpfnWndProc 	= &MainWndProc;
 	wc.hInstance 	= hInstance;
-	wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDICON_TL1));
-	wc.hIconSm 		= 0;
+	wc.hIcon = 0;
+	wc.hIconSm 		= LoadIcon(hInstance, MAKEINTRESOURCE(IDICON_TL1));
 	wc.hCursor		= LoadCursor(NULL,IDC_ARROW);
 	wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
 	wc.lpszClassName = L"TWnd";
@@ -1085,21 +1078,32 @@ DWORD WINAPI uploader( void *files )	//upload files through scp or sftp
 	for ( char *q=files; *q; q++ ) if ( *q=='\\' ) *q='/';
 	term_Learn_Prompt();
 	
-	char rdir[1024];
-	term_Pwd(rdir, 1024);
-	strcat(rdir, "/");
-
 	char *p=(char *)files, *p1;
-	do {
-		p1 = strchr(p, 0x0a);
-		if ( p1!=NULL ) *p1++=0;
-		if ( host_Type()==SSH )
+	if ( host_Type()==SSH ) {
+		char rdir[1024];
+		term_Pwd(rdir, 1024);
+		strcat(rdir, "/");
+
+		do {
+			p1 = strchr(p, 0x0a);
+			if ( p1!=NULL ) *p1++=0;
 			scp_write(p, rdir);
-		else if ( host_Type()==SFTP ) {
-			sftp_put(p, rdir);
 		}
+		while ( (p=p1)!=NULL );
 	}
-	while ( (p=p1)!=NULL );
+	if ( host_Type()==SFTP ) {
+		char cmd[1024];
+		strcpy(cmd, "put ");
+		cmd[1023]=0;
+		term_Disp("\n");
+		do {
+			p1 = strchr(p, 0x0a);
+			if ( p1!=NULL ) *p1++=0;
+			strncpy(cmd+4, p, 1019);
+			sftp_cmd(cmd);
+		}
+		while ( (p=p1)!=NULL );
+	}
 	host_Send("\r", 1);
 	free((char *)files);
 	return 0;
@@ -1149,10 +1153,8 @@ DWORD WINAPI scripter( void *cmds )
 				}
 			}
 			else {
-				if ( p1[-1]==0x0d ) p1[-1] = 0;
 				tiny_Cmd( p0, NULL );
 				Sleep(iScriptDelay);
-				if ( p1[-1]==0 ) p1[-1] = 0x0d;
 			}
 		}
 		if ( p0!=p1 ) { p0 = p1+1; *p1 = 0x0a; }

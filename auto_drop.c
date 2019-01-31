@@ -1,5 +1,5 @@
 //
-// "$Id: auto_drop.c 18552 2019-01-12 21:05:10 $"
+// "$Id: auto_drop.c 18640 2019-01-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -25,9 +25,6 @@
 #include <shldisp.h>
 DEFINE_GUID(CLSID_AutoComplete, 0x00bb2763, 0x6a77, 0x11d0, 
 								0xa5, 0x35, 0x00, 0xc0, 0x4f, 0xd7, 0xd0, 0x62);
-
-
-#define STRINGSIZE 256
 //
 //impletemention of IEnumString interface,
 //provided to IAutoCompelte for command history
@@ -37,7 +34,7 @@ typedef struct CAutoEnumString {
 	LPOLESTR * m_arString;
 	unsigned int m_Size;
 	unsigned int m_iterCur;
-	unsigned int m_addCur;
+	unsigned int m_count;
 	unsigned int m_rtrvCur;
 	int	m_Ref;
 } CAutoEnumString;
@@ -76,11 +73,11 @@ STDMETHODIMP CAutoEnumString_Next(IEnumString *this, ULONG celt, LPOLESTR *rgelt
 {
 	CAutoEnumString *self = (CAutoEnumString *)this;
 	if (rgelt == NULL || (celt != 1 && pceltFetched == NULL)) return E_POINTER;
-    if (self->m_iterCur == self->m_addCur) return E_FAIL;
+    if (self->m_iterCur == self->m_count) return E_FAIL;
 
     ULONG nFetched = 0;
-    while( self->m_iterCur<self->m_addCur && celt>0) {
-		(*rgelt) = (LPOLESTR)CoTaskMemAlloc(sizeof(OLECHAR)*STRINGSIZE);
+    while( self->m_iterCur<self->m_count && celt>0) {
+		(*rgelt) = (LPOLESTR)CoTaskMemAlloc(sizeof(OLECHAR)*256);
 		if ( *rgelt ) {
 			wcscpy(*rgelt, self->m_arString[self->m_iterCur++]);
 			celt--; nFetched++; rgelt++;
@@ -95,8 +92,8 @@ STDMETHODIMP CAutoEnumString_Next(IEnumString *this, ULONG celt, LPOLESTR *rgelt
 STDMETHODIMP CAutoEnumString_Skip(IEnumString *this, ULONG celt)
 {
 	CAutoEnumString *self = (CAutoEnumString *)this;
-	if (self->m_addCur - self->m_iterCur <  celt) {
-		self->m_iterCur = self->m_addCur;
+	if (self->m_count - self->m_iterCur <  celt) {
+		self->m_iterCur = self->m_count;
 		return S_FALSE;
 	}
 	self->m_iterCur += celt;
@@ -131,26 +128,25 @@ void CAutoEnumString_Construct(CAutoEnumString* this)
 	this->m_arString = (LPOLESTR *)malloc(256*sizeof(LPOLESTR));
 	this->m_Size = 256;
 	this->m_iterCur = 0;
-	this->m_addCur = 0;
+	this->m_count = 0;
 	this->m_rtrvCur = 0;
 }
 void CAutoEnumString_Destruct(CAutoEnumString* this)
 {
-	if ( this->m_addCur>0 )
-		for (int i=0; i<this->m_addCur; i++)
+	if ( this->m_count>0 )
+		for (int i=0; i<this->m_count; i++)
 			free(this->m_arString[i]);
 	if ( this->m_arString ) free(this->m_arString);
 }
 int CAutoEnumString_AddString(CAutoEnumString* this, LPOLESTR lpszStr)
 {
-	for ( int i=0; i<this->m_addCur; i++ )
-		if ( wcscmp(this->m_arString[i], lpszStr) == 0 )
-			return 0;
-
-	this->m_arString[this->m_addCur] = _wcsdup(lpszStr);
-	this->m_rtrvCur = this->m_addCur;
-
-	if ( ++this->m_addCur==this->m_Size ) {
+	int cur;
+	for ( cur=0; cur<this->m_count; cur++ ) {
+		int cmp =  wcscmp(this->m_arString[cur], lpszStr);
+		if ( cmp == 0 ) return 0;
+		if ( cmp > 0 ) break;
+	} 
+	if ( ++this->m_count==this->m_Size ) {
 		int size = this->m_Size*2;
 		LPOLESTR * arString = realloc(this->m_arString, size*sizeof(LPOLESTR));
 		if ( arString != NULL ) {
@@ -158,13 +154,18 @@ int CAutoEnumString_AddString(CAutoEnumString* this, LPOLESTR lpszStr)
 			this->m_Size=size;
 		}
 		else
-			this->m_addCur--;
+			this->m_count--;
 	}
+	for ( int i=this->m_count-1; i>=cur; i-- ) 
+		this->m_arString[i+1] = this->m_arString[i];
+	this->m_arString[cur] = _wcsdup(lpszStr);
+	this->m_rtrvCur = cur;
+
 	return 1;
 }
 LPOLESTR CAutoEnumString_prevString(CAutoEnumString* this)
 {
-    if ( this->m_addCur>0 && this->m_rtrvCur>0)
+    if ( this->m_count>0 && this->m_rtrvCur>0)
 		return this->m_arString[--this->m_rtrvCur];
     else
 		return L"";
@@ -172,14 +173,14 @@ LPOLESTR CAutoEnumString_prevString(CAutoEnumString* this)
 LPOLESTR CAutoEnumString_firstString(CAutoEnumString* this)
 {
     this->m_rtrvCur = 0;
-	if ( this->m_addCur>0 ) 
+	if ( this->m_count>0 ) 
 		return this->m_arString[0];
 	else
 		return L"";
 }
 LPOLESTR CAutoEnumString_nextString(CAutoEnumString* this)
 {
-	if ( this->m_rtrvCur < this->m_addCur-1 )
+	if ( this->m_rtrvCur < this->m_count-1 )
 		return this->m_arString[++this->m_rtrvCur];
 	else 
 		return L"";

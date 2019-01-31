@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 38103 2019-01-15 21:05:10 $"
+// "$Id: ssh2.c 38395 2019-01-15 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -126,7 +126,8 @@ void ssh2_Exit( )
 }
 
 void tun_closeall();
-const char *keytypes[]={"unknown", "ssh-rsa", "ssh-dss", "ssh-ecdsa"};
+const char *keytypes[]={"unknown", "rsa", "dss", "ecdsa256", 
+							"ecdsa384", "ecdsa521", "ed25519"};
 static char homedir[MAX_PATH];
 static char *subsystem;
 static char *username;
@@ -361,6 +362,9 @@ DWORD WINAPI ssh( void *pv )
 	if ( ssh_knownhost()<0 )
 		goto Session_Close;
 	
+	const char *banner = libssh2_session_banner_get(sshSession);
+	if ( banner!=NULL ) term_Print("\n%s\n", banner);
+	
 	if ( ssh_authentication(username, password, passphrase)<0 ) 
 		goto Session_Close;
 
@@ -400,9 +404,15 @@ DWORD WINAPI ssh( void *pv )
 				term_Parse( buf, cch );
 			}
 			else {
-				if ( cch==LIBSSH2_ERROR_EAGAIN )
+				if ( cch==LIBSSH2_ERROR_EAGAIN ) {
 					if ( ssh_wait_socket()>0 )
 						continue;
+				}
+				else {
+					char *errmsg;
+					libssh2_session_last_error(sshSession, &errmsg,	NULL, 0);
+					term_Print("\n\033[31m%s error", errmsg);
+				}
 				break;
 			}
 		}
@@ -1248,7 +1258,6 @@ DWORD WINAPI sftp( void *pv )
 		sprintf(prompt, "sftp %s> ", realpath);
 		cmd = ssh2_Gets(prompt, TRUE);
 		if ( cmd!=NULL ) {
-			term_Disp("\n");
 			if ( *cmd ) 
 				if ( sftp_cmd(cmd)==-1 ) break;
 		}
