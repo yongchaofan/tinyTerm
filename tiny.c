@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 34530 2019-01-30 14:35:10 $"
+// "$Id: tiny.c 35166 2019-02-25 14:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -7,7 +7,7 @@
 //
 // Copyright 2018-2019 by Yongchao Fan.
 //
-// This library is free software distributed under GNU LGPL 3.0,
+// This library is free software distributed under GNU GPL 3.0,
 // see the license at:
 //
 //     https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
@@ -19,6 +19,7 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <shlobj.h>
+#include <versionhelpers.h>
 #include "tiny.h"
 #include "res/resource.h"
 
@@ -43,7 +44,7 @@ const char WELCOME[]="\n\n\n\
 \t    * Command history and autocompletion\n\n\
 \t    * Task automation via list of commands\n\n\
 \t    * Scripting interface xmlhttp://127.0.0.1:%d\n\n\n\
-\t©2018-2019 Yongchao Fan, All rights reserved\n\n\
+\tÂ©2018-2019 Yongchao Fan, All rights reserved\n\n\
 \thttps://yongchaofan.github.io/tinyTerm\n\n\n";
 
 const COLORREF COLORS[16] ={RGB(0,0,0), 	RGB(192,0,0), RGB(0,192,0),
@@ -62,7 +63,6 @@ static HBRUSH dwBkBrush, dwScrollBrush, dwSliderBrush;
 static HMENU hMenu[3], hTermMenu, hScriptMenu, hOptionMenu, hContextMenu;
 static int menuX[4] = {32, 0, 0, 0};	//menuX[0]=32 leave space for icon
 
-static WCHAR wsFontFace[256]=L"Consolas";
 static int iFontHeight, iFontWidth;
 static int iTransparency = 255;
 static int iScriptDelay = 250;
@@ -72,8 +72,8 @@ static BOOL bFTPd = FALSE, bTFTPd = FALSE;
 static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
 
 void tiny_TermSize(char *size);
-void tiny_FontFace(char *fontface);
-void tiny_FontSize(int fontsize);
+void tiny_FontFace(char *face);
+void tiny_FontSize(int i);
 void tiny_Transparency(int t);
 void CopyText( );
 void PasteText( );
@@ -186,8 +186,7 @@ void menu_Add(char *cmd, WCHAR *wcmd)
 		 strncmp(cmd, "sftp", 4)==0 || 
 		 strncmp(cmd, "telnet",6)==0 || 
 		 strncmp(cmd, "netconf",7)==0 )
-		InsertMenu( hTermMenu, -1, MF_BYPOSITION,
-					ID_CONNECT0+iConnectCount++, wcmd);
+		AppendMenu( hTermMenu, 0, ID_CONNECT0+iConnectCount++, wcmd);
 }
 
 int tiny_Cmd( char *cmd, char **preply )
@@ -276,7 +275,7 @@ LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 	}
 	return CallWindowProc(wpOrigCmdProc, hwnd, uMsg, wParam, lParam);
 }
-WCHAR Title[256] = L"   Term      Script      Options               ";
+WCHAR Title[256] = L"   Term      Script      Option                 ";
 char hostname[256]="";
 char *tiny_Hostname()
 {
@@ -286,17 +285,13 @@ void tiny_Title( char *buf )
 {
 	strncpy(hostname, buf, 200);
 	hostname[200] = 0;
-	utf8_to_wchar(buf, strlen(buf)+1, Title+47, 208);
+	utf8_to_wchar(buf, strlen(buf)+1, Title+48, 206);
 	SetWindowText(hwndMain, Title);
 	
-	if ( *buf ) {
+	if ( *buf )
 		host_Size(size_x, size_y);
-		ModifyMenu(hTermMenu,ID_CONNECT,MF_BYCOMMAND,ID_DISCONN,L"&Disconnect");
-	}
-	else {
+	else
 		term_Disp("\n\033[31mDisconnected. Press Enter to restart\n\033[37m");
-		ModifyMenu(hTermMenu,ID_DISCONN,MF_BYCOMMAND,ID_CONNECT,L"&Connect...");
-	}
 }
 
 void tiny_Redraw()
@@ -314,7 +309,7 @@ void tiny_Connecting()
 void tiny_Font( HWND hwnd )
 {
 	HDC hdc;
-    TEXTMETRIC tm;
+  TEXTMETRIC tm;
 	hdc = GetDC(hwnd);
 	SelectObject(hdc, hTermFont);
 	GetTextMetrics(hdc, &tm);
@@ -350,15 +345,19 @@ void tiny_TermSize(char *size)
 		tiny_Font(hwndMain);
 	}
 }
+WCHAR wsFontFace[256];
+int fontsize = 16;
+float dpi = 96;
 void tiny_FontFace(char *fontface)
 {
 	utf8_to_wchar(fontface, strlen(fontface)+1, wsFontFace, 255);
 	wsFontFace[255] = 0;
 }
-void tiny_FontSize(int fontsize)
+void tiny_FontSize(int i)
 {
 	DeleteObject(hTermFont);
-	hTermFont = CreateFont(fontsize,0,0,0,FW_MEDIUM, FALSE,FALSE,FALSE,
+	fontsize = i;
+	hTermFont = CreateFont(fontsize*(dpi/96),0,0,0,FW_MEDIUM, FALSE,FALSE,FALSE,
 						DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
 						DEFAULT_QUALITY, FIXED_PITCH, wsFontFace);
 	tiny_Font(hwndMain);
@@ -396,7 +395,7 @@ void tiny_Paint(HDC hDC)
 			if ( utf ) {
 				int cch = utf8_to_wchar(buff+i, len, wbuf, 1024);
 				TextOutW(hBufDC, dx, dy, wbuf, cch);
-				DrawText(hBufDC, wbuf, cch, &text_rect, DT_CALCRECT);
+				DrawText(hBufDC, wbuf, cch, &text_rect, DT_CALCRECT|DT_NOPREFIX);
 				dx += text_rect.right;
 			}
 			else {
@@ -419,7 +418,7 @@ void tiny_Paint(HDC hDC)
 	BitBlt(hDC,0,0,termRect.right,termRect.bottom, hBufDC,0,0,SRCCOPY);
 	int cch = utf8_to_wchar(buff+line[cursor_y],
 								cursor_x-line[cursor_y], wbuf, 1024);
-	DrawText(hBufDC, wbuf, cch, &text_rect, DT_CALCRECT);
+	DrawText(hBufDC, wbuf, cch, &text_rect, DT_CALCRECT|DT_NOPREFIX);
 	if ( bEdit ) {
 		MoveWindow( hwndCmd, text_rect.right, (cursor_y-screen_y)*iFontHeight,
 						termRect.right-text_rect.right, iFontHeight, TRUE );
@@ -492,7 +491,7 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 					for ( int i=0; i<host_cnt; i++ )
 						ComboBox_AddString(hwndHost,HOSTS[i]);
 					ComboBox_SetCurSel(hwndHost, host_cnt-1);
-					Static_SetText(hwndStatic, L"Address:");
+					Static_SetText(hwndStatic, L"Host:");
 				}
 				proto = new_proto;
 				ComboBox_SetCurSel(hwndPort, proto);
@@ -611,7 +610,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 			MoveWindow( hwndCmd, 0, termRect.bottom-1, 1, 1, TRUE );
 			SetFocus(hwndMain);
 		}
-		check_Option( hTermMenu, ID_EDIT, bEdit);
+		check_Option( hOptionMenu, ID_EDIT, bEdit);
 		tiny_Redraw();
 		break;
 	case ID_TRANSP:
@@ -624,6 +623,12 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		break;
 	case ID_FONT:
 		if ( fontDialog() ) tiny_Font( hwndMain );
+		break;
+	case ID_FONTSIZE0: 
+		if ( fontsize<24 ) tiny_FontSize(fontsize+2);
+		break;
+	case ID_FONTSIZE1:
+		if ( fontsize>8 ) tiny_FontSize(fontsize-2);
 		break;
 	case ID_FTPD:
 		bFTPd = ftp_Svr(bFTPd?NULL:getFolderName(L"Choose root directory"));
@@ -678,6 +683,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 	}
 	return TRUE;
 }
+#define WM_DPICHANGED       0x02E0
 LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 {
 	PAINTSTRUCT ps;
@@ -718,6 +724,10 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		tiny_Redraw( );
 	case WM_MOVE:
 		GetWindowRect( hwnd, &wndRect );
+		break;
+	case WM_DPICHANGED:
+		dpi = LOWORD(wParam);
+		tiny_FontSize(fontsize);
 		break;
 	case WM_PAINT:
 		hDC = BeginPaint(hwnd, &ps);
@@ -862,19 +872,27 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		if ( sel_right>sel_left )
 			term_Send(buff+sel_left, sel_right-sel_left);
 		break;
-	case WM_RBUTTONUP:
-		TrackPopupMenu(hContextMenu,TPM_RIGHTBUTTON,
-					GET_X_LPARAM(lParam)+wndRect.left,
-					GET_Y_LPARAM(lParam)+wndRect.top+24, 0, hwnd, NULL);
+	case WM_CONTEXTMENU:
+		TrackPopupMenu(hContextMenu,TPM_RIGHTBUTTON, GET_X_LPARAM(lParam),
+					 					GET_Y_LPARAM(lParam), 0, hwnd, NULL);
 		break;
 	case WM_NCLBUTTONDOWN: {
 		int x = GET_X_LPARAM(lParam)-wndRect.left;
 		int y = GET_Y_LPARAM(lParam)-wndRect.top;
+		if ( y>0 && y<iTitleHeight ) 
+			if ( x>menuX[0] && x<menuX[3] ) return 0;
+		}
+		return DefWindowProc(hwnd,msg,wParam,lParam);
+	case WM_NCLBUTTONUP: {
+		int x = GET_X_LPARAM(lParam)-wndRect.left;
+		int y = GET_Y_LPARAM(lParam)-wndRect.top;
 		if ( y>0 && y<iTitleHeight ) for ( int i=0; i<3; i++ )
-			if ( x>menuX[i] && x<menuX[i+1] )
+			if ( x>menuX[i] && x<menuX[i+1] ) {
 				TrackPopupMenu( hMenu[i],TPM_LEFTBUTTON, 
 									wndRect.left+menuX[i]-24,
 									wndRect.top+iTitleHeight, 0, hwnd, NULL );
+				return 0;
+			}
 		}
 		return DefWindowProc(hwnd,msg,wParam,lParam);
 	case WM_DROPFILES:
@@ -914,8 +932,8 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 void tiny_Menu( HWND hwnd )
 {
 	iTitleHeight = 	 GetSystemMetrics(SM_CYFRAME)
-					+GetSystemMetrics(SM_CYCAPTION)
-					+GetSystemMetrics(92);	//SM_CXPADDEDBORDER
+									+GetSystemMetrics(SM_CYCAPTION)
+									+GetSystemMetrics(92);	//SM_CXPADDEDBORDER
 	HDC wndDC = GetWindowDC(hwnd);
 	RECT menuRect;
 	DrawText(wndDC, L"  Term  ", 8, &menuRect, DT_CALCRECT);
@@ -976,7 +994,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	dwBkBrush = CreateSolidBrush( COLORS[0] );
 	dwScrollBrush = CreateSolidBrush( RGB(64,64,64) );
 	dwSliderBrush = CreateSolidBrush( COLORS[1] );
-	hTermFont = CreateFont( 18,0,0,0,FW_MEDIUM, FALSE,FALSE,FALSE,
+	HDC sysDC = GetDC(0);
+	dpi = GetDeviceCaps(sysDC, LOGPIXELSX);
+	ReleaseDC(0, sysDC);
+	wcscpy(wsFontFace,IsWindows7OrGreater() ? L"Consolas": L"Courier New");
+	
+	hTermFont = CreateFont( fontsize*(dpi/96),0,0,0,FW_MEDIUM, FALSE,FALSE,FALSE,
 						DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
 						DEFAULT_QUALITY, FIXED_PITCH, wsFontFace);
 	hwndMain = CreateWindowEx( WS_EX_LAYERED, L"TWnd", Title,
@@ -1001,6 +1024,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	}
 	if ( bLogging ) term_Logg( NULL );
 
+	LoadDict(L"tinyTerm.hist");
 	SaveDict(L"tinyTerm.hist");
 	autocomplete_Destroy( );
 	host_Destory();

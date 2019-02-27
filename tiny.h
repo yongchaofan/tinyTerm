@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 3191 2019-01-12 21:05:10 $"
+// "$Id: tiny.h 3290 2019-01-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -7,7 +7,7 @@
 //
 // Copyright 2018-2019 by Yongchao Fan.
 //
-// This library is free software distributed under GNU LGPL 3.0,
+// This library is free software distributed under GNU GPL 3.0,
 // see the license at:
 //
 //     https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE

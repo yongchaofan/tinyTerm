@@ -21,16 +21,18 @@
 #include "resource.h"
 
 IDICON_TL1	ICON	"TL1.ico"
+
 IDMENU_MAIN MENU
 {
 	POPUP "&Term"
 	{
 		MENUITEM "&Connect...", ID_CONNECT
+		MENUITEM "&Disconnect", ID_DISCONN
+		MENUITEM "Local &Echo",	ID_ECHO
 		MENUITEM "&Logging...", ID_LOGGING
-		MENUITEM "Local Echo",	ID_ECHO
-		MENUITEM "Local Editing\tAlt+E",	ID_EDIT
-		MENUITEM "&About",		ID_ABOUT
 		MENUITEM SEPARATOR
+		MENUITEM "&Ftpd...", 	ID_FTPD
+		MENUITEM "&Tftpd...", 	ID_TFTPD
 	}
 	POPUP "&Script"
 	{
@@ -41,34 +43,38 @@ IDMENU_MAIN MENU
 	}
 	POPUP "&Options"
 	{
-		MENUITEM "&Tranparency",ID_TRANSP
-		MENUITEM "&Font...",	ID_FONT
-		MENUITEM "Ftp&d...", 	ID_FTPD
-		MENUITEM "&Tftpd...", 	ID_TFTPD
+		MENUITEM "Local Editing\tAlt+E",ID_EDIT
+		MENUITEM "&Tranparency",        ID_TRANSP
+        MENUITEM "Font Size &++",       ID_FONTSIZE0
+        MENUITEM "Font Size &--",       ID_FONTSIZE1
+		MENUITEM "&Font...",            ID_FONT
+		MENUITEM "&About",		ID_ABOUT
 	}
 }
 IDACCEL_MAIN ACCELERATORS
 {
-  "a",	ID_SELALL,	ALT
-  "c",	ID_COPY, 	ALT
-  "v",	ID_PASTE,	ALT
-  "e", 	ID_EDIT, 	ALT
-  "o",	ID_OPTIONS, ALT
-  "s", 	ID_SCRIPT, 	ALT
-  "t", 	ID_TERM,	ALT
+  "a", ID_SELALL,	ALT
+  "c", ID_COPY, 	ALT
+  "v", ID_PASTE,	ALT
+  "e", ID_EDIT, 	ALT
+  "o", ID_OPTIONS,	ALT
+  "s", ID_SCRIPT, 	ALT
+  "t", ID_TERM,		ALT
+  "+", ID_FONTSIZE0,ALT
+  "-", ID_FONTSIZE1,ALT
  }
 
-IDD_CONNECT DIALOG 45, 30, 116, 90	// Connection Dialog
+IDD_CONNECT DIALOG 45, 30, 150, 100	// Connection Dialog
 CAPTION "Connect Dialog"
 {
-    COMBOBOX IDPROTO, 40, 10, 64, 16, CBS_DROPDOWNLIST|CBS_HASSTRINGS|WS_TABSTOP
-    LTEXT    "Protocol:", 	0,  4, 12, 32, 12, SS_RIGHT, WS_EX_LEFT
-    COMBOBOX IDPORT,  40, 30, 64, 16, CBS_DROPDOWN|CBS_HASSTRINGS|WS_TABSTOP
-    LTEXT    "Port:", 		0, 4, 32, 32, 12, SS_RIGHT, WS_EX_LEFT
-    COMBOBOX IDHOST,  40, 50, 64, 16, CBS_DROPDOWN|CBS_HASSTRINGS|CBS_AUTOHSCROLL|WS_TABSTOP
-    LTEXT    "Address:", IDSTATIC,	4, 52, 32, 12, SS_RIGHT, WS_EX_LEFT
-    PUSHBUTTON    "Cancel",  IDCANCEL,  10, 72, 40, 12, 0, WS_EX_LEFT
-    DEFPUSHBUTTON "Connect", IDCONNECT, 64, 72, 40, 12, 0, WS_EX_LEFT
+    COMBOBOX IDPROTO, 60, 10, 70, 16, CBS_DROPDOWNLIST|CBS_HASSTRINGS|WS_TABSTOP
+    LTEXT    "Protocol:", 	0,  4, 12, 50, 12, SS_RIGHT, WS_EX_LEFT
+    COMBOBOX IDPORT,  60, 30, 70, 16, CBS_DROPDOWN|CBS_HASSTRINGS|WS_TABSTOP
+    LTEXT    "Port:", 		0,  4, 32, 50, 12, SS_RIGHT, WS_EX_LEFT
+    COMBOBOX IDHOST,  60, 50, 70, 16, CBS_DROPDOWN|CBS_HASSTRINGS|WS_TABSTOP
+    LTEXT    "Host:", IDSTATIC,	4, 52, 50, 12, SS_RIGHT, WS_EX_LEFT
+    DEFPUSHBUTTON "Connect", IDCONNECT, 80, 75, 50, 16, 0, WS_EX_LEFT
+    PUSHBUTTON    "Cancel",  IDCANCEL,  20, 75, 50, 16, 0, WS_EX_LEFT
 }
 
 1 VERSIONINFO						// Version Information
@@ -85,7 +91,7 @@ CAPTION "Connect Dialog"
         BLOCK "040904B0"
         {
             VALUE "FileDescription", "Tiny Terminal Emulator"
-            VALUE "LegalCopyright", "©2018-2019 Yongchao Fan"
+            VALUE "LegalCopyright", "Â©2018-2019 Yongchao Fan"
             VALUE "ProductName", "tinyTerm"
             VALUE "ProductVersion", "1.0.0"
         }

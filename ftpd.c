@@ -1,5 +1,5 @@
 //
-// "$Id: ftpd.c 14454 2019-01-01 21:05:10 $"
+// "$Id: ftpd.c 14477 2019-02-25 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -7,7 +7,7 @@
 //
 // Copyright 2018-2019 by Yongchao Fan.
 //
-// This library is free software distributed under GNU LGPL 3.0,
+// This library is free software distributed under GNU GPL 3.0,
 // see the license at:
 //
 //     https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
@@ -44,19 +44,20 @@ DWORD WINAPI ftpd(LPVOID p)
 	unsigned long  dwIp;
 	unsigned short wPort;
 	unsigned int c[6], ii[2];
-	char *param=0, szBuf[4096], fn[MAX_PATH], svrRoot[MAX_PATH];
+	char *param=0, szBuf[32768];
+	char fn[MAX_PATH], workDir[MAX_PATH], rootDir[MAX_PATH];
 	BOOL bPassive;
 
 	SOCKET s2=-1, s3=-1; 		// s2 data connection, s3 data listen
 	struct sockaddr_in svraddr, clientaddr;		// for data connection
-	int iRootLen, addrsize=sizeof(clientaddr);
+	int addrsize=sizeof(clientaddr);
 
-	strcpy( svrRoot, (char*)p );
-	iRootLen = strlen( svrRoot ) - 1;
+	strcpy( rootDir, (char*)p );
 	term_Disp( "FTPd started\r\n" );
 
 	int ret0, ret1;
 	while( (ret0=sock_select(ftp_s0, 900)) == 1 ) {
+		strcpy(workDir, "\\");;
 		ftp_s1 = accept( ftp_s0, (struct sockaddr*)&clientaddr, &addrsize );
 		if ( ftp_s1 ==INVALID_SOCKET ) continue;
 
@@ -90,19 +91,21 @@ DWORD WINAPI ftpd(LPVOID p)
 			}
 			if (stricmp("pass", szBuf) == 0){
 				bPass = bUser && strncmp(param, "term", 4)==0;
-				sock_send( bPass?"230 Logged in okay\n":
+				sock_send( bPass ?  "230 Logged in okay\n":
 									"530 Login incorrect\n");
 				continue;
 			}
 			if ( !bPass ) {
 				sock_send( "530 Login required\n");
-				 continue;
+				continue;
 			}
-			fn[0]=0;
-			if ( *param=='/' ) strcpy(fn, svrRoot);
+			strcpy(fn, rootDir);
+			strcat(fn, workDir);
+			if ( workDir[strlen(workDir)-1]!='\\' ) strcat(fn, "\\");
 			strcat(fn, param);
+
 			if (stricmp("syst", szBuf) ==0 ){
-				sock_send( "215 UNIX emulated by tinyTerm\n");
+				sock_send( "215 tinyTerm ftpd\n");
 			}
 			else if(stricmp("port", szBuf) == 0){
 				sscanf(param, "%d,%d,%d,%d,%d,%d",
@@ -119,37 +122,39 @@ DWORD WINAPI ftpd(LPVOID p)
 				sock_send( "200 Type can only be binary\n");
 			}
 			else if(stricmp("pwd", szBuf) == 0 || stricmp("xpwd", szBuf) == 0){
-				_getcwd(fn, MAX_PATH); fn[iRootLen] = '/';
-				sprintf( szBuf, "257 \"%s\" is current directory\n",
-																fn+iRootLen );
+				sprintf( szBuf, "257 \"%s\" is current directory\n", workDir );
 				sock_send( szBuf);
 			}
 			else if(stricmp("cwd", szBuf) == 0){
-				fn[0]=0;
-				if ( *param=='/' || *param=='\\' || *param==0)
-					strcpy(fn, svrRoot);
-				strcat(fn, param);
-				_getcwd(szBuf, MAX_PATH);
-				if ( _chdir(fn) != 0 )
-					sock_send( "550 No such file or directory\n");
-				else {
-					_getcwd(fn, MAX_PATH);
-					if ( strncmp(fn, svrRoot, strlen(svrRoot))!=0 ) {
-						sock_send( "550 Invalid directory name\n");
-						_chdir(szBuf);
-					}
-					else
-						sock_send( "250 CWD command sucessful\n");
+				char *pPart, fullDir[MAX_PATH];
+				if ( GetFullPathNameA(fn, MAX_PATH, fullDir, &pPart)==0 ) {
+					sock_send( "550 Invalid path\n");
+					continue;
 				}
+				if ( strncmp(rootDir, fullDir, strlen(rootDir))!=0 ) {
+					sock_send( "550 Invalid path\n");
+					continue;
+				}
+				struct stat sb;
+				if ( stat(fullDir, &sb)==-1 ) {
+					sock_send( "550 No such directory\n");
+					continue;
+				}
+				if ( (sb.st_mode&S_IFMT)!=S_IFDIR ) {
+					sock_send( "550 No such directory\n");
+					continue;
+				}
+				sock_send( "250 CWD sucessful\n");
+				strcpy(workDir, fullDir+strlen(rootDir));
 			}
-			else if(stricmp("cdup", szBuf) == 0){
-				_getcwd(fn, MAX_PATH);
-				if ( strcmp(fn, svrRoot)>0 )
-					if(_chdir("..") == 0){
-						sock_send( "250 CWD command sucessful\n");
-						continue;
-					}
-				sock_send( "550 No such file or directory.\n");
+			else if(stricmp("cdup", szBuf) == 0) {
+				char *p = strrchr(workDir, '\\');
+				if( p!=NULL && p!=workDir ) {
+					*p = 0;
+					sock_send( "250 CWD sucessful\n");
+				}
+				else
+					sock_send( "550 Invalid path\n");
 			}
 			else if(stricmp("pasv", szBuf)==0 || stricmp("epsv", szBuf)==0 ){
 				getsockname(ftp_s1, (struct sockaddr *)&svraddr, &addrsize);
@@ -176,10 +181,9 @@ DWORD WINAPI ftpd(LPVOID p)
 			}
 			else if( stricmp("nlst", szBuf)==0 || stricmp("list", szBuf)==0 ){
 				struct _finddata_t  ffblk;
-				if ( *param=='/' && *(param+1)=='/' ) param++;
-				if ( *(param+strlen(param)-1)=='/') strcat(param, "*.*");
-				if ( *param==0 ) strcpy(param, "*.*");
-				int nCode = _findfirst(param, &ffblk);
+				if ( *(param+strlen(param)-1)=='/') strcat(fn, "*.*");
+				if ( *param==0 ) strcat(fn, "\\*.*");
+				int nCode = _findfirst(fn, &ffblk);
 				if ( nCode==-1 ) {
 					sock_send( "550 No such file or directory\n");
 					continue;
@@ -221,7 +225,7 @@ DWORD WINAPI ftpd(LPVOID p)
 				if ( strstr(param, ".." )==NULL )
 					fp = fopen_utf8(fn, "wb");
 				if(fp == NULL){
-					sock_send( "550 Unable to create file\n");
+					sock_send( "550 Unable write file\n");
 					continue;
 				}
 				sock_send( "150 Opening BINARY data connection\n");
@@ -236,7 +240,7 @@ DWORD WINAPI ftpd(LPVOID p)
 				unsigned long  lSize = 0;
 				unsigned int   nLen=0, nCnt=0;
 				do {
-					nLen = recv(s2, szBuf, 4096, 0);
+					nLen = recv(s2, szBuf, 32768, 0);
 					if ( nLen>0 ) {
 						lSize += nLen;
 						fwrite(szBuf, nLen, 1, fp);
@@ -256,7 +260,7 @@ DWORD WINAPI ftpd(LPVOID p)
 				if ( strstr(param, ".." )==NULL )
 					fp = fopen_utf8(fn, "rb");
 				if(fp == NULL) {
-					sock_send( "550 No such file or directory\n");
+					sock_send( "550 Unable to read file\n");
 					continue;
 				}
 				sock_send( "150 Opening BINARY data connection\n");
@@ -271,15 +275,15 @@ DWORD WINAPI ftpd(LPVOID p)
 				unsigned long  lSize = 0;
 				unsigned int   nLen=0, nCnt=0;
 				do {
-					nLen = fread(szBuf, 1, 4096, fp);
+					nLen = fread(szBuf, 1, 32768, fp);
 					if ( send(s2, szBuf, nLen, 0) == 0) break;
 					lSize += nLen;
-					if ( ++nCnt==256 ) {
+					if ( ++nCnt==32 ) {
 						term_Print("\r%lu bytes sent", lSize);
 						nCnt = 0;
 					}
 				}
-				while ( nLen==4096);
+				while ( nLen==32768);
 				fclose(fp);
 				term_Print("\r%lu bytes sentd\n", lSize);
 				sock_send( "226 Transfer complete\n");
@@ -419,8 +423,8 @@ DWORD WINAPI tftpd(LPVOID p)
 	struct sockaddr_in clientaddr;
 	int addrsize=sizeof(clientaddr);
 
-	char svrRoot[MAX_PATH], fn[MAX_PATH];
-	strcpy( svrRoot, (char *)p );
+	char rootDir[MAX_PATH], fn[MAX_PATH];
+	strcpy( rootDir, (char *)p );
 	term_Disp( "TFTPd started\r\n" );
 
 	int ret;
@@ -433,7 +437,7 @@ DWORD WINAPI tftpd(LPVOID p)
 			BOOL bRead = dataBuf[1]==1;
 			term_Print("TFTPd: %cRQ from %s\n", bRead?'R':'W',
 									inet_ntoa(clientaddr.sin_addr) );
-			strcpy(fn, svrRoot);
+			strcpy(fn, rootDir);
 			strcat(fn, dataBuf+2);
 			FILE *fp = fopen_utf8(fn,  bRead?"rb":"wb");
 			if ( fp == NULL ) {

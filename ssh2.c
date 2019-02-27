@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 38395 2019-01-15 21:05:10 $"
+// "$Id: ssh2.c 38376 2019-02-08 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -8,7 +8,7 @@
 //
 // Copyright 2018-2019 by Yongchao Fan.
 //
-// This library is free software distributed under GNU LGPL 3.0,
+// This library is free software distributed under GNU GPL 3.0,
 // see the license at:
 //
 //	   https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
@@ -193,21 +193,20 @@ int ssh_knownhost()
 	if ( stat(knownhostfile, &sb)!=0 ) mkdir(knownhostfile);
 	strcat(knownhostfile, "/known_hosts");
 
-	char buf[256];
+	char keybuf[256];
 	const char *key = libssh2_session_hostkey(sshSession, &len, &type);
 	if ( key==NULL ) {
 		term_Disp("hostkey failure!");
 		return -4;
 	}
-	buff_len=sprintf(buf, "hostkey type %s\nfingerprint", keytypes[type]);
+	buff_len=sprintf(keybuf, "%s key fingerprint", keytypes[type]);
 	if ( type>0 ) type++;
 
 	const char *fingerprint;
 	fingerprint = libssh2_hostkey_hash(sshSession, LIBSSH2_HOSTKEY_HASH_SHA1);
 	for(int i = 0; i < 20; i++) {
-		sprintf(buf+buff_len+i*3, ":%02X", (unsigned char)fingerprint[i]);
+		sprintf(keybuf+buff_len+i*3, ":%02x", (unsigned char)fingerprint[i]);
 	}
-	term_Disp( buf ); term_Disp("\n");
 
 	LIBSSH2_KNOWNHOSTS *nh = libssh2_knownhost_init(sshSession);
 	if ( nh==NULL ) {
@@ -228,7 +227,7 @@ int ssh_knownhost()
 	case LIBSSH2_KNOWNHOST_CHECK_MISMATCH:
 		if ( type==((knownhost->typemask&LIBSSH2_KNOWNHOST_KEY_MASK)
 								  >>LIBSSH2_KNOWNHOST_KEY_SHIFT) ) {
-			term_Print("\033[31m!!!Danger, hostkey changed!!!\n");
+			term_Print("%s\n\033[31m!!!Danger, hostkey changed!!!\n", keybuf);
 			p=ssh2_Gets("Update hostkey and continue with the risk?(Yes/No):",
 						TRUE);
 			if ( p!=NULL ) {
@@ -244,7 +243,7 @@ int ssh_knownhost()
 		//fall through if hostkey type mismatch, or hostkey deleted for update
 	case LIBSSH2_KNOWNHOST_CHECK_NOTFOUND:
 		if ( p == NULL ) {
-			term_Print("\033[33munknown hostkey!\n");
+			term_Print("%s\n\033[33munknown hostkey!\n", keybuf);
 			p = ssh2_Gets("Add entry to .ssh/known_hosts?(Yes/No):", TRUE);
 		}
 		if ( p!=NULL ) {
@@ -264,7 +263,6 @@ int ssh_knownhost()
 		}
 	}
 
-	term_Disp("\n");
 	libssh2_knownhost_free(nh);
 	return rc;
 }
@@ -275,7 +273,7 @@ static void kbd_callback(const char *name, int name_len,
                          LIBSSH2_USERAUTH_KBDINT_RESPONSE *responses,
                          void **abstract)
 {
-    for ( int i=0; i<num_prompts; i++) {
+  for ( int i=0; i<num_prompts; i++) {
 		char *prompt = strdup(prompts[i].text);
 		prompt[prompts[i].length] = 0;
 		const char *p = ssh2_Gets(prompt, prompts[i].echo);
@@ -284,7 +282,7 @@ static void kbd_callback(const char *name, int name_len,
 			responses[i].text = strdup(p);
 			responses[i].length = strlen(p);
 		}
-    }
+  }
 } 
 int ssh_authentication(char *username, char *password, char *passphrase)
 {
@@ -363,7 +361,7 @@ DWORD WINAPI ssh( void *pv )
 		goto Session_Close;
 	
 	const char *banner = libssh2_session_banner_get(sshSession);
-	if ( banner!=NULL ) term_Print("\n%s\n", banner);
+	if ( banner!=NULL ) term_Print("%s\n\n", banner);
 	
 	if ( ssh_authentication(username, password, passphrase)<0 ) 
 		goto Session_Close;
@@ -644,6 +642,7 @@ void scp_write( char *lpath, char *rpath )
 					scp_write_one(lfile, rfile);
 				}
 			}
+			closedir(dir);
 		}
 		else 
 			term_Print("\n\033[31mSCP: couldn't open \033[32m%s\n", ldir);	
