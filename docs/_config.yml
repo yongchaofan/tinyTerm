@@ -1,6 +1,5 @@
 theme: jekyll-theme-cayman
 show_downloads: true
 github:
-  zip_url: tinyTerm.exe
-  tgz_url: tinyTerm64.exe
+  zip_url: https://github.com/yongchaofan/tinyTerm/releases/download/1.0/tinyTerm-1.0.zip
   description: simple, small and scriptable terminal emulator
