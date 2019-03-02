@@ -3,19 +3,19 @@ LIBS = ${MINGW_PREFIX}/lib/libssh2.a ${MINGW_PREFIX}/lib/libz.a ${MINGW_PREFIX}/
 
 CC = gcc
 RC = windres
-CFLAGS= -Os -std=c99 -D UNICODE -Wall -ffunction-sections -fdata-sections  -I${MINGW_PREFIX}/include
-LDFLAGS = -s -lgdi32 -lcomdlg32 -lcomctl32 -lole32 -lwinmm -lws2_32 -lshell32 -lcrypt32 -lbcrypt -Wl,--subsystem,windows -Wl,-gc-sections
+CFLAGS= -Os -std=c99 -D UNICODE -Wall -ffunction-sections -fdata-sections -I${MINGW_PREFIX}/include
+LDFLAGS = -s -lgdi32 -lcomdlg32 -lcomctl32 -lole32 -lwinmm -lws2_32 -lshell32 -lcrypt32 -ldwmapi -luxtheme -lbcrypt -Wl,--subsystem,windows -Wl,-gc-sections
 
 all: tinyTerm.exe
 
-tinyTerm.exe: ${OBJS} 
+tinyTerm.exe: ${OBJS}
 	${CC} -o "$@" ${OBJS} ${LIBS} ${LDFLAGS}
 
 obj/%.o: %.c tiny.h 
 	${CC} ${CFLAGS} -c $< -o $@
 
-obj/resource.o: res\tinyTerm.rc res\tiny.manifest res\TL1.ico 
+obj/resource.o: res\tinyTerm.rc res\tiny.manifest res\TL1.ico
 	${RC} -I. -I.\res -i $< -o $@
 	
 clean:
-	rm obj/*.o "tinyTerm.exe"
+	del obj\*.o "tinyTerm.exe"
