@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 3290 2019-01-12 21:05:10 $"
+// "$Id: tiny.h 5569 2019-01-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -18,11 +18,90 @@
 //
 #include <stdio.h>
 #include <sys/stat.h>
+#include <libssh2.h>
+#include <libssh2_sftp.h>
+
 #define TERMLINES	25
 #define TERMCOLS	80
 #define MAXLINES	8192
 #define BUFFERSIZE	8192*64
 
+struct Tunnel
+{
+	int socket;
+	char *localip;
+	char *remoteip;
+	unsigned short localport;
+	unsigned short remoteport;
+	LIBSSH2_CHANNEL *channel;
+	struct Tunnel *next;
+	struct tagHOST *host;
+};
+
+typedef struct tagHOST {
+	int host_type;
+	int host_status;
+
+	char cmdline[256];
+	SOCKET sock;					//for tcp connection used by telnet/ssh reader
+	HANDLE hExitEvent, hSerial;		//for serial reader
+	HANDLE hStdioRead, hStdioWrite;	//for stdio reader
+	HANDLE hReaderThread;			//reader thread handle
+
+	short port;						//ssh/sftp/netconf host
+	char *subsystem;
+	char *username;
+	char *password;
+	char *passphrase;
+	char *hostname;
+	char homedir[MAX_PATH];
+	char keys[256];
+	int cursor, bReturn, bPassword;
+	HANDLE mtx;						//ssh2 reading/writing mutex
+	LIBSSH2_SESSION *session;
+	LIBSSH2_CHANNEL *channel;
+	HANDLE mtx_tun;					//tunnel list add/delete mutex
+	struct Tunnel *tunnel_list;
+
+	LIBSSH2_SFTP *sftp;				//sftp host
+	char homepath[MAX_PATH];
+	char realpath[MAX_PATH];
+	int msg_id;						//netconf host
+
+	struct tagTERM *term;
+} HOST;
+
+typedef struct tagTERM {
+	char buff[BUFFERSIZE], attr[BUFFERSIZE], c_attr;
+	int line[MAXLINES];
+	int size_x, size_y;
+	int cursor_x, cursor_y;
+	int screen_y, scroll_y;
+	int sel_left, sel_right;
+	BOOL bLogging, bEcho, bCursor, bAlterScreen;
+	BOOL bAppCursor, bGraphic, bEscape, bTitle, bInsert;
+	int save_x, save_y;
+	int roll_top, roll_bot;
+
+	char title[64];
+	int title_idx;
+	FILE *fpLogFile;
+
+	BOOL bPrompt;
+	char sPrompt[32];
+	int  iPrompt, iTimeOut;
+	char *tl1text;
+	int tl1len;
+
+	BOOL save_edit;
+	char escape_code[32];
+	int escape_idx;
+
+	int xmlIndent;
+	BOOL xmlPreviousIsOpen;
+
+	HOST *host;
+} TERM;
 #define HOST_IDLE			0
 #define HOST_CONNECTING 	1
 #define HOST_AUTHENTICATING	2
@@ -50,58 +129,56 @@ WCHAR *autocomplete_First( );
 WCHAR *autocomplete_Next( );
 
 /****************host.c****************/
-int host_Init( );
-void host_Open( char *port );
-void host_Size( int w, int h );
-void host_Send( char *buf, int len );
-int host_Type();
-int host_Status();
-void host_Close( );
-void host_Destory( );
-void url_decode(char *url);
-int http_Svr( char *intf );
-int tcp( const char *hostname, short port );
+void host_Init( HOST *ph );
+void host_Open( HOST *ph, char *port );
+void host_Send_Size( HOST *ph, int w, int h );
+void host_Send( HOST *ph, char *buf, int len );
+int host_Type(HOST *ph);
+int host_Status(HOST *ph);
+void host_Close( HOST *ph );
+SOCKET tcp( char *host, short port );
 
 /****************ssh2.c****************/
-void ssh2_Init( void );
-void ssh2_Size( int w, int h );
-void ssh2_Send( char *buf, int len );
-void ssh2_Close( );
-void ssh2_Exit( );
-void ssh2_Tun(char *cmd);
-void scp_read(char *lpath, char *rfiles);
-void scp_write(char *lpath, char *rpath);
-void netconf_Send( char *msg, int len );
-int sftp_cmd(char *cmd);
+void ssh2_Init( HOST *ph );
+void ssh2_Size( HOST *ph, int w, int h );
+void ssh2_Send( HOST *ph, char *buf, int len );
+char *ssh2_Gets( HOST *ph, char *prompt, BOOL bEcho);
+void ssh2_Close( HOST *ph );
+void ssh2_Tun( HOST *ph, char *cmd );
+void scp_read( HOST *ph, char *lpath, char *rfiles );
+void scp_write( HOST *ph, char *lpath, char *rpath );
+void netconf_Send( HOST *ph, char *msg, int len );
+int sftp_cmd( HOST *ph, char *cmd );
 
 /****************ftpd.c****************/
 BOOL ftp_Svr( char *root );
 BOOL tftp_Svr( char *root );
 
 /****************term.c****************/
-void term_Init( void );
-void term_Clear( void );
-void term_Size( void );
-void term_Parse( char *buf, int len );
-void term_Parse_XML( char *xml, int len );
-void term_Print( const char *fmt, ... );
-void term_Scroll(int lines);
-void term_Keydown(DWORD key);
+void host_callback( void *term, char *buf, int len);
+void term_Init( TERM *pt );
+void term_Clear( TERM *pt );
+void term_Size( TERM *pt, int x, int y );
+void term_Title( TERM *pt, char *title );
+void term_Parse( TERM *pt, char *buf, int len );
+void term_Parse_XML( TERM *pt, char *xml, int len );
+void term_Print( TERM *pt, const char *fmt, ... );
+void term_Scroll( TERM *pt, int lines);
+void term_Keydown( TERM *pt, DWORD key );
 
-BOOL term_Echo();
-void term_Logg( char *fn );
-void term_Srch( char *sstr );
-void term_Disp( char *buf );
-void term_Send( char *buf, int len );
-int term_Recv( char **preply );	//get new text since last Disp/Send/Recv
-
-void term_Learn_Prompt();
-char *term_Mark_Prompt();
-int term_Waitfor_Prompt();
-int term_Pwd(char *buf, int len);
-int term_Scp(char *cmd, char **preply);
-int term_Tun(char *cmd, char **preply);
-int term_Cmd( char *cmd, char **preply );
+BOOL term_Echo( TERM *pt );
+void term_Logg( TERM *pt, char *fn );
+void term_Srch( TERM *pt, char *sstr );
+void term_Disp( TERM *pt, char *buf );
+void term_Send( TERM *pt, char *buf, int len );
+int term_Recv( TERM *pt, char **preply );	//get new text since last Disp/Send/Recv
+void term_Learn_Prompt( TERM *pt );
+char *term_Mark_Prompt( TERM *pt );
+int term_Waitfor_Prompt(TERM *pt );
+int term_Pwd( TERM *pt, char *buf, int len );
+int term_Scp( TERM *pt, char *cmd, char **preply );
+int term_Tun( TERM *pt, char *cmd, char **preply );
+int term_Cmd( TERM *pt, char *cmd, char **preply );
 
 /****************tiny.c****************/
 void cmd_Disp_utf8(char *buf);
@@ -111,3 +188,6 @@ void tiny_Connecting();
 void tiny_Title( char *buf );
 BOOL tiny_Edit(BOOL e);			//return BOOL to indicate if status changed
 char *tiny_Hostname();			//return hostname of current connection
+char *tiny_Gets(char *prompt, BOOL bEcho);
+void url_decode(char *url);
+int http_Svr( char *intf );
