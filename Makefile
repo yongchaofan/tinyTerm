@@ -1,5 +1,5 @@
 OBJS = obj/tiny.o obj/term.o obj/host.o obj/ssh2.o obj/auto_drop.o obj/resource.o
-LIBS = ${MINGW_PREFIX}/lib/libssh2.a ${MINGW_PREFIX}/lib/libz.a ${MINGW_PREFIX}/lib/binutils/libiberty.a 
+LIBS = ${MINGW_PREFIX}/lib/libssh2.a ${MINGW_PREFIX}/lib/libz.a ${MINGW_PREFIX}/lib/libiberty.a 
 
 CC = gcc
 RC = windres

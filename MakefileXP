@@ -1,4 +1,4 @@
-OBJS = obj/tiny.o obj/term.o obj/host.o obj/ssh2.o obj/auto_drop.o obj/resource.o
+OBJS = obj/tinyXP.o obj/term.o obj/host.o obj/ssh2.o obj/auto_drop.o obj/resource.o
 LIBS = ${MINGW_PREFIX}/lib/libssh2.a ${MINGW_PREFIX}/lib/libz.a ${MINGW_PREFIX}/lib/libiberty.a ${MINGW_PREFIX}/lib/libmbedcrypto.a 
 
 CC = gcc
@@ -18,4 +18,4 @@ obj/resource.o: res\tinyTerm.rc res\tiny.manifest res\TL1.ico
 	${RC} -I. -I.\res -i $< -o $@
 	
 clean:
-	rm obj/*.o "tinyTermXP.exe"
+	del obj\*.o "tinyTermXP.exe"
