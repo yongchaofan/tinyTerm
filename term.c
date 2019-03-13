@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 29255 2019-02-28 21:05:10 $"
+// "$Id: term.c 29920 2019-03-12 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -58,7 +58,7 @@ void term_Clear( TERM *pt )
 	pt->escape_idx = 0;
 	pt->xmlIndent = 0;
 	pt->xmlPreviousIsOpen = TRUE;
-	tiny_Redraw();
+	tiny_Redraw_Term(  );
 }
 void term_Size( TERM *pt, int x, int y )
 {
@@ -72,7 +72,7 @@ void term_Size( TERM *pt, int x, int y )
 		pt->scroll_y = 0;
 	}
 	host_Send_Size( pt->host, pt->size_x, pt->size_y );
-	tiny_Redraw();
+	tiny_Redraw_Term(  );
 }
 void term_nextLine(TERM *pt)
 {
@@ -106,10 +106,11 @@ void term_nextLine(TERM *pt)
 }
 void term_Scroll( TERM *pt, int lines )
 {
+	int old_scroll_y = pt->scroll_y;
 	pt->scroll_y -= lines;
 	if ( pt->scroll_y<-pt->screen_y ) pt->scroll_y = -pt->screen_y;
 	if ( pt->scroll_y>0 ) pt->scroll_y = 0;
-	tiny_Redraw();
+	if ( old_scroll_y!=pt->scroll_y ) tiny_Scroll();
 }
 void term_Keydown( TERM *pt, DWORD key )
 {
@@ -130,6 +131,7 @@ void term_Parse( TERM *pt, char *buf, int len )
 {
 	unsigned char *p=(unsigned char *)buf;
 	unsigned char *zz = p+len;
+	int old_cursor_y = pt->cursor_y;
 
 	if ( pt->bLogging ) fwrite( buf, 1, len, pt->fpLogFile );
 	if ( pt->bEscape ) p = vt100_Escape( pt, p, zz-p );
@@ -240,7 +242,11 @@ void term_Parse( TERM *pt, char *buf, int len )
 														pt->iPrompt)==0)
 			pt->bPrompt = TRUE;
 	}
-	tiny_Redraw();
+	if ( old_cursor_y==pt->cursor_y )
+		tiny_Redraw_Line();
+	else
+		tiny_Redraw_Term();
+	
 }
 BOOL term_Echo(TERM *pt)
 {
@@ -257,7 +263,7 @@ void term_Title( TERM *pt, char *title )
 	}
 	else {
 		pt->title[0] = 0;
-		term_Disp( pt, "Disconnected\n" );
+		term_Disp(pt, "\n\033[31mDisconnected. Press Enter to restart\n\033[37m");
 	}
 	tiny_Title(pt->title);
 }
@@ -330,6 +336,19 @@ void term_Logg( TERM *pt, char *fn )
 		}
 	}
 }
+void term_Save( TERM *pt, char *fn )
+{
+	if ( fn!=NULL ) {
+		if ( *fn==' ' ) fn++;
+		FILE *fp = fopen_utf8( fn, "wb" );
+		if ( fp != NULL ) {
+			fwrite(pt->buff, 1, pt->cursor_x, fp);
+			term_Print( pt, "\n\033[32m%d bytes written to %s\n", pt->cursor_x, fn );
+			fclose( fp );
+		}
+	}
+}
+
 void term_Srch( TERM *pt, char *sstr )
 {
 	int l = strlen(sstr);
@@ -348,7 +367,7 @@ void term_Srch( TERM *pt, char *sstr )
 		}
 	}
 	if ( p<pt->buff+l ) pt->sel_left = pt->sel_right = pt->scroll_y = 0;
-	tiny_Redraw();
+	tiny_Redraw_Term(  );
 }
 int term_TL1( TERM *pt, char *cmd, char **pTl1Text )
 {
@@ -487,24 +506,29 @@ int term_Cmd( TERM *pt, char *cmd, char **preply )
 	else if ( strncmp(cmd, "Log", 3)==0 ) 	term_Logg( pt, cmd+3 );
 	else if ( strncmp(cmd, "Find ",5)==0 ) 	term_Srch( pt, cmd+5 );
 	else if ( strncmp(cmd, "Disp ",5)==0 )  term_Disp( pt, cmd+5 );
-	else if ( strncmp(cmd, "Send ",5)==0 )  {
+	else if ( strncmp(cmd, "Send ",5)==0 )  
+	{
 		term_Mark_Prompt( pt );
 		term_Send( pt, cmd+5,strlen(cmd+5) );
 	}
-	else if ( strncmp(cmd, "Hostname",8)==0) {
-		if ( preply!=NULL ) {
-			*preply = tiny_Hostname();
+	else if ( strncmp(cmd, "Hostname",8)==0) 
+	{
+		if ( preply!=NULL ) 
+		{
+			*preply = host_Status(pt->host)==HOST_IDLE ? "":pt->host->hostname;
 			rc = strlen(*preply);
 		}
 	}
-	else if ( strncmp(cmd,"Selection",9)==0) {
+	else if ( strncmp(cmd,"Selection",9)==0) 
+	{
 		if ( preply!=NULL ) *preply = pt->buff+pt->sel_left;
 		rc = pt->sel_right-pt->sel_left;
 	}
 	else if ( strncmp(cmd, "Recv" ,4)==0 )  rc = term_Recv( pt, preply );
 	else if ( strncmp(cmd, "Echo", 4)==0 )  rc = term_Echo( pt ) ? 1 : 0;
 	else if ( strncmp(cmd, "Timeout",7)==0 )pt->iTimeOut = atoi( cmd+8 );
-	else if ( strncmp(cmd, "Prompt ",7)==0 ) {
+	else if ( strncmp(cmd, "Prompt ",7)==0 ) 
+	{
 		strncpy(pt->sPrompt, cmd+7, 31);
 		pt->sPrompt[31] = 0;
 		url_decode(pt->sPrompt);
@@ -514,8 +538,10 @@ int term_Cmd( TERM *pt, char *cmd, char **preply )
 	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 	ftp_Svr( cmd+4 );
 	else if ( strncmp(cmd, "tun",  3)==0 ) 	rc = term_Tun( pt, cmd+3, preply);
 	else if ( strncmp(cmd, "scp ", 4)==0 ) 	rc = term_Scp( pt, cmd+4, preply);
-	else if ( strncmp(cmd, "Waitfor",7)==0) {
-		for ( int i=pt->iTimeOut; i>0; i-- ) {
+	else if ( strncmp(cmd, "Waitfor",7)==0) 
+	{
+		for ( int i=pt->iTimeOut; i>0; i-- ) 
+		{
 			pt->buff[pt->cursor_x] = 0;
 			if ( strstr(pt->tl1text, cmd+8)!=NULL ) {
 				if ( preply!=NULL ) *preply = pt->tl1text;
@@ -534,15 +560,19 @@ unsigned char *vt100_Escape( TERM *pt, unsigned char *sz, int cnt )
 	unsigned char *zz = sz+cnt;
 
 	pt->bEscape = TRUE;
-	while ( sz<zz && pt->bEscape ) {
+	while ( sz<zz && pt->bEscape ) 
+	{
 		pt->escape_code[pt->escape_idx++] = *sz++;
-		switch( pt->escape_code[0] ) {
+		switch( pt->escape_code[0] ) 
+		{
 		case '[': if ( isalpha(pt->escape_code[pt->escape_idx-1])
 						|| pt->escape_code[pt->escape_idx-1]=='@'
-						|| pt->escape_code[pt->escape_idx-1]=='`' ) {
+						|| pt->escape_code[pt->escape_idx-1]=='`' ) 
+						{
 			pt->bEscape = FALSE;
 			int n0=1, n1=1, n2=1;
-			if ( pt->escape_idx>1 ) {
+			if ( pt->escape_idx>1 ) 
+			{
 				char *p = strchr(pt->escape_code, ';');
 				if ( p != NULL ) {
 					n0 = 0; n1 = atoi(pt->escape_code+1); n2 = atoi(p+1);
@@ -551,7 +581,8 @@ unsigned char *vt100_Escape( TERM *pt, unsigned char *sz, int cnt )
 					if ( isdigit(pt->escape_code[1]) ) n0 = atoi(pt->escape_code+1);
 			}
 			int x;
-			switch ( pt->escape_code[pt->escape_idx-1] ) {
+			switch ( pt->escape_code[pt->escape_idx-1] ) 
+			{
 			case 'A':
 					x = pt->cursor_x - pt->line[pt->cursor_y];
 					pt->cursor_y -= n0;
@@ -602,16 +633,19 @@ unsigned char *vt100_Escape( TERM *pt, unsigned char *sz, int cnt )
 					if ( n2>pt->size_x ) n2 = pt->size_x;
 					pt->cursor_y = pt->screen_y+n1-1;
 					pt->cursor_x = pt->line[pt->cursor_y];
-					while ( --n2>0 ) {
+					while ( --n2>0 ) 
+					{
 						pt->cursor_x++;
 						while ( isUTF8c(pt->buff[pt->cursor_x]) ) pt->cursor_x++;
 					}
 					break;
 			case 'J': 	//[J kill till end, 1J begining, 2J entire screen
-					if ( pt->escape_code[pt->escape_idx-2]=='[' ) {
+					if ( pt->escape_code[pt->escape_idx-2]=='[' ) 
+					{
 						if ( pt->bAlterScreen )
 							pt->screen_y = pt->cursor_y;
-						else {
+						else 
+						{
 							int i=pt->cursor_y+1; pt->line[i]=pt->cursor_x;
 							while ( ++i<=pt->screen_y+pt->size_y ) pt->line[i]=0;
 							break;
@@ -619,13 +653,15 @@ unsigned char *vt100_Escape( TERM *pt, unsigned char *sz, int cnt )
 					}
 					pt->cursor_y = pt->screen_y;
 					pt->cursor_x = pt->line[pt->cursor_y];
-					for ( int i=0; i<pt->size_y; i++ ) {
+					for ( int i=0; i<pt->size_y; i++ ) 
+					{
 						memset( pt->buff+pt->cursor_x, ' ', pt->size_x );
 						memset( pt->attr+pt->cursor_x,   0, pt->size_x );
 						pt->cursor_x += pt->size_x;
 						term_nextLine( pt );
 					}
-					pt->cursor_y = --pt->screen_y; pt->cursor_x = pt->line[pt->cursor_y];
+					pt->cursor_y = --pt->screen_y; 
+					pt->cursor_x = pt->line[pt->cursor_y];
 					break;
 			case 'K': {		//[K kill till end, 1K begining, 2K entire line
 					int i = pt->line[pt->cursor_y];

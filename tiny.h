@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5569 2019-01-12 21:05:10 $"
+// "$Id: tiny.h 5609 2019-03-12 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -136,7 +136,12 @@ void host_Send( HOST *ph, char *buf, int len );
 int host_Type(HOST *ph);
 int host_Status(HOST *ph);
 void host_Close( HOST *ph );
+
 SOCKET tcp( char *host, short port );
+void url_decode(char *url);
+int http_Svr( char *intf );
+BOOL ftp_Svr( char *root );
+BOOL tftp_Svr( char *root );
 
 /****************ssh2.c****************/
 void ssh2_Init( HOST *ph );
@@ -150,9 +155,6 @@ void scp_write( HOST *ph, char *lpath, char *rpath );
 void netconf_Send( HOST *ph, char *msg, int len );
 int sftp_cmd( HOST *ph, char *cmd );
 
-/****************ftpd.c****************/
-BOOL ftp_Svr( char *root );
-BOOL tftp_Svr( char *root );
 
 /****************term.c****************/
 void host_callback( void *term, char *buf, int len);
@@ -168,6 +170,7 @@ void term_Keydown( TERM *pt, DWORD key );
 
 BOOL term_Echo( TERM *pt );
 void term_Logg( TERM *pt, char *fn );
+void term_Save( TERM *pt, char *fn );
 void term_Srch( TERM *pt, char *sstr );
 void term_Disp( TERM *pt, char *buf );
 void term_Send( TERM *pt, char *buf, int len );
@@ -183,11 +186,10 @@ int term_Cmd( TERM *pt, char *cmd, char **preply );
 /****************tiny.c****************/
 void cmd_Disp_utf8(char *buf);
 void tiny_Beep();
-void tiny_Redraw();
+void tiny_Scroll();
+void tiny_Redraw_Line();		//redraw cursor line only
+void tiny_Redraw_Term();		//redraw whole term window
 void tiny_Connecting();
 void tiny_Title( char *buf );
 BOOL tiny_Edit(BOOL e);			//return BOOL to indicate if status changed
-char *tiny_Hostname();			//return hostname of current connection
 char *tiny_Gets(char *prompt, BOOL bEcho);
-void url_decode(char *url);
-int http_Svr( char *intf );

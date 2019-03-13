@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40189 2019-02-08 21:05:10 $"
+// "$Id: ssh2.c 40183 2019-03-02 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -23,6 +23,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <fnmatch.h>
+extern const char *homedir;
 
 void ssh2_Init( HOST *ph )
 {
@@ -159,9 +160,8 @@ int ssh_knownhost( HOST *ph )
 	size_t len;
 	char knownhostfile[MAX_PATH];
 
-	const char *dir = getenv("USERPROFILE");
-	if ( dir!=NULL ) {
-		strncpy(ph->homedir, dir, MAX_PATH-64);
+	if ( homedir!=NULL ) {
+		strncpy(ph->homedir, homedir, MAX_PATH-64);
 		ph->homedir[MAX_PATH-64] = 0;
 	}
 	else

@@ -26,13 +26,13 @@ IDMENU_MAIN MENU
 {
 	POPUP "&Term"
 	{
-		MENUITEM "&Connect...", ID_CONNECT
-		MENUITEM "&Disconnect", ID_DISCONN
-		MENUITEM "Local &Echo",	ID_ECHO
-		MENUITEM "&Logging...", ID_LOGGING
+		MENUITEM "&Connect...\tAlt+C", ID_CONNECT
+		MENUITEM "&Log...\tAlt+L",  ID_LOGGING
+		MENUITEM "&Save...\tAlt+S", ID_SAVE
+		MENUITEM "&About",		ID_ABOUT
 		MENUITEM SEPARATOR
-		MENUITEM "&Ftpd...", 	ID_FTPD
-		MENUITEM "&Tftpd...", 	ID_TFTPD
+		MENUITEM "Ftpd...", 	ID_FTPD
+		MENUITEM "Tftpd...", 	ID_TFTPD
 	}
 	POPUP "&Script"
 	{
@@ -43,25 +43,20 @@ IDMENU_MAIN MENU
 	}
 	POPUP "&Options"
 	{
-		MENUITEM "Local Editing\tAlt+E",ID_EDIT
-		MENUITEM "&Tranparency",        ID_TRANSP
-        MENUITEM "Font Size &++",       ID_FONTSIZE0
-        MENUITEM "Font Size &--",       ID_FONTSIZE1
-		MENUITEM "&Font...",            ID_FONT
-		MENUITEM "&About",		ID_ABOUT
+		MENUITEM "Local &Echo",	ID_ECHO
+		MENUITEM "Local Edit \tAlt+E", ID_EDIT
+		MENUITEM "Font...\tAlt+F",ID_FONT
+		MENUITEM "Zoom\tAlt+Z", ID_ZOOM
+		MENUITEM "&Tranparent", ID_TRANSP
 	}
 }
 IDACCEL_MAIN ACCELERATORS
 {
-  "a", ID_SELALL,	ALT
-  "c", ID_COPY, 	ALT
-  "v", ID_PASTE,	ALT
+  "c", ID_CONNECT, 	ALT
   "e", ID_EDIT, 	ALT
-  "o", ID_OPTIONS,	ALT
-  "s", ID_SCRIPT, 	ALT
-  "t", ID_TERM,		ALT
-  "+", ID_FONTSIZE0,ALT
-  "-", ID_FONTSIZE1,ALT
+  "f", ID_FONT,     ALT
+  "l", ID_LOGGING,	ALT
+  "z", ID_ZOOM,     ALT
  }
 
 IDD_CONNECT DIALOG 45, 30, 150, 100	// Connection Dialog

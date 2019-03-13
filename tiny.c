@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 41682 2019-02-28 14:35:10 $"
+// "$Id: tiny.c 36916 2019-03-12 14:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -31,6 +31,7 @@ int iTitleHeight;
 #define ID_SCRIPT0		1000
 #define ID_CONNECT0		2000
 
+const char *homedir;
 const char WELCOME[]="\n\n\n\
 \ttinyTerm is an open source terminal emulator designed to be\n\n\
 \tsimple, small and scriptable, release 1.0 features:\n\n\n\
@@ -51,18 +52,16 @@ const COLORREF COLORS[16] ={RGB(0,0,0), 	RGB(192,0,0), RGB(0,192,0),
 static HINSTANCE hInst;
 static RECT termRect, wndRect;
 static HWND hwndMain, hwndCmd;
-static HDC hDC, hBufDC=NULL;
-static HBITMAP hBufMap=NULL;
 static HFONT hTermFont;
-static HBRUSH dwBkBrush, dwScrollBrush, dwSliderBrush;
-static HMENU hMenu[3], hTermMenu, hScriptMenu, hOptionMenu, hContextMenu;
-static int menuX[4] = {32, 0, 0, 0};	//menuX[0]=32 leave space for icon
+static HBRUSH dwBkBrush;
+static HMENU hTermMenu, hScriptMenu, hOptionMenu, hMenu[4];
+int menuX[4] = {32, 0, 0, 0};
 
 static int iFontHeight, iFontWidth;
 static int iTransparency = 255;
 static int iScriptDelay = 250;
 static int iConnectCount, iScriptCount, httport;
-static BOOL bScrollbar = FALSE, bFocus = FALSE, bEdit = FALSE;
+static BOOL bFocus = FALSE, bEdit = FALSE;
 static BOOL bFTPd = FALSE, bTFTPd = FALSE;
 static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
 
@@ -72,8 +71,8 @@ void tiny_FontSize(int i);
 void tiny_Transparency(int t);
 void CopyText( );
 void PasteText( );
-void LoadDict( WCHAR *wfn );
-void SaveDict( WCHAR *wfn );
+BOOL LoadDict( char *fn );
+BOOL SaveDict( char *fn );
 void OpenScript( WCHAR *wfn );
 void DropScript( char *tl1s );
 void DropFiles( HDROP hDrop );
@@ -126,10 +125,8 @@ WCHAR *fileDialog( WCHAR *szFilter, DWORD dwFlags )
 		ret = GetSaveFileName(&ofn);
 	else
 		ret = GetOpenFileName(&ofn);
-	if ( ret )
-		return wname;
-	else
-		return NULL;
+
+	return ret ? wname : NULL;
 }
 char *getFolderName(WCHAR *wtitle)
 {
@@ -149,7 +146,8 @@ char *getFolderName(WCHAR *wtitle)
 	bi.lParam = 0;
 	pidl = SHBrowseForFolder(&bi);
 	if ( pidl != NULL )
-		if ( SHGetPathFromIDList(pidl, wfolder) ) {
+		if ( SHGetPathFromIDList(pidl, wfolder) )
+		{
 			wchar_to_utf8(wfolder, wcslen(wfolder)+1, szFolder, MAX_PATH);
 			return szFolder;
 		}
@@ -158,21 +156,21 @@ char *getFolderName(WCHAR *wtitle)
 BOOL fontDialog()
 {
 	LOGFONT lf;
-	if ( GetObject(hTermFont, sizeof(lf), &lf)==0 )
-		ZeroMemory(&lf, sizeof(lf));
 	CHOOSEFONT cf;
 	ZeroMemory(&cf, sizeof(cf));
 	cf.lStructSize = sizeof (cf);
 	cf.hwndOwner = hwndMain;
 	cf.lpLogFont = &lf;
 	cf.Flags = CF_SCREENFONTS|CF_FIXEDPITCHONLY|CF_INITTOLOGFONTSTRUCT;
+	if ( GetObject(hTermFont, sizeof(lf), &lf)==0 ) ZeroMemory(&lf, sizeof(lf));
 
-	BOOL rc = ChooseFont(&cf);
-	if ( rc ) {
+	if ( ChooseFont(&cf) ) 
+	{
 		DeleteObject(hTermFont);
 		hTermFont = CreateFontIndirect(cf.lpLogFont);
+		return TRUE;
 	}
-	return rc;
+	return FALSE;
 }
 void menu_Add(char *cmd, WCHAR *wcmd)
 {
@@ -184,20 +182,16 @@ void menu_Add(char *cmd, WCHAR *wcmd)
 		AppendMenu( hTermMenu, 0, ID_CONNECT0+iConnectCount++, wcmd);
 }
 
-int tiny_Cmd( char *cmd, char **preply )
+BOOL tiny_Cmd( char *cmd )
 {
-	int rc = 0;
-	if ( preply ) *preply = pt->buff+pt->cursor_x;
-	cmd_Disp_utf8(cmd);
 	if (strncmp(cmd,"!Transparency",13)==0)		tiny_Transparency(atoi(cmd+13));
 	else if ( strncmp(cmd,"!ScriptDelay",12)==0)iScriptDelay = atoi(cmd+12);
 	else if ( strncmp(cmd, "!FontSize", 9)==0 )	tiny_FontSize(atoi(cmd+9));
 	else if ( strncmp(cmd, "!FontFace", 9)==0 )	tiny_FontFace(cmd+9);
 	else if ( strncmp(cmd, "!TermSize", 9)==0 )	tiny_TermSize(cmd+9);
-	else
-		rc = term_Cmd( pt, cmd, preply);
+	else return FALSE;
 
-	return rc;
+	return TRUE;
 }
 DWORD WINAPI scper(void *pv)
 {
@@ -227,29 +221,25 @@ void cmd_Enter(void)
 	char cmd[256];
 	WCHAR wcmd[256];
 	int cch = SendMessage(hwndCmd, WM_GETTEXT, (WPARAM)255, (LPARAM)wcmd);
-	if ( cch >= 0 ) {
+	if ( cch >= 0 ) 
+	{
 		wcmd[cch] = 0;
-		cch = wchar_to_utf8(wcmd, cch+1, cmd, 255);
-		cmd[cch] = 0;
-		if ( autocomplete_Add(wcmd) ) 
-			if ( *cmd=='!' ) menu_Add(cmd+1, wcmd+1);
-		if ( *cmd=='!' ) {
+		cch = wchar_to_utf8(wcmd, cch+1, cmd, 256);
+		BOOL added = autocomplete_Add(wcmd);
+		if ( *cmd=='!' )
+		{
+			if ( added ) menu_Add(cmd+1, wcmd+1);
 			if ( strncmp(cmd+1, "scp ", 4)==0 && host_Type( pt->host )==SSH )
 				CreateThread(NULL, 0, scper, strdup(cmd+5), 0, NULL);
 			  else if ( strncmp(cmd+1, "tun",  3)==0 && host_Type( pt->host )==SSH )
 				CreateThread(NULL, 0, tuner, strdup(cmd+4), 0, NULL);
 			  else
-				tiny_Cmd(cmd, NULL);
+				if ( !tiny_Cmd( cmd ) ) term_Cmd( pt, cmd, NULL );
 		}
-		else{
-			if ( host_Status( pt->host ) == HOST_IDLE ) {
-				cmd[cch] = 0;
-				host_Open( pt->host, cmd );
-			}
-			else {
-				cmd[cch]='\r'; 
-				term_Send( pt, cmd, cch+1 );
-			}
+		else
+		{
+			cmd[cch]='\r'; 
+			term_Send( pt, cmd, cch+1 );
 		}
 	}
 	PostMessage(hwndCmd, EM_SETSEL, 0, -1);
@@ -258,16 +248,20 @@ WNDPROC wpOrigCmdProc;
 LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 								WPARAM wParam, LPARAM lParam)
 {
-	if ( uMsg==WM_KEYDOWN ){
-		if ( GetKeyState(VK_CONTROL) & 0x8000 ) { 				//CTRL+
+	if ( uMsg==WM_KEYDOWN )
+	{
+		if ( GetKeyState(VK_CONTROL) & 0x8000 ) 					//CTRL+
+		{ 				
 			char cmd = 0;
 			if ( wParam==54 ) cmd = 30;											//^
 			if ( wParam>64 && wParam<91 ) cmd = wParam-64;	//A-Z
 			if ( wParam>218&&wParam<222 ) cmd = wParam-192;	//[\]
 			if ( cmd ) term_Send( pt, &cmd, 1 );
 		}
-		else {
-			switch ( wParam ) {
+		else 
+		{
+			switch ( wParam ) 
+			{
 			case VK_UP: 	cmd_Disp(autocomplete_Prev()); break;
 			case VK_DOWN: 	cmd_Disp(autocomplete_Next()); break;
 			case VK_RETURN: cmd_Enter(); break;
@@ -276,26 +270,50 @@ LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 	}
 	return CallWindowProc(wpOrigCmdProc, hwnd, uMsg, wParam, lParam);
 }
-WCHAR Title[256] = L"   Term      Script      Options               ";
-char hostname[256]="";
-char *tiny_Hostname()
-{
-	return hostname;
-}
+WCHAR Title[256] = L"    Term    Script    Options                     ";
 void tiny_Title( char *buf )
 {
-	strncpy(hostname, buf, 200);
-	hostname[200] = 0;
-	utf8_to_wchar(buf, strlen(buf)+1, Title+47, 208);
+	utf8_to_wchar(buf, strlen(buf)+1, Title+50, 200);
 	SetWindowText(hwndMain, Title);
+	if ( *buf ) 
+		ModifyMenu(hTermMenu,ID_CONNECT,MF_BYCOMMAND,ID_DISCONN,L"&Disconnect");
+	else 
+		ModifyMenu(hTermMenu,ID_DISCONN,MF_BYCOMMAND,ID_CONNECT,L"&Connect...\tAlt+C");
 }
 char *tiny_Gets( char *prompt, BOOL bEcho)
 {
 	return ssh2_Gets( pt->host, prompt, bEcho );
 }
-void tiny_Redraw()
+void tiny_Redraw_Line()
+{
+	RECT lineRect = termRect;
+	lineRect.top = (pt->cursor_y-pt->screen_y)*iFontHeight;
+	lineRect.bottom = lineRect.top + iFontHeight;
+	InvalidateRect( hwndMain, &lineRect, TRUE );
+}
+void tiny_Redraw_Term()
 {
 	InvalidateRect( hwndMain, &termRect, TRUE );
+}
+void tiny_Scroll()
+{
+static BOOL bScrollbar = FALSE;
+	if ( pt->scroll_y ) {
+		if ( !bScrollbar ) {
+			bScrollbar = TRUE;
+			ShowScrollBar(hwndMain, SB_VERT, TRUE);
+		}
+		SetScrollRange(hwndMain, SB_VERT, 0, pt->cursor_y, TRUE);
+		SetScrollPos(hwndMain, SB_VERT, pt->cursor_y+pt->scroll_y, TRUE);
+	}
+	else {
+		if ( bScrollbar ) {
+			bScrollbar = FALSE;
+			ShowScrollBar(hwndMain, SB_VERT, FALSE);
+		}
+	}
+
+	tiny_Redraw_Term(  );
 }
 void tiny_Beep()
 {
@@ -319,7 +337,7 @@ void tiny_Font( HWND hwnd )
 	int x = wndRect.left;
 	int y = wndRect.top;
 	wndRect.right = x + iFontWidth*pt->size_x;
-	wndRect.bottom = y + iFontHeight*pt->size_y + 1;
+	wndRect.bottom = y + iFontHeight*pt->size_y;
 	AdjustWindowRect(&wndRect, WS_TILEDWINDOW, FALSE);
 	MoveWindow( hwnd, x, y, wndRect.right-wndRect.left,
 							wndRect.bottom-wndRect.top, TRUE );
@@ -361,63 +379,64 @@ void tiny_FontSize(int i)
 						DEFAULT_QUALITY, FIXED_PITCH, wsFontFace);
 	tiny_Font(hwndMain);
 }
-void tiny_Paint(HDC hDC)
+void tiny_Paint(HDC hDC, RECT rcPaint)
 {
 	WCHAR wbuf[1024];
 	RECT text_rect = {0, 0, 0, 0};
-	BitBlt(hBufDC,0,0, termRect.right, termRect.bottom, NULL,0,0, BLACKNESS);
+	SelectObject(hDC, hTermFont);
 	int y = pt->screen_y+pt->scroll_y; if ( y<0 ) y = 0;
 	int sel_min = min(pt->sel_left, pt->sel_right);
 	int sel_max = max(pt->sel_left, pt->sel_right);
-	int dx=1, dy=0;
-	for ( int l=0; l<pt->size_y; l++ ) {
-		dx = 1;
+	int dx, dy=rcPaint.top;
+	for ( int l=dy/iFontHeight; l<pt->size_y; l++ ) 
+	{
+		dx = 0;
 		int i = pt->line[y+l];
 		while ( i<pt->line[y+l+1] ) {
-			BOOL utf = FALSE;
+			BOOL utf8 = FALSE;
 			int j = i;
 			while ( pt->attr[j]==pt->attr[i] ) {
-				if ( (pt->buff[j]&0xc0)==0xc0 ) utf = TRUE;
+				if ( (pt->buff[j]&0xc0)==0xc0 ) utf8 = TRUE;
 				if ( ++j==pt->line[y+l+1] ) break;
 				if ( j==sel_min || j==sel_max ) break;
 			}
 			if ( i>=sel_min&&i<sel_max ) {
-				SetTextColor( hBufDC, COLORS[0] );
-				SetBkColor( hBufDC, COLORS[7] );
+				SetTextColor( hDC, COLORS[0] );
+				SetBkColor( hDC, COLORS[7] );
 			}
 			else {
-				SetTextColor( hBufDC, COLORS[pt->attr[i]&0x0f] );
-				SetBkColor( hBufDC, COLORS[(pt->attr[i]>>4)&0x0f] );
+				SetTextColor( hDC, COLORS[pt->attr[i]&0x0f] );
+				SetBkColor( hDC, COLORS[(pt->attr[i]>>4)&0x0f] );
 			}
 			int len = j-i;
 			if ( pt->buff[j-1]==0x0a ) len--;	//remove unprintable 0x0a for XP
-			if ( utf ) {
+			if ( utf8 ) {
 				int cch = utf8_to_wchar(pt->buff+i, len, wbuf, 1024);
-				TextOutW(hBufDC, dx, dy, wbuf, cch);
-				DrawText(hBufDC, wbuf, cch, &text_rect, DT_CALCRECT|DT_NOPREFIX);
+				TextOutW(hDC, dx, dy, wbuf, cch);
+				DrawText(hDC, wbuf, cch, &text_rect, DT_CALCRECT|DT_NOPREFIX);
 				dx += text_rect.right;
 			}
 			else {
-				TextOutA(hBufDC, dx, dy, pt->buff+i, len);
+				TextOutA(hDC, dx, dy, pt->buff+i, len);
 				dx += iFontWidth*len;
 			}
 			i=j;
 		}
+		if ( dx < termRect.right )
+		{
+			RECT fillRect;
+			fillRect.top = dy;
+			fillRect.bottom = dy+iFontHeight;
+			fillRect.left = dx;
+			fillRect.right = termRect.right;
+			FillRect(hDC, &fillRect, dwBkBrush);
+		}
 		dy += iFontHeight;
 	}
-	if ( pt->scroll_y ) {
-		int slider_y = termRect.bottom*(pt->cursor_y+pt->scroll_y)/pt->cursor_y;
-		SelectObject(hBufDC,dwScrollBrush);
-		Rectangle(hBufDC, termRect.right-11, 0, termRect.right,
-												termRect.bottom);
-		SelectObject(hBufDC,dwSliderBrush);
-		Rectangle(hBufDC, termRect.right-11, slider_y-8,termRect.right,
-														slider_y+7 );
-	}
-	BitBlt(hDC,0,0,termRect.right,termRect.bottom, hBufDC,0,0,SRCCOPY);
+
 	int cch = utf8_to_wchar(pt->buff+pt->line[pt->cursor_y],
 								pt->cursor_x-pt->line[pt->cursor_y], wbuf, 1024);
-	DrawText(hBufDC, wbuf, cch, &text_rect, DT_CALCRECT|DT_NOPREFIX);
+	DrawText(hDC, wbuf, cch, &text_rect, DT_CALCRECT|DT_NOPREFIX);
 	if ( bEdit ) {
 		MoveWindow( hwndCmd, text_rect.right, (pt->cursor_y-pt->screen_y)*iFontHeight,
 						termRect.right-text_rect.right, iFontHeight, TRUE );
@@ -427,9 +446,8 @@ void tiny_Paint(HDC hDC)
 					(pt->cursor_y-pt->screen_y)*iFontHeight+iFontHeight*3/4);
 		pt->bCursor ? ShowCaret(hwndMain) : HideCaret(hwndMain);
 	}
-
 }
-const WCHAR *PROTOCOLS[]={L"Serial", L"telnet", L"ssh", L"sftp", L"netconf"};
+const WCHAR *PROTOCOLS[]={L"Serial ", L"telnet ", L"ssh ", L"sftp ", L"netconf "};
 const WCHAR *PORTS[]    ={L"2024",   L"23",     L"22",  L"22",   L"830"};
 const WCHAR *SETTINGS[] ={L"9600,n,8,1", L"19200,n,8,1", L"38400,n,8,1",
 										L"57600,n,8,1", L"115200,n,8,1"};
@@ -521,7 +539,7 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 			switch ( LOWORD(wParam) ) {
 			case IDCONNECT:
 					proto = ComboBox_GetCurSel(hwndProto);
-					conn[0]=L'!';
+					conn[0] = L'!';
 					if ( proto==0 ) {
 						ComboBox_GetText(hwndPort, conn+1, 127);
 						wcscat(conn, L":");
@@ -529,9 +547,8 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 					}
 					else {
 						ComboBox_GetText(hwndProto, conn+1, 127);
-						wcscat(conn, L" ");
 						int len = wcslen(conn);
-						ComboBox_GetText(hwndHost, conn+wcslen(conn), 127);
+						ComboBox_GetText(hwndHost, conn+len, 127);
 						int i;
 						for ( i=0; i<host_cnt; i++ )
 							if ( wcscmp(conn+len,HOSTS[i])==0 ) break;
@@ -539,10 +556,10 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 							HOSTS[host_cnt++] = _wcsdup(conn+len);
 							ComboBox_AddString(hwndHost,HOSTS[++i]);
 						}
-						len = wcslen(conn);
 						wcscat(conn, L":");
-						ComboBox_GetText(hwndPort, conn+wcslen(conn), 128);
-						if ( wcscmp(conn+len+1, PORTS[proto])==0 ) conn[len]=0;
+						len = wcslen(conn);
+						ComboBox_GetText(hwndPort, conn+len, 128);
+						if ( wcscmp(conn+len, PORTS[proto])==0 ) conn[len-1]=0;
 					}
 					cmd_Disp(conn);
 					cmd_Enter();
@@ -575,31 +592,6 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 	case ID_DISCONN:
 		if ( host_Status( pt->host )!=HOST_IDLE ) host_Close( pt->host );
 		break;
-	case ID_COPY:
-		if ( OpenClipboard(hwndMain) ) {
-			if ( pt->sel_left!=pt->sel_right ) {
-				EmptyClipboard( );
-				CopyText();
-			}
-			CloseClipboard( );
-		}
-		break;
-	case ID_PASTE:
-		if ( OpenClipboard(hwndMain) ) {
-			UINT format = 0;
-			while ( (format=EnumClipboardFormats(format))!=0 ) {
-				if ( format==CF_HDROP ) 
-					DropFiles(GetClipboardData(CF_HDROP));
-				if ( format==CF_UNICODETEXT ) 
-					PasteText();
-			}
-			CloseClipboard();
-		}
-		break;
-	case ID_SELALL:
-		pt->sel_left=0; pt->sel_right=pt->cursor_x;
-		tiny_Redraw();
-		break;
 	case ID_LOGGING:
 		if ( !pt->bLogging ) {
 			WCHAR *wfn = fileDialog(L"logfile\0*.log\0All\0*.*\0\0",
@@ -613,6 +605,17 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		else
 			term_Logg( pt, NULL );
 		check_Option( hTermMenu, ID_LOGGING, pt->bLogging );
+		break;
+	case ID_SAVE:
+		{
+			WCHAR *wfn = fileDialog(L"logfile\0*.log\0All\0*.*\0\0",
+				OFN_PATHMUSTEXIST|OFN_NOREADONLYRETURN|OFN_OVERWRITEPROMPT);
+			if ( wfn!=NULL ) {
+				char fn[MAX_PATH];
+				wchar_to_utf8(wfn, wcslen(wfn)+1, fn, MAX_PATH);
+				term_Save( pt, fn );
+			}
+		}
 		break;
 	case ID_ECHO:	//toggle local echo
 		check_Option( hTermMenu, ID_ECHO, term_Echo(pt) );
@@ -629,7 +632,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 			SetFocus(hwndMain);
 		}
 		check_Option( hOptionMenu, ID_EDIT, bEdit);
-		tiny_Redraw();
+		tiny_Redraw_Term(  );
 		break;
 	case ID_TRANSP:
 		if ( lParam>0 && lParam<256 ) 
@@ -642,11 +645,9 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 	case ID_FONT:
 		if ( fontDialog() ) tiny_Font( hwndMain );
 		break;
-	case ID_FONTSIZE0: 
-		if ( fontsize<24 ) tiny_FontSize(fontsize+2);
-		break;
-	case ID_FONTSIZE1:
-		if ( fontsize>8 ) tiny_FontSize(fontsize-2);
+	case ID_ZOOM:
+		if ( fontsize>18 ) fontsize = 8; 
+		tiny_FontSize(fontsize+2);
 		break;
 	case ID_FTPD:
 		bFTPd = ftp_Svr(bFTPd?NULL:getFolderName(L"Choose root directory"));
@@ -668,6 +669,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		TrackPopupMenu(hMenu[2],TPM_LEFTBUTTON, wndRect.left+menuX[2],
 								wndRect.top+iTitleHeight, 0, hwndMain, NULL);
 		break;
+
 	case ID_SCPAUSE:
 		if ( bScriptRun ) bScriptPause = !bScriptPause;
 		if ( bScriptPause ) cmd_Disp( L"Script Paused" );
@@ -704,6 +706,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 #define WM_DPICHANGED       0x02E0
 LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 {
+	HDC hDC;
 	PAINTSTRUCT ps;
 	static WCHAR wm_chars[2]={0,0};
 
@@ -722,20 +725,13 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		DragAcceptFiles( hwnd, TRUE );
 		GetClientRect( hwnd, &termRect );
 		tiny_Font( hwnd );
+		hDC = GetDC( hwnd );
 		break;
 	case WM_SIZE:
 		GetClientRect( hwnd, &termRect );
 		term_Size( pt, termRect.right/iFontWidth, termRect.bottom/iFontHeight );
-		if ( hBufDC!=NULL ) DeleteDC(hBufDC);
-		if ( hBufMap!=NULL )DeleteObject(hBufMap);
-		hDC = GetDC(hwnd);
-		hBufDC = CreateCompatibleDC(hDC);
-		hBufMap = CreateCompatibleBitmap(hDC, termRect.right, termRect.bottom);
-		SelectObject(hBufDC, hBufMap);
-		SelectObject(hBufDC, hTermFont);
-		SetBkMode(hBufDC, OPAQUE);
-		ReleaseDC(hwnd, hDC);
-		tiny_Redraw( );
+		FillRect( hDC, &termRect, dwBkBrush );
+		tiny_Redraw_Term(  );
 	case WM_MOVE:
 		GetWindowRect( hwnd, &wndRect );
 		break;
@@ -744,14 +740,13 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		tiny_FontSize(fontsize);
 		break;
 	case WM_PAINT:
-		hDC = BeginPaint(hwnd, &ps);
-		if ( hDC!=NULL ) tiny_Paint(hDC);
+		if ( BeginPaint(hwnd, &ps)!=NULL ) 
+			tiny_Paint(ps.hdc, ps.rcPaint);
 		EndPaint( hwnd, &ps );
 		break;
 	case WM_SETFOCUS:
 		CreateCaret(hwnd, NULL, iFontWidth, iFontHeight/4);
 		bFocus = TRUE;
-		tiny_Redraw();
 		break;
 	case WM_KILLFOCUS:
 		DestroyCaret();
@@ -799,12 +794,36 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		else
 			KillTimer(hwndMain, HOST_TIMER);
 		break;
-	case WM_MOUSEWHEEL:
-		term_Scroll( pt, GET_WHEEL_DELTA_WPARAM(wParam)/40 );
-		break;
 	case WM_ACTIVATE:
 		SetFocus( bEdit? hwndCmd : hwndMain );
-		tiny_Redraw( );
+		tiny_Redraw_Term(  );
+		break;
+	case WM_VSCROLL: {
+			int yPos;
+      SCROLLINFO si; 
+			si.cbSize = sizeof (si);
+      si.fMask  = SIF_ALL;
+			si.nPage = pt->size_y-1;
+      GetScrollInfo (hwnd, SB_VERT, &si);
+
+      yPos = si.nPos;
+      switch (LOWORD (wParam))
+      {
+        case SB_LINEUP: 	si.nPos -= 1; break;
+        case SB_LINEDOWN: si.nPos += 1; break;
+        case SB_PAGEUP:   si.nPos -= si.nPage; break;
+        case SB_PAGEDOWN: si.nPos += si.nPage; break;
+        case SB_THUMBTRACK:si.nPos = si.nTrackPos; break;
+        default:break; 
+      }
+      si.fMask = SIF_POS;
+      SetScrollInfo (hwnd, SB_VERT, &si, TRUE);
+      GetScrollInfo (hwnd, SB_VERT, &si);
+      if (si.nPos != yPos) term_Scroll(pt, yPos-si.nPos);
+		}
+		break;
+	case WM_MOUSEWHEEL:
+		term_Scroll( pt, GET_WHEEL_DELTA_WPARAM(wParam)/40 );
 		break;
 	case WM_LBUTTONDBLCLK: {
 		int x = GET_X_LPARAM(lParam)/iFontWidth;
@@ -818,52 +837,35 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			}
 		while ( ++pt->sel_right<pt->line[y+1])
 			if ( pt->buff[pt->sel_right]==0x0a || pt->buff[pt->sel_right]==0x20 ) break;
-		tiny_Redraw();
+		tiny_Redraw_Term(  );
 		break;
 	}
 	case WM_LBUTTONDOWN: {
 		int x = GET_X_LPARAM(lParam)/iFontWidth;
-		int y = (GET_Y_LPARAM(lParam)+2);
-
-		if ( x>=pt->size_x-2 ) {
-			bScrollbar = TRUE;
-			pt->scroll_y = y*pt->cursor_y/termRect.bottom-pt->cursor_y;
-			if ( pt->scroll_y<-pt->screen_y ) pt->scroll_y = -pt->screen_y;
-			tiny_Redraw();
-		}
-		else {
-			y = y/iFontHeight+pt->screen_y+pt->scroll_y;
-			pt->sel_left = min(pt->line[y]+x, pt->line[y+1]);
-			while ( isUTF8c(pt->buff[pt->sel_left]) ) pt->sel_left--;
-			pt->sel_right = pt->sel_left;
-		}
+		int y = (GET_Y_LPARAM(lParam)+2)/iFontHeight;
+		y += pt->screen_y + pt->scroll_y;
+		pt->sel_left = min(pt->line[y]+x, pt->line[y+1]);
+		while ( isUTF8c(pt->buff[pt->sel_left]) ) pt->sel_left--;
+		pt->sel_right = pt->sel_left;
 		SetCapture(hwnd);
 		break;
 	}
 	case WM_MOUSEMOVE:
 		if ( MK_LBUTTON&wParam ) {
 			int x = GET_X_LPARAM(lParam)/iFontWidth;
-			int y = (GET_Y_LPARAM(lParam)+2);
-			if ( bScrollbar ) {
-				pt->scroll_y = y*pt->cursor_y/termRect.bottom-pt->cursor_y;
+			int y = (GET_Y_LPARAM(lParam)+2)/iFontHeight;
+			if ( y<0 ) {
+				pt->scroll_y += y*2;
 				if ( pt->scroll_y<-pt->screen_y ) pt->scroll_y = -pt->screen_y;
-				if ( pt->scroll_y>0 ) pt->scroll_y = 0;
 			}
-			else {
-				y /= iFontHeight;
-				if ( y<0 ) {
-					pt->scroll_y += y*2;
-					if ( pt->scroll_y<-pt->screen_y ) pt->scroll_y = -pt->screen_y;
-				}
-				if ( y>pt->size_y) {
-					pt->scroll_y += (y-pt->size_y)*2;
-					if ( pt->scroll_y>0 ) pt->scroll_y=0;
-				}
-				y += pt->screen_y+pt->scroll_y;
-				pt->sel_right = min(pt->line[y]+x, pt->line[y+1]);
-				while ( isUTF8c(pt->buff[pt->sel_right]) ) pt->sel_right++;
+			if ( y>pt->size_y) {
+				pt->scroll_y += (y-pt->size_y)*2;
+				if ( pt->scroll_y>0 ) pt->scroll_y=0;
 			}
-			tiny_Redraw( );
+			y += pt->screen_y+pt->scroll_y;
+			pt->sel_right = min(pt->line[y]+x, pt->line[y+1]);
+			while ( isUTF8c(pt->buff[pt->sel_right]) ) pt->sel_right++;
+			tiny_Redraw_Term(  );
 		}
 		break;
 	case WM_LBUTTONUP:
@@ -872,28 +874,39 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			int sel_max = max(pt->sel_left, pt->sel_right);
 			pt->sel_left = sel_min;
 			pt->sel_right = sel_max;
+			if ( OpenClipboard(hwndMain) ) {
+				if ( pt->sel_left!=pt->sel_right ) {
+					EmptyClipboard( );
+					CopyText();
+				}
+				CloseClipboard( );
+			}
 		}
 		else {
 			pt->sel_left = pt->sel_right = 0;
-			tiny_Redraw( );
+			tiny_Redraw_Term(  );
 		}
 		ReleaseCapture();
-		bScrollbar = FALSE;
 		SetFocus( bEdit ? hwndCmd : hwndMain );
 		break;
-	case WM_MBUTTONUP:
-		if ( pt->sel_right>pt->sel_left )
-			term_Send( pt, pt->buff+pt->sel_left, pt->sel_right-pt->sel_left );
-		break;
-	case WM_CONTEXTMENU:
-		TrackPopupMenu(hContextMenu,TPM_RIGHTBUTTON, GET_X_LPARAM(lParam),
-					 					GET_Y_LPARAM(lParam), 0, hwnd, NULL);
+	case WM_RBUTTONUP:
+		if ( OpenClipboard(hwndMain) ) {
+			UINT format = 0;
+			while ( (format=EnumClipboardFormats(format))!=0 ) {
+				if ( format==CF_HDROP ) 
+					DropFiles(GetClipboardData(CF_HDROP));
+				if ( format==CF_UNICODETEXT ) 
+					PasteText();
+			}
+			CloseClipboard();
+		}
 		break;
 	case WM_NCLBUTTONDOWN: {
 		int x = GET_X_LPARAM(lParam)-wndRect.left;
 		int y = GET_Y_LPARAM(lParam)-wndRect.top;
 		if ( y>0 && y<iTitleHeight ) 
-			if ( x>menuX[0] && x<menuX[3] ) return 0;
+			if ( x>menuX[0] && x<menuX[3] ) 
+				return 0;
 		}
 		return DefWindowProc(hwnd,msg,wParam,lParam);
 	case WM_NCLBUTTONUP: {
@@ -908,6 +921,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			}
 		}
 		return DefWindowProc(hwnd,msg,wParam,lParam);
+
 	case WM_DROPFILES:
 		DropFiles((HDROP)wParam);
 		break;
@@ -915,8 +929,6 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		SetTextColor( (HDC)wParam, COLORS[3] );
 		SetBkColor( (HDC)wParam, COLORS[0] );
 		return (LRESULT)dwBkBrush;		//must return brush for update
-	case WM_ERASEBKGND:
-		return 1;
 	case WM_CLOSE:
 		if ( host_Status( pt->host )!=HOST_IDLE ) {
 			if ( MessageBox(hwnd, L"Disconnect and quit?",
@@ -928,11 +940,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	case WM_DESTROY:
 		DragAcceptFiles(hwnd, FALSE);
 		drop_Destroy( hwnd );
-		DeleteDC(hBufDC);
-		DeleteObject(hBufMap);
 		DeleteObject(dwBkBrush);
-		DeleteObject(dwScrollBrush);
-		DeleteObject(dwSliderBrush);
 		PostQuitMessage(0);
 		break;
 	case WM_COMMAND:
@@ -942,12 +950,16 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	}
 	return 0;
 }
-void tiny_Menu( HWND hwnd )
+HMENU tiny_Menu( )
 {
+	HMENU hMainMenu = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_MAIN));
+	hTermMenu  = GetSubMenu(hMainMenu, 0);
+	hScriptMenu = GetSubMenu(hMainMenu, 1);
+	hOptionMenu = GetSubMenu(hMainMenu, 2);
 	iTitleHeight = 	 GetSystemMetrics(SM_CYFRAME)
 									+GetSystemMetrics(SM_CYCAPTION)
 									+GetSystemMetrics(92);	//SM_CXPADDEDBORDER
-	HDC wndDC = GetWindowDC(hwnd);
+	HDC wndDC = GetWindowDC(hwndMain);
 	RECT menuRect;
 	DrawText(wndDC, L"  Term  ", 8, &menuRect, DT_CALCRECT);
 	menuX[1] = menuX[0]+menuRect.right-menuRect.left;
@@ -955,18 +967,11 @@ void tiny_Menu( HWND hwnd )
 	menuX[2] = menuX[1]+menuRect.right-menuRect.left;
 	DrawText(wndDC, L"  Options  ", 11, &menuRect, DT_CALCRECT);
 	menuX[3] = menuX[2]+menuRect.right-menuRect.left;
-	ReleaseDC(hwnd, wndDC);
+	ReleaseDC(hwndMain, wndDC);
 
-	HMENU hMainMenu = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_MAIN));
 	hMenu[0] = hTermMenu  = GetSubMenu(hMainMenu, 0);
 	hMenu[1] = hScriptMenu = GetSubMenu(hMainMenu, 1);
 	hMenu[2] = hOptionMenu = GetSubMenu(hMainMenu, 2);
-	hContextMenu = CreatePopupMenu();
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION|MF_POPUP,
-								(UINT_PTR)hScriptMenu,	 L"Script");
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_SELALL,L"Select All\tAlt+A");
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_PASTE, L"Paste     \tAlt+V");
-	InsertMenu(hContextMenu, 0, MF_BYPOSITION, ID_COPY,  L"Copy      \tAlt+C");
 
 	WIN32_FIND_DATA FindFileData;
 	HANDLE hFind;
@@ -979,7 +984,7 @@ void tiny_Menu( HWND hwnd )
 							ID_SCRIPT0+iScriptCount++, FindFileData.cFileName);
 		} while( FindNextFile(hFind, &FindFileData) );
 	}
-
+	return hMainMenu;
 }
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 									LPSTR lpCmdLine, INT nCmdShow)
@@ -994,7 +999,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	wc.hIcon = 0;
 	wc.hIconSm 		= LoadIcon(hInstance, MAKEINTRESOURCE(IDICON_TL1));
 	wc.hCursor		= LoadCursor(NULL,IDC_ARROW);
-	wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	wc.hbrBackground = 0;
 	wc.lpszClassName = L"TWnd";
 	wc.lpszMenuName = 0;
 	if ( !RegisterClassEx(&wc) ) return 0;
@@ -1019,21 +1024,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	host_Init( &aHost );
 	aHost.term = pt;
 
-	dwBkBrush = CreateSolidBrush( COLORS[0] );
-	dwScrollBrush = CreateSolidBrush( RGB(64,64,64) );
-	dwSliderBrush = CreateSolidBrush( COLORS[1] );
 	HDC sysDC = GetDC(0);
 	dpi = GetDeviceCaps(sysDC, LOGPIXELSX);
 	ReleaseDC(0, sysDC);
 	wcscpy(wsFontFace,IsWindows7OrGreater() ? L"Consolas": L"Courier New");
 	
-	hTermFont = CreateFont( fontsize*(dpi/96),0,0,0,FW_MEDIUM, FALSE,FALSE,FALSE,
+	dwBkBrush = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	hTermFont = CreateFont( fontsize*(dpi/96), 0, 0, 0,
+						FW_MEDIUM, FALSE, FALSE, FALSE,
 						DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
 						DEFAULT_QUALITY, FIXED_PITCH, wsFontFace);
 	hwndMain = CreateWindowEx( WS_EX_LAYERED, L"TWnd", Title,
-						WS_TILEDWINDOW|WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT,
-						800, 480, NULL, NULL, hInst, NULL );
-	tiny_Menu(hwndMain);
+						WS_TILEDWINDOW|WS_VSCROLL|WS_VISIBLE, 
+						CW_USEDEFAULT, CW_USEDEFAULT, 800, 480, 
+						NULL, NULL, hInst, NULL );
+	ShowScrollBar(hwndMain, SB_VERT, FALSE);
+	tiny_Menu();
 	iConnectCount = 1;
 
 	if ( *lpCmdLine==0 )
@@ -1041,9 +1047,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	else
 		host_Open( pt->host, lpCmdLine );
 
-	LoadDict(L"tinyTerm.hist");
-	MSG msg;
+	homedir = getenv("USERPROFILE");
+ 	char fn_hist[MAX_PATH] = "tinyTerm.hist";
+	if ( !LoadDict( fn_hist ) && homedir!=NULL ) {
+		strcpy( fn_hist, homedir );
+		strcat( fn_hist, "\\Documents\\tinyTerm.hist" );
+		LoadDict( fn_hist );
+	}
+
 	HACCEL haccel = LoadAccelerators(hInst, MAKEINTRESOURCE(IDACCEL_MAIN));
+	MSG msg;
 	while ( GetMessage(&msg, NULL, 0, 0) ){
 		if (!TranslateAccelerator(hwndMain, haccel,  &msg)) {
 			TranslateMessage(&msg);
@@ -1052,8 +1065,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	}
 	if ( pt->bLogging ) term_Logg( pt, NULL );
 
-	LoadDict(L"tinyTerm.hist");
-	SaveDict(L"tinyTerm.hist");
+	LoadDict( fn_hist );
+	if ( !SaveDict("tinyTerm.hist") && homedir!=NULL ) {
+		strcpy( fn_hist, homedir );
+		strcat( fn_hist, "\\Documents\\tinyTerm.hist" );
+		SaveDict( fn_hist );
+	}
 	autocomplete_Destroy( );
 	
 	http_Svr("127.0.0.1");
@@ -1092,9 +1109,9 @@ void PasteText( )
 	}
 }
 
-void LoadDict( WCHAR *wfn )
+BOOL LoadDict( char *fn )
 {
-	FILE *fp = _wfopen(wfn, L"r");
+	FILE *fp = fopen(fn, "r");
 	if ( fp!=NULL ) {
 		char cmd[256];
 		while ( fgets( cmd, 256, fp )!=NULL ) {
@@ -1106,11 +1123,13 @@ void LoadDict( WCHAR *wfn )
 				if ( *cmd=='!' ) menu_Add(cmd+1, wcmd+1);
 		}
 		fclose( fp );
+		return TRUE;
 	}
+	return FALSE;
 }
-void SaveDict( WCHAR *wfn )
+BOOL SaveDict( char *fn )
 {
-	FILE *fp = _wfopen(wfn, L"w");
+	FILE *fp = fopen(fn, "w");
 	if ( fp!=NULL ) {
 		WCHAR *wp = autocomplete_First();
 		while ( *wp!=0 ) {
@@ -1121,7 +1140,9 @@ void SaveDict( WCHAR *wfn )
 			wp = autocomplete_Next();
 		}
 		fclose( fp );
+		return TRUE;
 	}
+	return FALSE;
 }
 
 DWORD WINAPI uploader( void *files )	//upload files through scp or sftp
@@ -1204,7 +1225,7 @@ DWORD WINAPI scripter( void *cmds )
 				}
 			}
 			else {
-				tiny_Cmd( p0, NULL );
+				if ( !tiny_Cmd( p0 ) ) term_Cmd( pt, p0, NULL );
 				Sleep(iScriptDelay);
 			}
 		}
@@ -1268,174 +1289,4 @@ void OpenScript( WCHAR *wfn )
 				cmd_Disp(L"Couldn't open file");
 		}
 	}
-}
-/**********************************HTTPd*******************************/
-const char *RFC1123FMT="%a, %d %b %Y %H:%M:%S GMT";
-const char *exts[]={".txt",
-					".htm", ".html",
-					".js",
-					".jpg", ".jpeg",
-					".png",
-					".css"
-					};
-const char *mime[]={"text/plain",
-					"text/html", "text/html",
-					"text/javascript",
-					"image/jpeg", "image/jpeg",
-					"image/png",
-					"text/css"
-					};
-const char HEADER[]="HTTP/1.1 200 Ok\
-					\nServer: tinyTerm-httpd\
-					\nAccess-Control-Allow-Origin: *\
-					\nContent-Type: text/plain\
-					\nContent-length: %d\
-					\nCache-Control: no-cache\n\n";
-void httpFile( int s1, char *file)
-{
-	char reply[4096], timebuf[128];
-	int len, i, j;
-	time_t now;
-
-	now = time( NULL );
-	strftime( timebuf, sizeof(timebuf), RFC1123FMT, gmtime( &now ) );
-
-    struct stat sb;
-	if ( stat( file, &sb ) ==-1 ) {
-		len=sprintf(reply, "HTTP/1.1 404 not found\nDate: %s\nServer: tinyTerm_httpd\n", timebuf);
-		len+=sprintf(reply+len, "Content-Type: text/html\nContent-Length: 14\n\n");
-	    send(s1, reply, len, 0);
-	    len=sprintf(reply, "file not found");
-		send(s1, reply, len, 0);
-		return;
-	}
-
-	FILE *fp = fopen( file, "rb" );	
-	if ( fp!=NULL ) {
-		len=sprintf(reply, "HTTP/1.1 200 Ok\nDate: %s\nServer: tinyTerm_httpd\n", timebuf);
-
-		const char *filext=file+strlen(file)-1;
-		while ( *filext!='.' ) filext--;
-		for ( i=0, j=0; j<8; j++ ) if ( strcmp(filext, exts[j])==0 ) i=j;
-		len+=sprintf(reply+len, "Content-Type: %s\n", mime[i]);
-
-		long filesize = sb.st_size;
-		len+=sprintf(reply+len, "Content-Length: %ld\n", filesize );
-		strftime(timebuf, sizeof(timebuf), RFC1123FMT, gmtime( &sb.st_mtime ));
-		len+=sprintf(reply+len, "Last-Modified: %s\n\n", timebuf );
-
-		send(s1, reply, len, 0);
-		while ( (len=fread(reply, 1, 4096, fp))>0 )
-			if ( send(s1, reply, len, 0)==-1)	break;
-		fclose(fp);
-	}
-}
-void url_decode(char *url)
-{
-	char *p = url, *q = url;
-	while ( *p ) {
-		if ( *p=='%' && isdigit(p[1]) ) {
-			int a;
-			sscanf( ++p, "%02x", &a);
-			*(++p) = a;
-		}
-		*q++ = *p++;
-	}
-	*q = 0;
-}
-DWORD WINAPI *httpd( void *pv )
-{
-	char buf[4096], *cmd, *reply;
-	struct sockaddr_in cltaddr;
-	int addrsize=sizeof(cltaddr), cmdlen, replen;
-	SOCKET http_s0 = *(SOCKET *)pv;
-
-	while ( TRUE ) {
-		SOCKET http_s1 = accept(http_s0, (struct sockaddr*)&cltaddr, &addrsize);
-		if ( http_s1 == INVALID_SOCKET ) {
-			cmd_Disp_utf8("httpd terminated");
-			break;
-		}
-		cmd_Disp_utf8( "http connected" );
-		cmdlen=recv(http_s1, buf, 4095, 0);
-		if ( cmdlen>0 ) {
-			if ( strncmp(buf, "GET /", 5)!=0 ) {//TCP connection
-				FD_SET readset;
-				struct timeval tv = { 0, 100 };	//tv_sec=0, tv_usec=300
-				term_Send( pt, buf, cmdlen);
-				do {
-					if ( host_Status( pt->host )==HOST_CONNECTED ) {
-						replen = term_Recv( pt,  &reply );
-						if ( replen > 0 ) send(http_s1, reply, replen, 0);
-					}
-					FD_ZERO(&readset);
-					FD_SET(http_s1, &readset);
-					if ( select(1, &readset, NULL, NULL, &tv)>0 ) {
-						cmdlen = recv(http_s1, buf, 4095, 0);
-						if ( cmdlen>0 ) 
-							term_Send( pt, buf, cmdlen);
-					}
-				} while ( cmdlen>0 );
-			}
-			else {								//HTTP connection
-				do {
-					buf[cmdlen] = 0;
-					cmd = buf+5;
-					char *p=strchr(cmd, ' ');
-					if ( p!=NULL ) *p = 0;
-					url_decode(cmd);
-					cmd_Disp_utf8(cmd);
-
-					if ( *cmd=='?' ) {	//get CGI, cmd+1 points to command
-						replen = term_Cmd( pt,  cmd+1, &reply );
-						int len = sprintf( buf, HEADER, replen );
-						send( http_s1, buf, len, 0 );
-						if ( replen>0 ) send( http_s1, reply, replen, 0 );
-					}
-					else {				//get file, cmd points to filename
-						httpFile(http_s1, cmd);
-					}
-					cmdlen = recv(http_s1, buf, 4095, 0);
-				} while ( cmdlen>0 );
-			}
-		}
-		cmd_Disp_utf8( "http disconnected" );
-		shutdown(http_s1, SD_SEND);
-		closesocket(http_s1);
-	}
-	return 0;
-}
-int http_Svr( char *intf )
-{
-static SOCKET http_s0=INVALID_SOCKET;
-
-	if ( http_s0 !=INVALID_SOCKET ) {
-		closesocket( http_s0 );
-		http_s0 = INVALID_SOCKET;
-		return 0;
-	}
-
-	http_s0 = socket(AF_INET, SOCK_STREAM, 0);
-	if ( http_s0==INVALID_SOCKET ) return 0;
-
-	struct sockaddr_in svraddr;
-	int addrsize=sizeof(svraddr);
-	memset(&svraddr, 0, addrsize);
-	svraddr.sin_family=AF_INET;
-	svraddr.sin_addr.s_addr=inet_addr( intf );
-	int p;
-	for ( p=8080; p<8099; p++ ) {
-		svraddr.sin_port=htons(p);
-		if ( bind(http_s0, (struct sockaddr*)&svraddr, addrsize)!=SOCKET_ERROR ) {
-			if ( listen(http_s0, 1)!=SOCKET_ERROR){
-				DWORD dwThreadId;
-				CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE)httpd,
-											&http_s0, 0, &dwThreadId);
-				return p;
-			}
-		}
-	}
-	closesocket(http_s0);
-	http_s0 = INVALID_SOCKET;
-	return 0;
 }

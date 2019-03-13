@@ -22,9 +22,8 @@
 #define ID_DISCONN	68	//D
 #define ID_EDIT		69
 #define ID_FONT     70
-#define ID_COPY		71
-#define ID_PASTE	72
-#define ID_SELALL	73
+#define ID_SAVE 	73
+#define ID_ZOOM     74
 #define ID_LOGGING	76	//L
 #define ID_FTPD		77
 #define ID_TFTPD	78
@@ -35,9 +34,6 @@
 #define ID_SCRIPT	83	//S
 #define ID_TRANSP	84	//T
 #define ID_TERM		85
-
-#define ID_FONTSIZE0    91
-#define ID_FONTSIZE1    92
 
 #define IDICON_TL1		5128
 #define IDMENU_MAIN		5129
