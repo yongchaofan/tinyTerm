@@ -34,9 +34,8 @@ Makefiles are provided for building with MSYS2+MingW64/32
     tiny.h  header file for all function definitions
     tiny.c  winmain and UI functions
     term.c  simple xterm compatible terminal implementation
-    host.c  serial and telnet host implementation
+    host.c  serial and telnet host implementation, plus http/ftp/tftp servers
     ssh2.c  ssh/sftp/netconf host implementation based on libssh2
-    ftpd.c  ftp and tftp server implementation
     auto_drop.c COM wrapper for auto completion and drag&drop function
     
 
