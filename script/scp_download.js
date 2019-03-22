@@ -1,8 +1,8 @@
 var xml = new ActiveXObject("Microsoft.XMLHTTP");
 var port = "8080/?";
 if ( WScript.Arguments.length>0 ) port = WScript.Arguments(0)+"/?";
-var filename = term("#Selection");
-term("#scp :"+filename+" .");
+var filename = term("!Selection");
+term("!scp :"+filename+" .");
 
 function term( cmd )
 {
