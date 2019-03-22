@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5609 2019-03-12 15:05:10 $"
+// "$Id: tiny.h 5759 2019-03-15 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -72,8 +72,8 @@ typedef struct tagHOST {
 } HOST;
 
 typedef struct tagTERM {
-	char buff[BUFFERSIZE], attr[BUFFERSIZE], c_attr;
-	int line[MAXLINES];
+	char *buff, *attr, c_attr;
+	int *line;
 	int size_x, size_y;
 	int cursor_x, cursor_y;
 	int screen_y, scroll_y;
@@ -115,8 +115,10 @@ typedef struct tagTERM {
 #define NETCONF	6
 
 BOOL isUTF8c(char c);	//check if a byte is a UTF8 continuation byte
-FILE *fopen_utf8(const char *fn, const char *mode);
+int utf8_to_wchar(const char *buf, int cnt, WCHAR *wbuf, int wcnt);
+int wchar_to_utf8(WCHAR *wbuf, int wcnt, char *buf, int cnt);
 int stat_utf8(const char *fn, struct _stat *buffer);
+FILE *fopen_utf8(const char *fn, const char *mode);
 
 /****************auto_drop.c*************/
 void drop_Init( HWND hwnd, void (*handler)(char *) );
@@ -129,13 +131,13 @@ WCHAR *autocomplete_First( );
 WCHAR *autocomplete_Next( );
 
 /****************host.c****************/
-void host_Init( HOST *ph );
+void host_Construct( HOST *ph );
 void host_Open( HOST *ph, char *port );
 void host_Send_Size( HOST *ph, int w, int h );
 void host_Send( HOST *ph, char *buf, int len );
+void host_Close( HOST *ph );
 int host_Type(HOST *ph);
 int host_Status(HOST *ph);
-void host_Close( HOST *ph );
 
 SOCKET tcp( char *host, short port );
 void url_decode(char *url);
@@ -144,7 +146,7 @@ BOOL ftp_Svr( char *root );
 BOOL tftp_Svr( char *root );
 
 /****************ssh2.c****************/
-void ssh2_Init( HOST *ph );
+void ssh2_Construct( HOST *ph );
 void ssh2_Size( HOST *ph, int w, int h );
 void ssh2_Send( HOST *ph, char *buf, int len );
 char *ssh2_Gets( HOST *ph, char *prompt, BOOL bEcho);
@@ -158,7 +160,8 @@ int sftp_cmd( HOST *ph, char *cmd );
 
 /****************term.c****************/
 void host_callback( void *term, char *buf, int len);
-void term_Init( TERM *pt );
+BOOL term_Construct( TERM *pt );
+void term_Desstruct( TERM *pt );
 void term_Clear( TERM *pt );
 void term_Size( TERM *pt, int x, int y );
 void term_Title( TERM *pt, char *title );

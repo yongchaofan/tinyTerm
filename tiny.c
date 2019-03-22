@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 36916 2019-03-12 14:35:10 $"
+// "$Id: tiny.c 37562 2019-03-20 14:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -21,27 +21,34 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <shlobj.h>
+#include <process.h>
 #include <fcntl.h>
 #include <time.h>
 #include <versionhelpers.h>
-
-TERM *pt;
-int iTitleHeight;
 #define HOST_TIMER		64
 #define ID_SCRIPT0		1000
 #define ID_CONNECT0		2000
+#define WM_DPICHANGED	0x02E0
+#define SM_CXPADDEDBORDER 92
+
+float dpi = 96;
+int iTitleHeight;
+int fontsize = 16;
+WCHAR wsFontFace[256] = L"Courier New";
+WCHAR Title[256] = L"    Term    Script    Options                     ";
 
 const char *homedir;
-const char WELCOME[]="\n\n\n\
-\ttinyTerm is an open source terminal emulator designed to be\n\n\
-\tsimple, small and scriptable, release 1.0 features:\n\n\n\
-\t    * Single exe, no dll, no installation\n\n\
-\t    * Serial/Telnet/SSH/SFTP/Netconf client\n\n\
-\t    * Command history and autocompletion\n\n\
-\t    * Task automation via list of commands\n\n\
-\t    * Scripting interface xmlhttp://127.0.0.1:%d\n\n\n\
-\t©2018-2019 Yongchao Fan, All rights reserved\n\n\
-\thttps://yongchaofan.github.io/tinyTerm\n\n\n";
+const char WELCOME[]="\n\
+\ttinyTerm is a simple, small and scriptable terminal emulator,\n\n\
+\ta serial/telnet/ssh/sftp/netconf client with unique features:\n\n\n\
+\t    * ultra small 256KB portable exe\n\n\
+\t    * command history and autocompletion\n\n\
+\t    * text based batch command automation\n\n\
+\t    * drag and drop to transfer files via scp\n\n\
+\t    * scripting interface at xmlhttp://127.0.0.1:%d\n\n\n\
+\tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\n\n\
+\tlicense: https://www.github.com/yongchaofan/tinyTerm/LICENSE\n\n\n\
+\tVerision 1.2, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
 
 const COLORREF COLORS[16] ={RGB(0,0,0), 	RGB(192,0,0), RGB(0,192,0),
 							RGB(192,192,0), RGB(32,96,240), RGB(192,0,192),
@@ -50,12 +57,14 @@ const COLORREF COLORS[16] ={RGB(0,0,0), 	RGB(192,0,0), RGB(0,192,0),
 							RGB(240,240,0), RGB(32,96,240), RGB(240,0,240),
 							RGB(0,240,240), RGB(240,240,240) };
 static HINSTANCE hInst;
-static RECT termRect, wndRect;
-static HWND hwndMain, hwndCmd;
-static HFONT hTermFont;
 static HBRUSH dwBkBrush;
-static HMENU hTermMenu, hScriptMenu, hOptionMenu, hMenu[4];
-int menuX[4] = {32, 0, 0, 0};
+static HWND hwndMain, hwndCmd;
+static RECT termRect, wndRect;
+static HFONT hTermFont;
+static HMENU hMainMenu, hMenu[4];
+const int TTERM=0, SCRIPT=1, OPTION=2;
+int menuX[4];
+TERM *pt;
 
 static int iFontHeight, iFontWidth;
 static int iTransparency = 255;
@@ -63,7 +72,7 @@ static int iScriptDelay = 250;
 static int iConnectCount, iScriptCount, httport;
 static BOOL bFocus = FALSE, bEdit = FALSE;
 static BOOL bFTPd = FALSE, bTFTPd = FALSE;
-static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
+static BOOL bScriptRun=FALSE, bScriptPaused=FALSE;
 
 void tiny_TermSize(char *size);
 void tiny_FontFace(char *face);
@@ -179,9 +188,71 @@ void menu_Add(char *cmd, WCHAR *wcmd)
 		 strncmp(cmd, "sftp", 4)==0 || 
 		 strncmp(cmd, "telnet",6)==0 || 
 		 strncmp(cmd, "netconf",7)==0 )
-		AppendMenu( hTermMenu, 0, ID_CONNECT0+iConnectCount++, wcmd);
+		AppendMenu( hMenu[TTERM], 0, ID_CONNECT0+iConnectCount++, wcmd);
 }
+void menu_Check( DWORD id, BOOL op)
+{
+	CheckMenuItem( hMainMenu, id, MF_BYCOMMAND|(op?MF_CHECKED:MF_UNCHECKED));
+}
+void menu_Enable( DWORD id, BOOL op)
+{
+	EnableMenuItem( hMainMenu, id, MF_BYCOMMAND|(op?MF_ENABLED:MF_GRAYED));
+}
+void menu_Popup( int i )
+{
+	TrackPopupMenu(hMenu[i], TPM_LEFTBUTTON, wndRect.left+menuX[i]-24,
+						wndRect.top+iTitleHeight, i, hwndMain, NULL );
+}
+void menu_Size()
+{
+	iTitleHeight = ( GetSystemMetrics(SM_CYFRAME)
+				 + GetSystemMetrics(SM_CYCAPTION)
+				 + GetSystemMetrics(SM_CXPADDEDBORDER) );
+	HFONT oldFont = 0;
+	RECT menuRect = { 0, 0, 0, 0};
+	HDC wndDC = GetWindowDC(hwndMain);
+    
+{
+    	oldFont = (HFONT)SelectObject(wndDC, GetStockObject(SYSTEM_FONT));
+		menuX[0] = 32;
+		DrawText(wndDC, L"  Term ", 7, &menuRect, DT_CALCRECT);
+		menuX[1] = menuX[0]+(menuRect.right-menuRect.left)*(dpi/96);
+		menuRect.left = menuRect.right = 0;
+		DrawText(wndDC, L"Script", 6, &menuRect, DT_CALCRECT);
+		menuX[2] = menuX[1]+(menuRect.right-menuRect.left)*(dpi/96);
+		menuRect.left = menuRect.right = 0;
+		DrawText(wndDC, L"Option", 6, &menuRect, DT_CALCRECT);
+		menuX[3] = menuX[2]+(menuRect.right-menuRect.left)*(dpi/96);
+	}
+	if ( oldFont ) SelectObject( wndDC, oldFont );
+	ReleaseDC(hwndMain, wndDC);
+}
+void menu_Build( )
+{
+	hMainMenu = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_MAIN));
+	hMenu[0] = hMenu[TTERM]  = GetSubMenu(hMainMenu, 0);
+	hMenu[1] = hMenu[SCRIPT] = GetSubMenu(hMainMenu, 1);
+	hMenu[2] = GetSubMenu(hMainMenu, 2);
+	menu_Size();
 
+	WCHAR script_dir[MAX_PATH+80] = L"";
+	if ( homedir!=NULL ) {
+		utf8_to_wchar(homedir, -1, script_dir, MAX_PATH);
+		wcscat(script_dir, L"\\Documents\\tinyTerm\\");
+	}
+	wcscat( script_dir, L"script\\**" );
+	
+	WIN32_FIND_DATA FindFileData;
+	HANDLE hFind = FindFirstFile(script_dir, &FindFileData);
+	if (hFind != INVALID_HANDLE_VALUE) {
+		iScriptCount = 1;
+		do {
+			if ( FindFileData.cFileName[0]!=L'.' )
+				InsertMenu( hMenu[SCRIPT], -1, MF_BYPOSITION,
+							ID_SCRIPT0+iScriptCount++, FindFileData.cFileName);
+		} while( FindNextFile(hFind, &FindFileData) );
+	}
+}
 BOOL tiny_Cmd( char *cmd )
 {
 	if (strncmp(cmd,"!Transparency",13)==0)		tiny_Transparency(atoi(cmd+13));
@@ -250,10 +321,10 @@ LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 {
 	if ( uMsg==WM_KEYDOWN )
 	{
-		if ( GetKeyState(VK_CONTROL) & 0x8000 ) 					//CTRL+
+		if ( GetKeyState(VK_CONTROL) & 0x8000 ) 			//CTRL+
 		{ 				
 			char cmd = 0;
-			if ( wParam==54 ) cmd = 30;											//^
+			if ( wParam==54 ) cmd = 30;						//^
 			if ( wParam>64 && wParam<91 ) cmd = wParam-64;	//A-Z
 			if ( wParam>218&&wParam<222 ) cmd = wParam-192;	//[\]
 			if ( cmd ) term_Send( pt, &cmd, 1 );
@@ -270,15 +341,19 @@ LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 	}
 	return CallWindowProc(wpOrigCmdProc, hwnd, uMsg, wParam, lParam);
 }
-WCHAR Title[256] = L"    Term    Script    Options                     ";
 void tiny_Title( char *buf )
 {
 	utf8_to_wchar(buf, strlen(buf)+1, Title+50, 200);
+	Title[250] = 0;
 	SetWindowText(hwndMain, Title);
-	if ( *buf ) 
-		ModifyMenu(hTermMenu,ID_CONNECT,MF_BYCOMMAND,ID_DISCONN,L"&Disconnect");
-	else 
-		ModifyMenu(hTermMenu,ID_DISCONN,MF_BYCOMMAND,ID_CONNECT,L"&Connect...\tAlt+C");
+	if ( *buf ) {
+		menu_Enable( ID_CONNECT, FALSE);
+		menu_Enable( ID_DISCONN, TRUE);
+	}
+	else { 
+		menu_Enable( ID_CONNECT, TRUE);
+		menu_Enable( ID_DISCONN, FALSE);
+	}
 }
 char *tiny_Gets( char *prompt, BOOL bEcho)
 {
@@ -326,7 +401,7 @@ void tiny_Connecting()
 void tiny_Font( HWND hwnd )
 {
 	HDC hdc;
-  TEXTMETRIC tm;
+	TEXTMETRIC tm;
 	hdc = GetDC(hwnd);
 	SelectObject(hdc, hTermFont);
 	GetTextMetrics(hdc, &tm);
@@ -362,9 +437,6 @@ void tiny_TermSize(char *size)
 		tiny_Font(hwndMain);
 	}
 }
-WCHAR wsFontFace[256];
-int fontsize = 16;
-float dpi = 96;
 void tiny_FontFace(char *fontface)
 {
 	utf8_to_wchar(fontface, strlen(fontface)+1, wsFontFace, 255);
@@ -436,7 +508,12 @@ void tiny_Paint(HDC hDC, RECT rcPaint)
 
 	int cch = utf8_to_wchar(pt->buff+pt->line[pt->cursor_y],
 								pt->cursor_x-pt->line[pt->cursor_y], wbuf, 1024);
-	DrawText(hDC, wbuf, cch, &text_rect, DT_CALCRECT|DT_NOPREFIX);
+	if ( cch > 0 ) {
+		DrawText(hDC, wbuf, cch, &text_rect, DT_CALCRECT|DT_NOPREFIX);
+	}
+	else {
+		text_rect.left = text_rect.right = 0;
+	}
 	if ( bEdit ) {
 		MoveWindow( hwndCmd, text_rect.right, (pt->cursor_y-pt->screen_y)*iFontHeight,
 						termRect.right-text_rect.right, iFontHeight, TRUE );
@@ -571,10 +648,6 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 	}
 	return FALSE;
 }
-void check_Option( HMENU hMenu, DWORD id, BOOL op)
-{
-	CheckMenuItem( hMenu, id, MF_BYCOMMAND|(op?MF_CHECKED:MF_UNCHECKED));
-}
 BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 {
 	switch ( LOWORD(wParam) ) {
@@ -592,7 +665,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 	case ID_DISCONN:
 		if ( host_Status( pt->host )!=HOST_IDLE ) host_Close( pt->host );
 		break;
-	case ID_LOGGING:
+	case ID_LOGG:
 		if ( !pt->bLogging ) {
 			WCHAR *wfn = fileDialog(L"logfile\0*.log\0All\0*.*\0\0",
 				OFN_PATHMUSTEXIST|OFN_NOREADONLYRETURN|OFN_OVERWRITEPROMPT);
@@ -604,7 +677,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		}
 		else
 			term_Logg( pt, NULL );
-		check_Option( hTermMenu, ID_LOGGING, pt->bLogging );
+		menu_Check( ID_LOGG, pt->bLogging );
 		break;
 	case ID_SAVE:
 		{
@@ -618,7 +691,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		}
 		break;
 	case ID_ECHO:	//toggle local echo
-		check_Option( hTermMenu, ID_ECHO, term_Echo(pt) );
+		menu_Check( ID_ECHO, term_Echo(pt) );
 		break;
 	case ID_EDIT:	//toggle local edit
 		if ( (bEdit=!bEdit) ) {
@@ -631,7 +704,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 			MoveWindow( hwndCmd, 0, termRect.bottom-1, 1, 1, TRUE );
 			SetFocus(hwndMain);
 		}
-		check_Option( hOptionMenu, ID_EDIT, bEdit);
+		menu_Check( ID_EDIT, bEdit);
 		tiny_Redraw_Term(  );
 		break;
 	case ID_TRANSP:
@@ -640,7 +713,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		else
 			iTransparency =  (iTransparency==255) ? 224 : 255;
 		SetLayeredWindowAttributes(hwndMain,0,iTransparency,LWA_ALPHA);
-		check_Option( hOptionMenu, ID_TRANSP, iTransparency!=255 );
+		menu_Check( ID_TRANSP, iTransparency!=255 );
 		break;
 	case ID_FONT:
 		if ( fontDialog() ) tiny_Font( hwndMain );
@@ -651,28 +724,25 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		break;
 	case ID_FTPD:
 		bFTPd = ftp_Svr(bFTPd?NULL:getFolderName(L"Choose root directory"));
-		check_Option( hOptionMenu, ID_FTPD, bFTPd );
+		menu_Check( ID_FTPD, bFTPd );
 		break;
 	case ID_TFTPD:
 		bTFTPd = tftp_Svr(bTFTPd?NULL:getFolderName(L"Choose root directory"));
-		check_Option( hOptionMenu, ID_TFTPD, bTFTPd );
+		menu_Check( ID_TFTPD, bTFTPd );
 		break;
 	case ID_TERM:
-		TrackPopupMenu(hMenu[0],TPM_LEFTBUTTON, wndRect.left+menuX[0],
-								wndRect.top+iTitleHeight, 0, hwndMain, NULL);
+		menu_Popup(0);
 		break;
 	case ID_SCRIPT:
-		TrackPopupMenu(hMenu[1],TPM_LEFTBUTTON, wndRect.left+menuX[1],
-								wndRect.top+iTitleHeight, 0, hwndMain, NULL);
+		menu_Popup(1);
 		break;
 	case ID_OPTIONS:
-		TrackPopupMenu(hMenu[2],TPM_LEFTBUTTON, wndRect.left+menuX[2],
-								wndRect.top+iTitleHeight, 0, hwndMain, NULL);
+		menu_Popup(2);
 		break;
 
 	case ID_SCPAUSE:
-		if ( bScriptRun ) bScriptPause = !bScriptPause;
-		if ( bScriptPause ) cmd_Disp( L"Script Paused" );
+		bScriptPaused = !bScriptPaused;
+		menu_Check( ID_SCPAUSE, bScriptPaused );
 		break;
 	case ID_SCQUIT:
 		bScriptRun = FALSE;
@@ -685,16 +755,17 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		break;
 	default:
 		if ( wParam>ID_SCRIPT0 && wParam<=ID_SCRIPT0+iScriptCount ) {
-			WCHAR wfn[256];
-			wcscpy(wfn, L"script\\");
-			GetMenuString(hScriptMenu, wParam, wfn+7, 248, 0);
+			WCHAR wfn[MAX_PATH+256];
+			utf8_to_wchar(homedir, -1, wfn, MAX_PATH);
+			wcscat(wfn, L"\\Documents\\tinyTerm\\script\\");
+			GetMenuString(hMenu[SCRIPT], wParam, wfn+wcslen(wfn), 256, 0);
 			OpenScript(wfn);
 			break;
 		}
 		if ( wParam>ID_CONNECT0 && wParam<=ID_CONNECT0+iConnectCount ) {
 			WCHAR cmd[256];
 			cmd[0]=L'!';
-			GetMenuString(hTermMenu, wParam, cmd+1, 248, 0);
+			GetMenuString(hMenu[TTERM], wParam, cmd+1, 248, 0);
 			cmd_Disp(cmd);
 			cmd_Enter();
 			break;
@@ -703,11 +774,9 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 	}
 	return TRUE;
 }
-#define WM_DPICHANGED       0x02E0
 LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 {
-	HDC hDC;
-	PAINTSTRUCT ps;
+	static HDC hDC;
 	static WCHAR wm_chars[2]={0,0};
 
 	switch (msg) {
@@ -738,11 +807,14 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	case WM_DPICHANGED:
 		dpi = LOWORD(wParam);
 		tiny_FontSize(fontsize);
+		menu_Size();
 		break;
-	case WM_PAINT:
-		if ( BeginPaint(hwnd, &ps)!=NULL ) 
-			tiny_Paint(ps.hdc, ps.rcPaint);
-		EndPaint( hwnd, &ps );
+	case WM_PAINT: {
+			PAINTSTRUCT ps;
+			if ( BeginPaint(hwnd, &ps)!=NULL ) 
+				tiny_Paint(ps.hdc, ps.rcPaint);
+			EndPaint( hwnd, &ps );
+		}
 		break;
 	case WM_SETFOCUS:
 		CreateCaret(hwnd, NULL, iFontWidth, iFontHeight/4);
@@ -902,26 +974,26 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		}
 		break;
 	case WM_NCLBUTTONDOWN: {
-		int x = GET_X_LPARAM(lParam)-wndRect.left;
 		int y = GET_Y_LPARAM(lParam)-wndRect.top;
-		if ( y>0 && y<iTitleHeight ) 
-			if ( x>menuX[0] && x<menuX[3] ) 
-				return 0;
+		if ( y>0 && y<iTitleHeight ) {
+			int x = GET_X_LPARAM(lParam)-wndRect.left;
+			if ( x>menuX[0] && x<menuX[3] ) return 0;
 		}
 		return DefWindowProc(hwnd,msg,wParam,lParam);
+	}
 	case WM_NCLBUTTONUP: {
-		int x = GET_X_LPARAM(lParam)-wndRect.left;
 		int y = GET_Y_LPARAM(lParam)-wndRect.top;
-		if ( y>0 && y<iTitleHeight ) for ( int i=0; i<3; i++ )
-			if ( x>menuX[i] && x<menuX[i+1] ) {
-				TrackPopupMenu( hMenu[i],TPM_LEFTBUTTON, 
-									wndRect.left+menuX[i]-24,
-									wndRect.top+iTitleHeight, 0, hwnd, NULL );
-				return 0;
+		if ( y>0 && y<iTitleHeight ) {
+			int x = GET_X_LPARAM(lParam)-wndRect.left;
+			for ( int i=0; i<3; i++ ) {
+				if ( x>menuX[i] && x<menuX[i+1] ) {
+					menu_Popup( i );
+					return 0;
+				}
 			}
 		}
 		return DefWindowProc(hwnd,msg,wParam,lParam);
-
+	}
 	case WM_DROPFILES:
 		DropFiles((HDROP)wParam);
 		break;
@@ -950,42 +1022,6 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	}
 	return 0;
 }
-HMENU tiny_Menu( )
-{
-	HMENU hMainMenu = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_MAIN));
-	hTermMenu  = GetSubMenu(hMainMenu, 0);
-	hScriptMenu = GetSubMenu(hMainMenu, 1);
-	hOptionMenu = GetSubMenu(hMainMenu, 2);
-	iTitleHeight = 	 GetSystemMetrics(SM_CYFRAME)
-									+GetSystemMetrics(SM_CYCAPTION)
-									+GetSystemMetrics(92);	//SM_CXPADDEDBORDER
-	HDC wndDC = GetWindowDC(hwndMain);
-	RECT menuRect;
-	DrawText(wndDC, L"  Term  ", 8, &menuRect, DT_CALCRECT);
-	menuX[1] = menuX[0]+menuRect.right-menuRect.left;
-	DrawText(wndDC, L"  Script  ", 10, &menuRect, DT_CALCRECT);
-	menuX[2] = menuX[1]+menuRect.right-menuRect.left;
-	DrawText(wndDC, L"  Options  ", 11, &menuRect, DT_CALCRECT);
-	menuX[3] = menuX[2]+menuRect.right-menuRect.left;
-	ReleaseDC(hwndMain, wndDC);
-
-	hMenu[0] = hTermMenu  = GetSubMenu(hMainMenu, 0);
-	hMenu[1] = hScriptMenu = GetSubMenu(hMainMenu, 1);
-	hMenu[2] = hOptionMenu = GetSubMenu(hMainMenu, 2);
-
-	WIN32_FIND_DATA FindFileData;
-	HANDLE hFind;
-	iScriptCount = 1;
-	hFind = FindFirstFile(L"script\\*.*", &FindFileData);
-	if (hFind != INVALID_HANDLE_VALUE) {
-		do {
-			if ( FindFileData.cFileName[0]!=L'.' )
-				InsertMenu( hScriptMenu, -1, MF_BYPOSITION,
-							ID_SCRIPT0+iScriptCount++, FindFileData.cFileName);
-		} while( FindNextFile(hFind, &FindFileData) );
-	}
-	return hMainMenu;
-}
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 									LPSTR lpCmdLine, INT nCmdShow)
 {
@@ -996,7 +1032,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	wc.cbWndExtra	= 0;
 	wc.lpfnWndProc 	= &MainWndProc;
 	wc.hInstance 	= hInstance;
-	wc.hIcon = 0;
+	wc.hIcon 		= 0;
 	wc.hIconSm 		= LoadIcon(hInstance, MAKEINTRESOURCE(IDICON_TL1));
 	wc.hCursor		= LoadCursor(NULL,IDC_ARROW);
 	wc.hbrBackground = 0;
@@ -1005,29 +1041,31 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	if ( !RegisterClassEx(&wc) ) return 0;
 	hInst = hInstance;
 	
-	INITCOMMONCONTROLSEX icce = {0};
-  icce.dwSize = sizeof(INITCOMMONCONTROLSEX);
-  icce.dwICC = ICC_STANDARD_CLASSES|ICC_TAB_CLASSES;
-  InitCommonControlsEx(&icce);
 	OleInitialize( NULL );
-
 	WSADATA wsaData;
 	WSAStartup(MAKEWORD(2, 2), &wsaData);
 	libssh2_init (0);
 	httport = http_Svr("127.0.0.1");
+	if ( IsWindows7OrGreater() ) 
+		wcscpy( wsFontFace, L"Consolas" );
 
 	TERM aTerm;
 	HOST aHost;
+	term_Construct( &aTerm );
+	host_Construct( &aHost );
 	aTerm.host = &aHost;
+	aHost.term = &aTerm;
+
 	pt = &aTerm;
-	term_Init( pt );
-	host_Init( &aHost );
-	aHost.term = pt;
+	homedir = getenv("USERPROFILE");
+	if ( homedir!=NULL ) {
+		strncpy(aHost.homedir, homedir, MAX_PATH-64);
+		aHost.homedir[MAX_PATH-64] = 0;
+	}
 
 	HDC sysDC = GetDC(0);
 	dpi = GetDeviceCaps(sysDC, LOGPIXELSX);
 	ReleaseDC(0, sysDC);
-	wcscpy(wsFontFace,IsWindows7OrGreater() ? L"Consolas": L"Courier New");
 	
 	dwBkBrush = (HBRUSH)GetStockObject(BLACK_BRUSH);
 	hTermFont = CreateFont( fontsize*(dpi/96), 0, 0, 0,
@@ -1039,7 +1077,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 						CW_USEDEFAULT, CW_USEDEFAULT, 800, 480, 
 						NULL, NULL, hInst, NULL );
 	ShowScrollBar(hwndMain, SB_VERT, FALSE);
-	tiny_Menu();
+	menu_Build();
 	iConnectCount = 1;
 
 	if ( *lpCmdLine==0 )
@@ -1047,13 +1085,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	else
 		host_Open( pt->host, lpCmdLine );
 
-	homedir = getenv("USERPROFILE");
- 	char fn_hist[MAX_PATH] = "tinyTerm.hist";
-	if ( !LoadDict( fn_hist ) && homedir!=NULL ) {
+ 	char fn_hist[MAX_PATH+80] = "";
+	if ( homedir!=NULL ) {
 		strcpy( fn_hist, homedir );
-		strcat( fn_hist, "\\Documents\\tinyTerm.hist" );
-		LoadDict( fn_hist );
+		strcat( fn_hist, "\\Documents\\tinyTerm\\");
+		struct stat sb;
+		if ( GetFileAttributesA( fn_hist )!= FILE_ATTRIBUTE_DIRECTORY )
+			CreateDirectoryA( fn_hist, NULL);
 	}
+	strcat( fn_hist, "tinyTerm.hist" );
+	LoadDict( fn_hist );
 
 	HACCEL haccel = LoadAccelerators(hInst, MAKEINTRESOURCE(IDACCEL_MAIN));
 	MSG msg;
@@ -1066,11 +1107,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	if ( pt->bLogging ) term_Logg( pt, NULL );
 
 	LoadDict( fn_hist );
-	if ( !SaveDict("tinyTerm.hist") && homedir!=NULL ) {
-		strcpy( fn_hist, homedir );
-		strcat( fn_hist, "\\Documents\\tinyTerm.hist" );
-		SaveDict( fn_hist );
-	}
+	SaveDict( fn_hist );
 	autocomplete_Destroy( );
 	
 	http_Svr("127.0.0.1");
@@ -1159,7 +1196,7 @@ DWORD WINAPI uploader( void *files )	//upload files through scp or sftp
 		do {
 			p1 = strchr(p, 0x0a);
 			if ( p1!=NULL ) *p1++=0;
-			scp_write( pt->host, p, rdir );
+			if ( *p ) scp_write( pt->host, p, rdir );
 		}
 		while ( (p=p1)!=NULL );
 	}
@@ -1208,7 +1245,10 @@ DWORD WINAPI scripter( void *cmds )
 {
 	char *p0=(char *)cmds, *p1, *p2;
 	int iRepCount = -1;
-	bScriptRun=TRUE; bScriptPause = FALSE;
+	bScriptRun=TRUE; bScriptPaused = FALSE;
+	menu_Enable( ID_SCRUN, FALSE);
+	menu_Enable( ID_SCPAUSE, TRUE);
+	menu_Enable( ID_SCQUIT, TRUE);
 	do {
 		p2=p1=strchr(p0, 0x0a);
 		if ( p1==NULL ) p1 = p0+strlen(p0);
@@ -1230,12 +1270,15 @@ DWORD WINAPI scripter( void *cmds )
 			}
 		}
 		if ( p0!=p1 ) { p0 = p1+1; *p1 = 0x0a; }
-		while ( bScriptPause && bScriptRun ) Sleep(500);
+		while ( bScriptPaused && bScriptRun ) Sleep(500);
 	}
 	while ( p2!=NULL && bScriptRun );
-	cmd_Disp( bScriptRun ? L"script completed" : L"script stopped");
-	bScriptRun = bScriptPause = FALSE;
 	free(cmds);
+	cmd_Disp( bScriptRun ? L"script completed" : L"script stopped");
+	bScriptRun = bScriptPaused = FALSE;
+	menu_Enable( ID_SCRUN, TRUE);
+	menu_Enable( ID_SCPAUSE, FALSE);
+	menu_Enable( ID_SCQUIT, FALSE);
 	return 0;
 }
 void DropScript( char *cmds )

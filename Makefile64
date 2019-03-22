@@ -1,10 +1,9 @@
 OBJS = obj/tiny.o obj/term.o obj/host.o obj/ssh2.o obj/auto_drop.o obj/resource.o
-LIBS = ${MINGW_PREFIX}/lib/libssh2.a ${MINGW_PREFIX}/lib/libz.a ${MINGW_PREFIX}/lib/libiberty.a 
-
+LIBS = ${MINGW_PREFIX}/lib/libssh2.a
 CC = gcc
 RC = windres
-CFLAGS= -Os -std=c99 -D UNICODE -Wall -ffunction-sections -fdata-sections -I${MINGW_PREFIX}/include
-LDFLAGS = -s -lgdi32 -lcomdlg32 -lcomctl32 -lole32 -lwinmm -lws2_32 -lshell32 -lcrypt32 -lbcrypt -ldwmapi -luxtheme -Wl,--subsystem,windows -Wl,-gc-sections
+CFLAGS= -Os -std=c99 -D UNICODE -I${MINGW_PREFIX}/include
+LDFLAGS = -s -lgdi32 -lcomdlg32 -lcomctl32 -lole32 -lwinmm -lws2_32 -lshell32 -l shlwapi -lcrypt32 -lbcrypt -ldwmapi -luxtheme -Wl,--subsystem,windows -Wl,-gc-sections
 
 all: tinyTerm64.exe
 

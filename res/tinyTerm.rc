@@ -1,5 +1,5 @@
 //
-// "$Id: tinyTerm.rc 2882 2019-01-10 21:05:10 $"
+// "$Id: tinyTerm.rc 3063 2019-03-15 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -7,7 +7,7 @@
 //
 // Copyright 2018-2019 by Yongchao Fan.
 //
-// This library is free software distributed under GNU LGPL 3.0,
+// This library is free software distributed under GNU GPL 3.0,
 // see the license at:
 //
 //     https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
@@ -16,38 +16,41 @@
 //
 //     https://github.com/yongchaofan/tinyTerm/issues/new
 //
+#pragma code_page(65001)
 #include <windows.h>
 #include <commctrl.h>
 #include "resource.h"
 
 IDICON_TL1	ICON	"TL1.ico"
 
+
 IDMENU_MAIN MENU
 {
 	POPUP "&Term"
 	{
 		MENUITEM "&Connect...\tAlt+C", ID_CONNECT
-		MENUITEM "&Log...\tAlt+L",  ID_LOGGING
-		MENUITEM "&Save...\tAlt+S", ID_SAVE
-		MENUITEM "&About",		ID_ABOUT
+		MENUITEM "&Disconnect\tAlt+D", ID_DISCONN, GRAYED
+		MENUITEM "&Log...    \tAlt+L", ID_LOGG
+		MENUITEM "&Save...   \tAlt+S", ID_SAVE
+		MENUITEM "&About",			ID_ABOUT
 		MENUITEM SEPARATOR
-		MENUITEM "Ftpd...", 	ID_FTPD
-		MENUITEM "Tftpd...", 	ID_TFTPD
 	}
 	POPUP "&Script"
 	{
-		MENUITEM "&Run...", 	ID_SCRUN
-		MENUITEM "&Pause", 		ID_SCPAUSE
-		MENUITEM "&Stop", 		ID_SCQUIT
+		MENUITEM "&Run...", 		ID_SCRUN
+		MENUITEM "&Pause", 			ID_SCPAUSE, GRAYED
+		MENUITEM "&Stop", 			ID_SCQUIT, 	GRAYED
+		MENUITEM "&Ftpd...", 		ID_FTPD
+		MENUITEM "&Tftpd...", 		ID_TFTPD
 		MENUITEM SEPARATOR
 	}
 	POPUP "&Options"
 	{
-		MENUITEM "Local &Echo",	ID_ECHO
-		MENUITEM "Local Edit \tAlt+E", ID_EDIT
-		MENUITEM "Font...\tAlt+F",ID_FONT
-		MENUITEM "Zoom\tAlt+Z", ID_ZOOM
-		MENUITEM "&Tranparent", ID_TRANSP
+		MENUITEM "&Local Echo",		ID_ECHO
+		MENUITEM "Local &Edit\tAlt+E", ID_EDIT
+		MENUITEM "&Font...\tAlt+F",	ID_FONT
+		MENUITEM "&Zoom\tAlt+Z", 	ID_ZOOM
+		MENUITEM "&Tranparent", 	ID_TRANSP
 	}
 }
 IDACCEL_MAIN ACCELERATORS
@@ -55,26 +58,29 @@ IDACCEL_MAIN ACCELERATORS
   "c", ID_CONNECT, 	ALT
   "e", ID_EDIT, 	ALT
   "f", ID_FONT,     ALT
-  "l", ID_LOGGING,	ALT
+  "l", ID_LOGG,	    ALT
   "z", ID_ZOOM,     ALT
+  "t", ID_TERM,     ALT
+  "s", ID_SCRIPT,   ALT
+  "o", ID_OPTIONS,  ALT
  }
 
 IDD_CONNECT DIALOG 45, 30, 150, 100	// Connection Dialog
 CAPTION "Connect Dialog"
 {
     COMBOBOX IDPROTO, 60, 10, 70, 16, CBS_DROPDOWNLIST|CBS_HASSTRINGS|WS_TABSTOP
-    LTEXT    "Protocol:", 	0,  4, 12, 50, 12, SS_RIGHT, WS_EX_LEFT
+    LTEXT    "Protocol:", 	IDSTATIC1,	4, 12, 50, 12, SS_RIGHT, WS_EX_LEFT
     COMBOBOX IDPORT,  60, 30, 70, 16, CBS_DROPDOWN|CBS_HASSTRINGS|WS_TABSTOP
-    LTEXT    "Port:", 		0,  4, 32, 50, 12, SS_RIGHT, WS_EX_LEFT
+    LTEXT    "Port:", 		IDSTATIC2,	4, 32, 50, 12, SS_RIGHT, WS_EX_LEFT
     COMBOBOX IDHOST,  60, 50, 70, 16, CBS_DROPDOWN|CBS_HASSTRINGS|CBS_AUTOHSCROLL|WS_TABSTOP
-    LTEXT    "Host:", IDSTATIC,	4, 52, 50, 12, SS_RIGHT, WS_EX_LEFT
-    DEFPUSHBUTTON "Connect", IDCONNECT, 80, 75, 50, 16, 0, WS_EX_LEFT
-    PUSHBUTTON    "Cancel",  IDCANCEL,  20, 75, 50, 16, 0, WS_EX_LEFT
+    LTEXT    "Host:", 		IDSTATIC,	4, 52, 50, 12, SS_RIGHT, WS_EX_LEFT
+    DEFPUSHBUTTON "Connect",IDCONNECT, 80, 75, 50, 16, 0, WS_EX_LEFT
+    PUSHBUTTON    "Cancel", IDCANCEL,  20, 75, 50, 16, 0, WS_EX_LEFT
 }
 
 1 VERSIONINFO						// Version Information
-    FILEVERSION     1,0,0,0
-    PRODUCTVERSION  1,0,0,0
+    FILEVERSION     1,2,0,0
+    PRODUCTVERSION  1,2,0,0
     FILEOS          VOS__WINDOWS32
     FILETYPE        VFT_APP
     FILESUBTYPE     VFT2_UNKNOWN
@@ -88,7 +94,7 @@ CAPTION "Connect Dialog"
             VALUE "FileDescription", "Tiny Terminal Emulator"
             VALUE "LegalCopyright", "©2018-2019 Yongchao Fan"
             VALUE "ProductName", "tinyTerm"
-            VALUE "ProductVersion", "1.0.0"
+            VALUE "ProductVersion", "1.2.0.0"
         }
     }
     BLOCK "VarFileInfo"

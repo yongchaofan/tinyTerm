@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 29920 2019-03-12 15:05:10 $"
+// "$Id: term.c 30356 2019-03-20 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -23,7 +23,7 @@
 unsigned char * vt100_Escape( TERM *pt, unsigned char *sz, int cnt );
 unsigned char * telnet_Options( TERM *pt, unsigned char *p, int cnt );
 
-void term_Init( TERM *pt )
+BOOL term_Construct( TERM *pt )
 {
 	pt->size_x=TERMCOLS;
 	pt->size_y=TERMLINES;
@@ -36,7 +36,27 @@ void term_Init( TERM *pt )
 	pt->iTimeOut=30;
 	pt->tl1len=0;
 	pt->tl1text=NULL;
-	term_Clear( pt );
+
+	pt->buff = (char *)malloc(BUFFERSIZE);
+	pt->attr = (char *)malloc(BUFFERSIZE);
+	pt->line = (int * )malloc(MAXLINES*sizeof(int));
+
+	if ( pt->buff!=NULL && pt->attr!=NULL && pt->line!=NULL ) 
+	{
+		term_Clear( pt );
+		return TRUE;
+	}
+	else
+	{
+		return FALSE;
+	}
+	
+}
+void term_Destruct( TERM *pt )
+{
+	free( pt->buff );
+	free( pt->attr );
+	free( pt->line );
 }
 void term_Clear( TERM *pt )
 {
@@ -187,10 +207,13 @@ void term_Parse( TERM *pt, char *buf, int len )
 					break;
 		case 0x1b: 	p = vt100_Escape( pt, p, zz-p ); break;
 		case 0xff: 	p = telnet_Options( pt, p-1, zz-p+1 ); break;
-		case 0xe2: 	if ( pt->bAlterScreen ) {
+		case 0xe2: 	if ( pt->bAlterScreen ) 
+					{
 						c = ' ';			//hack utf8 box drawing
-						if ( *p++==0x94 ){	//to make alterscreen easier
-							switch ( *p ) {
+						if ( *p++==0x94 )	//to make alterscreen easier
+						{	
+							switch ( *p ) 
+							{
 							case 0x80:
 							case 0xac:
 							case 0xb4:
@@ -204,7 +227,8 @@ void term_Parse( TERM *pt, char *buf, int len )
 						}
 						p++;
 					}
-		default:	if ( pt->bGraphic ) switch ( c ) {
+		default:	if ( pt->bGraphic ) switch ( c ) 
+					{
 						case 'q': c='_'; break;
 						case 'x':
 						case 't':
@@ -218,16 +242,18 @@ void term_Parse( TERM *pt, char *buf, int len )
 					if ( pt->bInsert ) 
 						vt100_Escape(pt, (unsigned char *)"[1@", 3);
 					if ( pt->cursor_x-pt->line[pt->cursor_y]
-													>=pt->size_x ) {
+													>=pt->size_x ) 
+					{
 						int char_cnt=0;
 						for ( int i=pt->line[pt->cursor_y]; i<pt->cursor_x; i++ )
 							if ( !isUTF8c(pt->buff[i]) ) char_cnt++;
-						if ( char_cnt==pt->size_x ) {
+						if ( char_cnt==pt->size_x ) 
+						{
 							if ( pt->bAlterScreen )
 								pt->cursor_x--; //don't overflow in vi
 							else
 								term_nextLine(pt);
-							}
+						}
 					}
 					pt->attr[pt->cursor_x] = pt->c_attr;
 					pt->buff[pt->cursor_x++] = c;
@@ -236,32 +262,33 @@ void term_Parse( TERM *pt, char *buf, int len )
 		}
 	}
 
-	if ( !pt->bPrompt ) {
+	if ( !pt->bPrompt ) 
+	{
 		pt->tl1len = pt->buff+pt->cursor_x - pt->tl1text;
 		if ( strncmp(pt->sPrompt, pt->buff+pt->cursor_x-pt->iPrompt, 
 														pt->iPrompt)==0)
 			pt->bPrompt = TRUE;
 	}
-	if ( old_cursor_y==pt->cursor_y )
-		tiny_Redraw_Line();
-	else
+	if ( old_cursor_y!=pt->cursor_y || pt->bAlterScreen )
 		tiny_Redraw_Term();
-	
+	else
+		tiny_Redraw_Line();
 }
 BOOL term_Echo(TERM *pt)
 {
 	pt->bEcho=!pt->bEcho;
-	term_Print( pt, "\n\033[32mEcho %s\n", pt->bEcho?"On":"Off" );
 	return pt->bEcho;
 }
 void term_Title( TERM *pt, char *title )
 {
-	if ( *title ) {
+	if ( *title )
+	{
 		strncpy(pt->title, title, 63);
 		pt->title[63] = 0;
 		host_Send_Size( pt->host, pt->size_x, pt->size_y);
 	}
-	else {
+	else
+	{
 		pt->title[0] = 0;
 		term_Disp(pt, "\n\033[31mDisconnected. Press Enter to restart\n\033[37m");
 	}
@@ -466,7 +493,7 @@ int term_Scp( TERM *pt, char *cmd, char **preply )
 		char lsld[1024]="ls -ld ";
 		if ( *rpath!='/' && *rpath!='~' ) {		//rpath is relative
 			term_Pwd( pt, lsld+7, 1017);
-			strcat(lsld, "/");
+			if ( *rpath ) strcat(lsld, "/");
 		}
 		strcat(lsld, rpath);
 		strcat(lsld, "\r");
@@ -500,6 +527,7 @@ int term_Tun( TERM *pt, char *cmd, char **preply)
 int term_Cmd( TERM *pt, char *cmd, char **preply )
 {
 	if ( *cmd!='!' ) return term_TL1( pt, cmd, preply);
+	cmd[strcspn(cmd, "\r")] = 0;	//remove trailing "\r"
 
 	int rc = 0;
 	if ( strncmp(++cmd, "Clear",5)==0 )		term_Clear( pt );
@@ -538,7 +566,7 @@ int term_Cmd( TERM *pt, char *cmd, char **preply )
 	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 	ftp_Svr( cmd+4 );
 	else if ( strncmp(cmd, "tun",  3)==0 ) 	rc = term_Tun( pt, cmd+3, preply);
 	else if ( strncmp(cmd, "scp ", 4)==0 ) 	rc = term_Scp( pt, cmd+4, preply);
-	else if ( strncmp(cmd, "Waitfor",7)==0) 
+	else if ( strncmp(cmd, "Waitfor ", 8)==0) 
 	{
 		for ( int i=pt->iTimeOut; i>0; i-- ) 
 		{

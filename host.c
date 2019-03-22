@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 28319 2019-03-12 15:05:10 $"
+// "$Id: host.c 28350 2019-03-15 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -33,11 +33,12 @@ DWORD WINAPI sftp( void *pv );
 DWORD WINAPI netconf( void *pv );
 void stdio_Close( HOST *ph );
 
-void host_Init( HOST *ph )
+void host_Construct( HOST *ph )
 {
 	ph->host_type = 0;
 	ph->host_status=HOST_IDLE;
-	ssh2_Init( ph );
+	ph->homedir[0]=0;
+	ssh2_Construct( ph );
 }
 void host_Open( HOST *ph, char *port )
 {
@@ -409,7 +410,8 @@ void url_decode(char *url)
 	}
 	*q = 0;
 }
-DWORD WINAPI *httpd( void *pv )
+
+DWORD WINAPI httpd( void *pv )
 {
 	char buf[4096], *cmd, *reply;
 	struct sockaddr_in cltaddr;

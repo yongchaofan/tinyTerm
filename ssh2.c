@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40183 2019-03-02 21:05:10 $"
+// "$Id: ssh2.c 41840 2019-03-02 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -21,11 +21,89 @@
 #include <ws2tcpip.h>
 #include <time.h>
 #include <fcntl.h>
-#include <dirent.h>
-#include <fnmatch.h>
-extern const char *homedir;
+#include <direct.h>
+//#include <dirent.h>
+//#include <fnmatch.h>
+#include <shlwapi.h>
+int fnmatch( char *pattern, char *file, int flag)
+{
+	return PathMatchSpecA(file, pattern) ? 0 : 1;
+}
+/****************************************************************************
+ * local dirent implementation for compiling on vs2017
+ * 
+ */
+#define DT_UNKNOWN 0
+#define DT_DIR     1
+#define DT_REG     2
+#define DT_LNK     3
 
-void ssh2_Init( HOST *ph )
+struct dirent {
+	unsigned char d_type;
+	char d_name[MAX_PATH * 3];
+};
+
+typedef struct tagDIR {
+	struct dirent dd_dir; 
+	HANDLE dd_handle;     
+	int dd_stat; 
+} DIR;
+static inline void finddata2dirent(struct dirent *ent, WIN32_FIND_DATA *fdata)
+{
+	wchar_to_utf8(fdata->cFileName, -1, ent->d_name, sizeof(ent->d_name));
+
+	if (fdata->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		ent->d_type = DT_DIR;
+	else
+		ent->d_type = DT_REG;
+}
+
+DIR *opendir(const char *name)
+{
+	WCHAR pattern[MAX_PATH + 2]; 
+	int len = utf8_to_wchar(name, -1, pattern, MAX_PATH+2);
+	if ( len < 0) return NULL;
+	if ( len && pattern[len - 1]!=L'/' ) wcscat(pattern, L"\\");
+	wcscat(pattern, L"*.*");
+
+	WIN32_FIND_DATA fdata;
+	HANDLE h = FindFirstFile(pattern, &fdata);
+	if ( h == INVALID_HANDLE_VALUE ) return NULL;
+
+	DIR *dir = (DIR *)malloc(sizeof(DIR));
+	dir->dd_handle = h;
+	dir->dd_stat = 0;
+	finddata2dirent(&dir->dd_dir, &fdata);
+	return dir;
+}
+
+struct dirent *readdir(DIR *dir)
+{
+	if (!dir) return NULL;
+
+	if (dir->dd_stat) {
+		WIN32_FIND_DATA fdata;
+		if (FindNextFile(dir->dd_handle, &fdata)) {
+			finddata2dirent(&dir->dd_dir, &fdata);
+		} 
+		else
+			return NULL;
+	}
+
+	++dir->dd_stat;
+	return &dir->dd_dir;
+}
+
+int closedir(DIR *dir)
+{
+	if (dir) {
+		FindClose(dir->dd_handle);
+		free(dir);
+	}
+	return 0;
+}
+/******************************************************************************/
+void ssh2_Construct( HOST *ph )
 {
 	ph->session = NULL;
 	ph->channel  =NULL;
@@ -159,13 +237,6 @@ int ssh_knownhost( HOST *ph )
 	int type, check, buff_len;
 	size_t len;
 	char knownhostfile[MAX_PATH];
-
-	if ( homedir!=NULL ) {
-		strncpy(ph->homedir, homedir, MAX_PATH-64);
-		ph->homedir[MAX_PATH-64] = 0;
-	}
-	else
-		ph->homedir[0]=0;
 
 	strcpy(knownhostfile, ph->homedir);
 	strcat(knownhostfile, "/.ssh");
@@ -571,7 +642,7 @@ void scp_read( HOST *ph, char *lpath, char *rfiles )
 
 	struct _stat statbuf;
 	if ( stat_utf8(lpath, &statbuf)!=-1 ) {
-		if ( S_ISDIR(statbuf.st_mode) ) 
+		if ( (statbuf.st_mode & S_IFMT) == S_IFDIR ) 
 			strcat(lfile, "/");
 	}
 	char *ldir = lfile+strlen(lfile);
@@ -615,7 +686,6 @@ void scp_write( HOST *ph, char *lpath, char *rpath )
 		}
 		else 
 			lpattern = lpath;
-
 		if ( (dir=opendir(ldir) ) != NULL ) {
 			while ( (dp=readdir(dir)) != NULL ) {
 				if ( fnmatch(lpattern, dp->d_name, 0)==0 ) {
@@ -868,7 +938,7 @@ int sftp_lcd( HOST *ph, char *cmd )
 {
 	if ( cmd==NULL || *cmd==0 ) {
 		char buf[4096];
-		if ( getcwd(buf, 4096)!=NULL ) 
+		if ( _getcwd(buf, 4096) != NULL ) 
 			term_Print( ph->term, "\033[32m%s ", buf);
 		term_Print( ph->term, "is local directory\n");
 	}
@@ -953,7 +1023,6 @@ int sftp_rm( HOST *ph, char *path )
 		if ( fnmatch(pattern, mem, 0)==0 ) {
 			strcpy(rfile, path);
 			strcat(rfile, "/");
-			strcat(rfile, mem);
 			if ( libssh2_sftp_unlink(ph->sftp, rfile) )
 				term_Print( ph->term, "\033[31mcouldn't delete file\033[32m%s\n", rfile);
 		}
@@ -1066,7 +1135,7 @@ int sftp_get( HOST *ph, char *src, char *dst )
 		strcpy(lfile, *dst?dst:".");
 		struct _stat statbuf;
 		if ( stat_utf8(lfile, &statbuf)!=-1 ) {
-			if ( S_ISDIR(statbuf.st_mode) ) {
+			if ( (statbuf.st_mode & S_IFMT) == S_IFDIR ) {
 				strcat(lfile, "/");
 				char *p = strrchr(src, '/');
 				if ( p!=NULL ) p++; else p=src;
