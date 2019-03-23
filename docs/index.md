@@ -1,13 +1,13 @@
 
 ## Introduction
 
-Network engineers commonly use terminal emulator to send CLI commands to network devices, and frequently face challenges like:
+Years ago when I started support telecom transport devices using TL1 command line interface, I quickly realized that existing terminal emulators was not adequat dealing with the challenges facing TL1 users:
 	
-	- what's the syntax of that magic command I used last time?
-	- have to send 100 commands to 10 devices, that's a lot of typing!
-	- Wish the terminal can send command intelligently based on server response
+	- have to remember and type long commands repeatedly
+	- have to send batches of commands to multiple devices
+	- have to make configuration changes based on the data retrived
 	
-tinyTerm is an open source terminal emulator designed to network engineers with features like:
+tinyTerm was started as a simple serial/telnet client with some unique features towards those challenges:
 	
 	- command hsitory and autocompletion
 	- automated command batch execution
@@ -60,17 +60,17 @@ is the third unique feature of tinyTerm. Built in xmlhttp interface at 127.0.0.1
 	!Send {cmd}	Send command and return immediately
 	!Selection	Get current text selection
 
-The screen capture below shows the execution of scp_download.js from script menu, which retrieves the selected filename “tinyTerm.exe” and uses “!scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. 
-
-![extension](tinyTerm-5.gif)
+The screen capture below shows the execution of scp_to_folder.js from script menu, which retrieves the selected filename “tinyTerm64.exe” and uses “!scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. 
 
 ```js
 // Javascript to download a highlighted file via scp.
 var xml = new ActiveXObject("Microsoft.XMLHTTP");
 var port = "8080/?";
 if ( WScript.Arguments.length>0 ) port = WScript.Arguments(0)+"/?";
-var filename = term("#Selection");
-term("#scp :"+filename+" .");
+var filename = term("!Selection");
+var objShell = new ActiveXObject("Shell.Application")
+var objFolder = objShell.BrowseForFolder(0, "Destination", 0x11, "")
+if ( objFolder ) term("!scp :"+filename+" "+objFolder.Self.path);
 
 function term( cmd )
 {
