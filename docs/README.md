@@ -8,17 +8,19 @@
 
 
 ## Project philosophy
-tinyTerm is intended to be small, simple and scriptable, WIN32 executable is only 352KB, source code is consist of 7 files totaling 140KB, ~5000 sloc, only required external dependency is libssh2. 
+tinyTerm is intended to be small, simple and scriptable, x64 executable is only 255KB, source code is consist of 6 files totaling 200KB, ~5000 sloc, only required external dependency is libssh2. 
 
-User interface design is minimal too, there is one window, main menu shares title bar space, scrollbar hidden until user trys to scroll back, only one dialog for makeing connections, 
+User interface design is minimal,, main menu shares title bar space, scrollbar hidden until user trys to scroll back, only one dialog for makeing connections, 
 
 
 ## Building
-Makefiles are provided for building with MSYS2+MingW64/32
+Makefiles are provided for building with MSYS2+MingW64/32, also a cmd file for building with Visual Studio building tools.
 
     Makefile    building 32bit tinyTerm.exe for Windows 7/10 using wincng crypto
     Makefile64  building 64bit tinyTerm64.exe for Windows 7/10 using wincng crypto
     MakefileXP  building 32bit tinyTermXP.exe for Windows XP/7/10 using mbedtls crypto
+    cl64.cmd    x64 build command for Visual Studio
+    cl86.cmd    x86 build command for Visual Studio
 
 ### Librarys
     libssh2 using any daily snapshot after March, 2018 for full support of WinCNG crypto functions
