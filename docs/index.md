@@ -11,9 +11,10 @@ tinyTerm started as a simple telnet and serial terminal emulator when I started 
 	
 Designed with minimalist philosophy, tinyTerm is ultra small even with all the unique features, x64 executable file is only 255KB, x86 executable is just 216KB, portable application, no installation needed, no dll required. 
 
-Released as open source under GPL 3.0, hosted on github https://github.com/yongchaofan/tinyTerm
+License: GPL 3.0, open source project hosted on github https://github.com/yongchaofan/tinyTerm
 
-Windows 10 user should install from microsoft store https://www.microsoft.com/store/apps/9NXGN9LJTL05
+Download: Windows 10 user should install from microsoft store to avoid smartscreen warnings
+	  Users with previous versions of windows, or prefer portable application "download zip"
 
 ## Terminal Emulation
 At first glance, tinyTerm is just another terminal emulator, user interface designed to be minimal, munu bar integrated into title bar, srollbar is hidden until scrolling back, there is only one dialog, used for connection making. 
