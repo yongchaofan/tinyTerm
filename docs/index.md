@@ -12,14 +12,13 @@ tinyTerm started as a simple telnet and serial terminal emulator when I started 
 Designed with minimalist philosophy, tinyTerm is ultra small even with all the unique features, x64 executable file is only 255KB, x86 executable is just 216KB, portable application, no installation needed, no dll required. 
 
 Released as open source under GPL 3.0, hosted on github https://github.com/yongchaofan/tinyTerm
+
 Windows 10 user should install from microsoft store https://www.microsoft.com/store/apps/9NXGN9LJTL05
 
 ## Terminal Emulation
 At first glance, tinyTerm is just another terminal emulator, user interface designed to be minimal, munu bar integrated into title bar, srollbar is hidden until scrolling back, there is only one dialog, used for connection making. 
 
-Five types of connections supported: serial, telnet, ssh, sftp and netconf. 
-For serial connections, available serial ports are auto detected and added to the ports drop down list.
-Making new connection will automatically add an entry to Term menu, simply select the menu entry to make the same connection again. 
+Five types of connections supported: serial, telnet, ssh, sftp and netconf. For serial connections, available serial ports are auto detected and added to the ports drop down list. Making new connection will automatically add an entry to Term menu, simply select the menu entry to make the same connection again. 
 
 ![operation](tinyTerm-1.gif)
 
@@ -31,8 +30,7 @@ Command history is saved to tinyTerm.hist at exit, then loaded into memory at th
 
 ![completion](tinyTerm-2.gif)
 
-In line edit mode, when special characters “!” is typed at the beginning of a command, the command will be executed by tinyTerm instead of sending to remote host, for functions like making connection, search scroll buffer, set terminal options, scp file transfer or ssh tunnel setup etc. 
-See Appendix A for list of supported special commands.
+
 
 
 ## Batch Automation
@@ -46,22 +44,18 @@ To automate the execution of commands, simply drag and drop from text editor to 
 
 
 ## SCP integration
-is a feature that maybe more attractive to server administrators than network engineers. When a SSH session is established in tinyTerm, simply drag and drop files to the terminal window will cause those files been transfered to remote host using SCP, remote files will be created in the current directory. Full featured scp command can be used in autocomplete mode like "!scp *.txt :" for upload and "!scp :*.log ." for download. 
+When a SSH session is established in tinyTerm, simply drag and drop files to the terminal window will cause those files been transfered to remote host using SCP, remote files will be created in the current directory. 
+
+To copy file from server to a local folder, simple select the filename in the terminal windows, then chose "scp_to_folder.js" from script menu. 
 
 ![integrasion](tinyTerm-4.gif)
 
-For simpler download operation, although not as simple as drag and drop, see the next section. 
 
 
 ## Script Extension
-is the third unique feature of tinyTerm. Built in xmlhttp interface at 127.0.0.1:8080 allows tinyTerm to be controled programmatically. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. Below are the commands most useful through xmlhttp interface: 
+Built in xmlhttp interface at 127.0.0.1:8080 allows tinyTerm to be controled programmatically. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. 
 
-	!Disp {str}	Display {str} in terminal window
-	!Recv		Return scroll buffer content since last Disp/Recv/Send command
-	!Send {cmd}	Send command and return immediately
-	!Selection	Get current text selection
-
-The screen capture below shows the execution of scp_to_folder.js from script menu, which retrieves the selected filename “tinyTerm64.exe” and uses “!scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. 
+The script scp_to_folder.js referenced in the previous section, which retrieves the selected filename “tinyTerm64.exe” and uses “!scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. 
 
 ```js
 // Javascript to download a highlighted file via scp.
@@ -99,6 +93,9 @@ Private key based authentication is supported too, key file should be stored in 
 
 ## Appendix A. List of special command for editor line and scripting
 
+In line edit mode, when special characters “!” is typed at the beginning of a command, the command will be executed by tinyTerm instead of sending to remote host, for functions like making connection, search scroll buffer, set terminal options, scp file transfer or ssh tunnel setup etc. 
+
+list of supported special commands:
 ### Connection
 	!com3:9600,n,8,1	connect to serial port com3 with 9600,n,8,1
 	!telnet 192.168.1.1	telnet to 192.168.1.1
