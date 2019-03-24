@@ -1,20 +1,21 @@
 
 ## Introduction
 
-Years ago when I started support telecom transport devices using TL1 command line interface, I quickly realized that existing terminal emulators was not adequat dealing with the challenges facing TL1 users:
+tinyTerm started as a simple telnet and serial terminal emulator when I started working on telecom tansport devices using command line interfaces like TL1, over time additional features were added to make network engineer's life eaiser:
 	
-	- have to remember and type long commands repeatedly
-	- have to send batches of commands to multiple devices
-	- have to make configuration changes based on the data retrived
+	- command autocompletion was added so that typing long commands repeatedly becomes easier
+	- batch automation was added so that have to send batches of commands to multiple devices
+	- ftpd/tftpd was added so that software upgrade for the network devices can be automated
+	- ssh/sftp/netconf support was added when network devices started require secure connections
+	- finally a scripting interface was added so new functions can be added easily
 	
-tinyTerm was started as a simple serial/telnet client with some unique features towards those challenges:
-	
-	- command hsitory and autocompletion
-	- automated command batch execution
-	- scripting interface for extension
+Designed with minimalist philosophy, tinyTerm is ultra small even with all the unique features, x64 executable file is only 255KB, x86 executable is just 216KB, portable application, no installation needed, no dll required. 
+
+Released as open source under GPL 3.0, hosted on github https://github.com/yongchaofan/tinyTerm
+Windows 10 user should install from microsoft store https://www.microsoft.com/store/apps/9NXGN9LJTL05
 
 ## Terminal Emulation
-At first glance, tinyTerm is just another terminal emulator, operates just like any other emulators. User interface design takes minimallist philosophy like putty, and goes even further as to integrate munu bar into title bar, hide srollbar until scrolling back, only one dialog for connection making. 
+At first glance, tinyTerm is just another terminal emulator, user interface designed to be minimal, munu bar integrated into title bar, srollbar is hidden until scrolling back, there is only one dialog, used for connection making. 
 
 Five types of connections supported: serial, telnet, ssh, sftp and netconf. 
 For serial connections, available serial ports are auto detected and added to the ports drop down list.
@@ -24,7 +25,7 @@ Making new connection will automatically add an entry to Term menu, simply selec
 
 
 ## Command Autocompletion
-is a unique feature of tinyTerm, when local edit mode is enabled, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs.
+When local edit mode is enabled, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs.
 
 Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
 
