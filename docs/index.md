@@ -1,20 +1,19 @@
 
 ## Introduction
 
-tinyTerm started as a simple telnet and serial terminal emulator when I started working on telecom tansport devices using command line interfaces like TL1, over time additional features were added to make network engineer's life eaiser:
+tinyTerm is a simple telnet and serial terminal emulator, supporting serial, telnet, ssh, sftp and netconf connections in a ultra small 256KB executable, designed with unique features for command line interfaces user:
 	
-	- command autocompletion was added so that typing long commands repeatedly becomes easier
-	- batch automation was added so that have to send batches of commands to multiple devices
-	- ftpd/tftpd was added so that software upgrade for the network devices can be automated
-	- ssh/sftp/netconf support was added when network devices started require secure connections
-	- finally a scripting interface was added so new functions can be added easily
+	- command autocompletion, easier to type long commands repeatedly
+	- batch automation, easier to send batch commands to multiple devices
+	- scp integration, easier to transfer files to and from servers
+	- embedded ftpd/tftpd, easier to perform software upgrade for network elements
+	- xmlhttp scripting interface, easier to add new functionality
 	
-Designed with minimalist philosophy, tinyTerm is ultra small even with all the unique features, x64 executable file is only 255KB, x86 executable is just 216KB, portable application, no installation needed, no dll required. 
+Download: Windows 10 user should install from microsoft store to avoid smartscreen warnings
+	  
+Users with previous versions of windows, or prefer portable application "download zip", just extract all files to perfered location, double click on tinyTerm.exe or tinyTerm64.exe to run, no installation required, no dll needed.
 
 License: GPL 3.0, open source project hosted on github https://github.com/yongchaofan/tinyTerm
-
-Download: Windows 10 user should install from microsoft store to avoid smartscreen warnings
-	  Users with previous versions of windows, or prefer portable application "download zip"
 
 ## Terminal Emulation
 At first glance, tinyTerm is just another terminal emulator, user interface designed to be minimal, munu bar integrated into title bar, srollbar is hidden until scrolling back, there is only one dialog, used for connection making. 
