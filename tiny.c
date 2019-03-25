@@ -49,6 +49,19 @@ const char WELCOME[]="\n\
 \tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\n\n\n\
 \tVerision 1.2, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
+const char SCP_TO_FOLDER[]="\
+var xml = new ActiveXObject(\"Microsoft.XMLHTTP\");\n\
+var port = \"8080/?\";\n\
+if ( WScript.Arguments.length>0 ) port = WScript.Arguments(0)+\"/?\";\n\
+var filename = term(\"!Selection\");\n\
+var objShell = new ActiveXObject(\"Shell.Application\");\n\
+var objFolder = objShell.BrowseForFolder(0,\"Destination folder\",0x11,\"\");\n\
+if ( objFolder ) term(\"!scp :\"+filename+\" \"+objFolder.Self.path);\n\
+function term( cmd ) {\n\
+   xml.Open (\"GET\", \"http://127.0.0.1:\"+port+cmd, false);\n\
+   xml.Send();\n\
+   return xml.responseText;\n\
+}";
 
 const COLORREF COLORS[16] ={RGB(0,0,0), 	RGB(192,0,0), RGB(0,192,0),
 							RGB(192,192,0), RGB(32,96,240), RGB(192,0,192),
@@ -69,7 +82,7 @@ TERM *pt;
 static int iFontHeight, iFontWidth;
 static int iTransparency = 255;
 static int iScriptDelay = 250;
-static int iConnectCount, iScriptCount, httport;
+static int iConnectCount=1, iScriptCount=1, httport;
 static BOOL bFocus = FALSE, bEdit = FALSE;
 static BOOL bFTPd = FALSE, bTFTPd = FALSE;
 static BOOL bScriptRun=FALSE, bScriptPaused=FALSE;
@@ -226,32 +239,6 @@ void menu_Size()
 	}
 	if ( oldFont ) SelectObject( wndDC, oldFont );
 	ReleaseDC(hwndMain, wndDC);
-}
-void menu_Build( )
-{
-	hMainMenu = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_MAIN));
-	hMenu[0] = hMenu[TTERM]  = GetSubMenu(hMainMenu, 0);
-	hMenu[1] = hMenu[SCRIPT] = GetSubMenu(hMainMenu, 1);
-	hMenu[2] = GetSubMenu(hMainMenu, 2);
-	menu_Size();
-
-	WCHAR script_dir[MAX_PATH+80] = L"";
-	if ( homedir!=NULL ) {
-		utf8_to_wchar(homedir, -1, script_dir, MAX_PATH);
-		wcscat(script_dir, L"\\Documents\\tinyTerm\\");
-	}
-	wcscat( script_dir, L"script\\**" );
-	
-	WIN32_FIND_DATA FindFileData;
-	HANDLE hFind = FindFirstFile(script_dir, &FindFileData);
-	if (hFind != INVALID_HANDLE_VALUE) {
-		iScriptCount = 1;
-		do {
-			if ( FindFileData.cFileName[0]!=L'.' )
-				InsertMenu( hMenu[SCRIPT], -1, MF_BYPOSITION,
-							ID_SCRIPT0+iScriptCount++, FindFileData.cFileName);
-		} while( FindNextFile(hFind, &FindFileData) );
-	}
 }
 BOOL tiny_Cmd( char *cmd )
 {
@@ -1077,24 +1064,50 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 						CW_USEDEFAULT, CW_USEDEFAULT, 800, 480, 
 						NULL, NULL, hInst, NULL );
 	ShowScrollBar(hwndMain, SB_VERT, FALSE);
-	menu_Build();
-	iConnectCount = 1;
+	hMainMenu = LoadMenu( hInst, MAKEINTRESOURCE(IDMENU_MAIN));
+	hMenu[0] = hMenu[TTERM]  = GetSubMenu(hMainMenu, 0);
+	hMenu[1] = hMenu[SCRIPT] = GetSubMenu(hMainMenu, 1);
+	hMenu[2] = GetSubMenu(hMainMenu, 2);
+	menu_Size();
+	
+ 	char hist_fn[MAX_PATH+80] = "tinyTerm.hist";
+ 	if ( !LoadDict( hist_fn ) && homedir!=NULL )
+ 	{
+		strcpy(hist_fn, homedir);
+		strcat( hist_fn, "\\Documents\\tinyTerm\\" );
+		if ( GetFileAttributesA( hist_fn )!= FILE_ATTRIBUTE_DIRECTORY )
+			CreateDirectoryA( hist_fn, NULL );
+		_chdir( hist_fn );
+		strcat( hist_fn, "tinyTerm.hist" );
+		LoadDict( hist_fn );
+				
+		if ( GetFileAttributesA( "script\\" )!= FILE_ATTRIBUTE_DIRECTORY )
+		{
+			CreateDirectoryA( "script\\", NULL );
+			FILE *fp = fopen("script\\scp_to_folder.js", "w+");
+			if ( fp!=NULL ) 
+			{
+				fprintf(fp, "%s", SCP_TO_FOLDER); 
+				fclose(fp);
+			}
+		}
+	}
+
+	WIN32_FIND_DATA FindFileData;
+	HANDLE hFind = FindFirstFile(L"script\\*.*", &FindFileData);
+	if (hFind != INVALID_HANDLE_VALUE) 
+	{
+		do {
+			if ( FindFileData.cFileName[0]!=L'.' )
+				InsertMenu( hMenu[SCRIPT], -1, MF_BYPOSITION,
+							ID_SCRIPT0+iScriptCount++, FindFileData.cFileName);
+		} while( FindNextFile(hFind, &FindFileData) );
+	}
 
 	if ( *lpCmdLine==0 )
 		PostMessage(hwndMain, WM_SYSCOMMAND, ID_CONNECT, 0);
 	else
 		host_Open( pt->host, lpCmdLine );
-
- 	char fn_hist[MAX_PATH+80] = "";
-	if ( homedir!=NULL ) {
-		strcpy( fn_hist, homedir );
-		strcat( fn_hist, "\\Documents\\tinyTerm\\");
-		struct stat sb;
-		if ( GetFileAttributesA( fn_hist )!= FILE_ATTRIBUTE_DIRECTORY )
-			CreateDirectoryA( fn_hist, NULL);
-	}
-	strcat( fn_hist, "tinyTerm.hist" );
-	LoadDict( fn_hist );
 
 	HACCEL haccel = LoadAccelerators(hInst, MAKEINTRESOURCE(IDACCEL_MAIN));
 	MSG msg;
@@ -1106,8 +1119,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	}
 	if ( pt->bLogging ) term_Logg( pt, NULL );
 
-	LoadDict( fn_hist );
-	SaveDict( fn_hist );
+	LoadDict( hist_fn );
+	SaveDict( hist_fn );
 	autocomplete_Destroy( );
 	
 	http_Svr("127.0.0.1");
