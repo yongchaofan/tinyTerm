@@ -10,34 +10,27 @@ tinyTerm is a simple telnet and serial terminal emulator, supporting serial, tel
 	
 ## Terminal Emulation
 <table><tr><td width="400">
-At first glance, tinyTerm is just another terminal emulator, user interface designed to be minimal, munu bar integrated into title bar, srollbar is hidden until scrolling back, there is only one dialog, used for connection making. 
-
-Five types of connections supported: serial, telnet, ssh, sftp and netconf. For serial connections, available serial ports are auto detected and added to the ports drop down list. Making new connection will automatically add an entry to Term menu, simply select the menu entry to make the same connection again. 
+Each time a connection is made using the connect dialog, an entry will be added to the Term menu, simply select the menu entry to make the same connection again. A selected set of escape code control sequence was implemented to support unix utilities like top, vi etc,   
 </td><td width="600">
 <img src="/tinyTerm/tinyTerm-1.gif" alt="emulation" />
 </td></tr></table>
 
 ## Command Autocompletion
 <table><tr><td width="400">
-When local edit mode is enabled, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs.
-
-Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
-
+When local edit mode is enabled, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs. Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. 
 </td><td width="600">
 <img src="/tinyTerm/tinyTerm-2.gif" alt="emulation" />
 </td></tr></table>
-
+Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
 
 ## Batch Automation
 <table><tr><td width="400">
-is another unique feature of tinyTerm, which can take a list of commands, send to remote host one at a time. Contrary to popular terminal programs, tinyTerm will not send all commands at once, risking overflow of the input buffer at remote host or network device, instead tinyTerm will wait for the prompt string from remote host before sending each command. Most command line interface system uses a prompt string to tell user it’s ready for the next command, for example “> “or “$ “used by Cisco routers. 
-
-To automate the execution of commands, simply drag and drop from text editor to the input line in autocomplete mode, or select "Run..." from Script menu and select a text file with all the commands need to be executed.
+To automate the execution of commands, simply drag and drop a list of commands from text editor, or select "Run..." from Script menu and select a text file with all the commands to be executed, tinyTerm send one command at a time, wait for prompt string before sending the next command, to avoid overflowing the receive buffer of the remote host or network device. 
 </td><td width="600">
  <img src="/tinyTerm/tinyTerm-3.gif" alt="emulation" />
 </td></tr></table>
 
-tinyTerm will auto detect the prompt string used by remote host when user is typing commands interactively, and use the detected prompt string during scripting. Additionally, prompt string can be set in the script using special command “!Prompt {str}”, refer to appendix A for details and other special commands supported for scripting. 
+Most command line interface system uses a prompt string to tell user it’s ready for the next command, for example “> “or “$ “used by Cisco routers. tinyTerm will auto detect the prompt string used by remote host when user is typing commands interactively, and use the detected prompt string during scripting. Additionally, prompt string can be set in the script using special command “!Prompt {str}”, refer to appendix A for details and other special commands supported for scripting. 
 
 
 ## SCP integration
