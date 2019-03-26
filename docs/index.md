@@ -16,12 +16,13 @@ Users with previous versions of windows, or prefer portable application "downloa
 License: GPL 3.0, open source project hosted on github https://github.com/yongchaofan/tinyTerm
 
 ## Terminal Emulation
+<table><tr><td>
 At first glance, tinyTerm is just another terminal emulator, user interface designed to be minimal, munu bar integrated into title bar, srollbar is hidden until scrolling back, there is only one dialog, used for connection making. 
 
 Five types of connections supported: serial, telnet, ssh, sftp and netconf. For serial connections, available serial ports are auto detected and added to the ports drop down list. Making new connection will automatically add an entry to Term menu, simply select the menu entry to make the same connection again. 
-
+</td><td>
 ![operation](tinyTerm-1.gif)
-
+</td></tr></table>
 
 ## Command Autocompletion
 When local edit mode is enabled, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs.
