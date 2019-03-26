@@ -19,7 +19,7 @@ License: GPL 3.0, open source project hosted on github https://github.com/yongch
 At first glance, tinyTerm is just another terminal emulator, user interface designed to be minimal, munu bar integrated into title bar, srollbar is hidden until scrolling back, there is only one dialog, used for connection making. 
 
 Five types of connections supported: serial, telnet, ssh, sftp and netconf. For serial connections, available serial ports are auto detected and added to the ports drop down list. Making new connection will automatically add an entry to Term menu, simply select the menu entry to make the same connection again. 
-</td><td>
+</td><td width="576">
 <img src="/tinyTerm/tinyTerm-1.gif" alt="emulation" />
 </td></tr></table>
 
@@ -29,7 +29,7 @@ When local edit mode is enabled, key presses are not sent until user presses "En
 
 Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
 
-</td><td>
+</td><td width="576">
 <img src="/tinyTerm/tinyTerm-2.gif" alt="emulation" />
 </td></tr></table>
 
@@ -40,7 +40,7 @@ is another unique feature of tinyTerm, which can take a list of commands, send t
 
 tinyTerm will auto detect the prompt string used by remote host when user is typing commands interactively, and use the detected prompt string during scripting. Additionally, prompt string can be set in the script using special command “!Prompt {str}”, refer to appendix A for details and other special commands supported for scripting. 
 To automate the execution of commands, simply drag and drop from text editor to the input line in autocomplete mode, or select "Run..." from Script menu and select a text file with all the commands need to be executed.
-</td><td>
+</td><td width="576">
  <img src="/tinyTerm/tinyTerm-3.gif" alt="emulation" />
 </td></tr></table>
 
@@ -53,7 +53,7 @@ When a SSH session is established in tinyTerm, simply drag and drop files to the
 
 To copy file from server to a local folder, simple select the filename in the terminal windows, then chose "scp_to_folder.js" from script menu. 
 
-</td><td>
+</td><td width="576">
 <img src="/tinyTerm/tinyTerm-4.gif" alt="scp integration" />
 </td></tr></table>
 
