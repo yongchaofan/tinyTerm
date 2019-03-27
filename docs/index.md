@@ -8,10 +8,11 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 		<h3>
 			License: GPL 3.0<br/><br/>
 			Stable release: 1.2<br/><br/>
-			Installation: Microsoft Store<br/><br/>
-			Portable app:<br/><br/>
-				tinyTerm.exe(x86)<br/><br/>
-				tinyTerm64.exe(x64)<br/><br/>
+			Installation: <br/>
+	<href src="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</href><br/><br/>
+			Portable app:<br/>
+	<href src="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm.exe">tinyTerm.exe(x86)</href><br/>
+	<href src="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm64.exe">tinyTerm64.exe(x64)</href>
 		</h3>
 	    </td>
 	    <td>
