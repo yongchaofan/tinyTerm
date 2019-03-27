@@ -2,17 +2,23 @@
 
 As implied by the same, tinyTerm is designed to be the smallest terminal emulator available. How small? In release 1.2, the x86 executable is only 216KB, the x64 executable is only 255KB, and the exe is the whole package, there is no installation needed, no dll required. 
 
-Being small in size doesn't mean function set is small too, in addition to supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation to run unix utilities like top, vi and raspi-config etc, tinyTerm also sports a few features that's not being offered by any other terminal emulators:
+Being small in size doesn't mean function set is small too, in addition to supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation to run unix utilities like top, vi and raspi-config etc, tinyTerm also sports a set of unique features:
 	
-<table border="0" style="padding:0px; margin:0px;">
-	<tr><td><h4>command autocompletion</h4></td><td>no more typing of long commands repeatedly</td></tr>
-	<tr><td><h4>batch automation</h4></td><td>drag&drop to run CLI script, no more copy paste of one command at a time</td></tr>
-	<tr><td><h4>scp integration</h4></td><td>drag&drop to transfer files in ssh sessions, no seperate scp utility needed</td></tr>
-	<tr><td><h4>ftpd/tftpd embedded</h4></td><td>to perform software upgrade or database backup on managed devices</td></tr>
-	<tr><td><h4>xmlhttp interface</h4></td><td>easily adding new functionality via scripting language like javascript</td></tr>
+<table>
+	<tr>
+	    <td>
+		<h4>command autocompletion<br>
+		    batch automation<br>
+		    scp integration<br>
+		    ftpd and tftpd<br>
+		    xmlhttp interface<br>
+		</h4>
+	    </td>
+	    <td>
+		<img src="tinyTerm.gif">
+	    </td>
+	</tr>
 </table>
-
-![trailer](tinyTerm.gif)
 
 Current stable release is 1.2, [license GPL 3.0](../LICENSE)
 
