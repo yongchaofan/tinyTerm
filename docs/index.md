@@ -4,12 +4,13 @@ As implied by the same, tinyTerm is designed to be the smallest terminal emulato
 
 Being small in size doesn't mean function set is small too, in addition to supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation to run unix utilities like top, vi and raspi-config etc, tinyTerm also sports a few features that's not being offered by any other terminal emulators:
 	
-    **command autocompletion** no more typing of long commands repeatedly
-    **batch automation** drag&drop to run CLI script, no more copy paste of one command at a time
-    **scp integration** drag&drop to transfer files in ssh sessions, no seperate scp utility needed
-    **embedded ftpd/tftpd** to perform software upgrade or database backup on managed devices
-    **xmlhttp interface** easily adding new functionality via scripting language like javascript
-
+<table>
+	<tr><td><h5>command autocompletion</h5></td><td>no more typing of long commands repeatedly</td></tr>
+	<tr><td><h5>batch automation</h5></td><td>drag&drop to run CLI script, no more copy paste of one command at a time</td></tr>
+	<tr><td><h5>scp integration</h5></td><td>drag&drop to transfer files in ssh sessions, no seperate scp utility needed</td></tr>
+	<tr><td><h5>ftpd/tftpd embedded</h5></td><td>to perform software upgrade or database backup on managed devices</td></tr>
+	<tr><td><h5>xmlhttp interface</h5></td><td>easily adding new functionality via scripting language like javascript</td></tr>
+</table>
 ![trailer](tinyTerm.gif)
 
 Current stable release is version 1.2, [license GPL 3.0](../blob/master/LICENSE)
