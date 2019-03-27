@@ -8,11 +8,11 @@ Being small in size doesn't mean function set is small too, in addition to suppo
 	<tr>
 	    <td>
 		<h3>
-		    command autocompletion
-		    batch automation
-		    scp integration
-		    ftpd and tftpd
-		    xmlhttp interface
+			<li>command autocompletion</li>
+			<li>batch automation</li>
+			<li>scp integration</li>
+			<li>ftpd and tftpd</li>
+			<li>xmlhttp interface</li>
 		</h3>
 	    </td>
 	    <td>
