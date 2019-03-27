@@ -5,7 +5,7 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 <table>
 	<tr>
 	    <td>
-		<h3>License: GPL 3.0<br/><br/></h3>
+		<h3>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a><br/><br/></h3>
 		<h3>Stable release: 1.2<br/><br/></h3>
 		<h3>Installation: <br/></h3>
 	<a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a><br/><br/>
