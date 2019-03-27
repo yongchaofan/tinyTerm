@@ -21,7 +21,7 @@ Being small in size doesn't mean function set is small too, in addition to suppo
 	</tr>
 </table>
 
-Current stable release is 1.2, [license GPL 3.0](../LICENSE)
+Current stable release is 1.2, [license GPL 3.0](https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE)
 
 Windows 10 user should install from microsoft store to avoid smartscreen warnings
 	  
