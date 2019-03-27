@@ -14,7 +14,7 @@ Being small in size doesn't mean function set is small too, in addition to suppo
 
 ![trailer](tinyTerm.gif)
 
-Current stable release is 1.2, [license GPL 3.0](../blob/master/LICENSE)
+Current stable release is 1.2, [license GPL 3.0](../LICENSE)
 
 Windows 10 user should install from microsoft store to avoid smartscreen warnings
 	  
