@@ -5,15 +5,13 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 <table>
 	<tr>
 	    <td>
-		<h3>
-			License: GPL 3.0<br/><br/>
-			Stable release: 1.2<br/><br/>
-			Installation: <br/>
+		<h3>License: GPL 3.0<br/><br/></h3>
+		<h3>Stable release: 1.2<br/><br/></h3>
+		<h3>Installation: <br/></h3>
 	<a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a><br/><br/>
-			Portable app:<br/>
+		<h3>Portable app:<br/></h3>
 	<a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm.exe">tinyTerm.exe(x86)</a><br/>
 	<a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm64.exe">tinyTerm64.exe(x64)</a>
-		</h3>
 	    </td>
 	    <td>
 		<img src="tinyTerm.gif">
@@ -21,11 +19,7 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 	</tr>
 </table>
 
-Current stable release is 1.2, [license GPL 3.0](https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE)
-
-Windows 10 user should install from microsoft store to avoid smartscreen warnings
-	  
-Users running earlier versions of Windows, or prefer the portable version, download and extract tinyTerm.zip
+While feature set has grown, the size is still tiny, the x86 executable is only 216KB, x64 executable only 255KB, the exe files is all that's needed to run tinyTerm, no installation, no external dll. All functions implemented using C and Win32 API, ssh functions provided by ![libssh2](http://libssh2.org), which is statically linked in the exe. 
 
 ---
 
