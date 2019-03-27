@@ -14,7 +14,10 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 	<a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm64.exe">tinyTerm64.exe(x64)</a>
 	    </td>
 	    <td>
-		<img src="tinyTerm.gif">
+		<video width="558" height="410" controls>
+			<source src="tinyTerm.mp4" type="video/mp4">
+			Your browser does not support the video tag.
+		</video>
 	    </td>
 	</tr>
 </table>
