@@ -1,68 +1,59 @@
 ## Introduction
 
-tinyTerm is a simple telnet and serial terminal emulator, supporting serial, telnet, ssh, sftp and netconf connections in a ultra small 256KB executable, designed with unique features for command line interfaces user:
-	
-	- command autocompletion, easier to type long commands repeatedly
-	- batch automation, easier to send batch commands to multiple devices
-	- scp integration, easier to transfer files to and from servers
-	- embedded ftpd/tftpd, easier to perform software upgrade for network elements
-	- xmlhttp scripting interface, easier to add new functionality
-	
-## Terminal Emulation
-<table><tr><td width="400">
-Each time a connection is made using the connect dialog, an entry will be added to the Term menu, simply select the menu entry to make the same connection again. A selected set of escape code control sequence was implemented to support unix utilities like top, vi etc,   
-</td><td width="600">
-<img src="/tinyTerm/tinyTerm-1.gif" alt="emulation" />
-</td></tr></table>
+As implied by the same, tinyTerm is designed to be the smallest terminal emulator available. How small? In release 1.2, the x86 executable is only 216KB, the x64 executable is only 255KB, and the exe is the whole package, there is no installation needed, no dll required. 
 
-## Command Autocompletion
-<table><tr><td width="400">
-When local edit mode is enabled, key presses are not sent until user presses "Enter" key, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs. Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. 
-</td><td width="600">
-<img src="/tinyTerm/tinyTerm-2.gif" alt="emulation" />
-</td></tr></table>
-Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
+Being small in size doesn't mean function set is small too, in addition to supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation to run unix utilities like top, vi and raspi-config etc, tinyTerm also sports a few features that's not being offered by any other terminal emulators:
+	
+	- **command autocompletion** no more typing of long commands repeatedly
+	- **batch automation** drag&drop to run CLI script, no more copy paste of one command at a time
+	- **scp integration** drag&drop to transfer files in ssh sessions, no seperate scp utility needed
+	- **embedded ftpd/tftpd** to perform software upgrade or database backup on managed devices
+	- **xmlhttp interface** easily adding new functionality via scripting language like javascript
 
-## Batch Automation
-<table><tr><td width="400">
+![trailer](tinyTerm.gif)
+
+## Installation
+
+Current stable release is version 1.2, [license GPL 3.0](../blob/master/LICENSE)
+
+Windows 10 user should install from microsoft store to avoid smartscreen warnings
+	  
+Users running earlier versions of Windows, or prefer the portable version, download and extract tinyTerm.zip
+
+---
+
+## Usage notes
+
+### Making Connection
+Each time a connection is made using the connect dialog, an entry will be added to the Term menu, simply select the menu entry to make the same connection again. When choosing serial protocol in connection dialog, available serial ports will be auto detected and added to the ports dropdown list.
+
+### Command Autocompletion
+When local edit mode is enabled, key presses are not sent to remote host until "Enter" key is pressed, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs. Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. 
+
+Default command history file location is %USERPROFILE%\documents\tinyTerm\tinyTerm.hist, copy tinyTerm.hist to the same folder as tinyTerm.exe for portable usage. Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
+
+### Batch Automation
 To automate the execution of commands, simply drag and drop a list of commands from text editor, or select "Run..." from Script menu and select a text file with all the commands to be executed, tinyTerm send one command at a time, wait for prompt string before sending the next command, to avoid overflowing the receive buffer of the remote host or network device. 
-</td><td width="600">
- <img src="/tinyTerm/tinyTerm-3.gif" alt="emulation" />
-</td></tr></table>
 
-Most command line interface system uses a prompt string to tell user it’s ready for the next command, for example “> “or “$ “used by Cisco routers. tinyTerm will auto detect the prompt string used by remote host when user is typing commands interactively, and use the detected prompt string during scripting. Additionally, prompt string can be set in the script using special command “!Prompt {str}”, refer to appendix A for details and other special commands supported for scripting. 
+Most command line interface system uses a prompt string to tell user it’s ready for the next command, for example "> " or "$ " used by Cisco routers. tinyTerm will auto detect the prompt string used by remote host when user is typing commands interactively, and use the detected prompt string during scripting. Additionally, prompt string can be set in the script using special command "!Prompt {str}", refer to appendix A for details and other special commands supported for scripting. 
 
-
-## SCP integration
-<table><tr><td width="400">
-When a SSH session is established in tinyTerm, simply drag and drop files to the terminal window will cause those files been transfered to remote host using SCP, remote files will be created in the current directory. 
+### SCP integration
+When a SSH or SFTP session is established in tinyTerm, simply drag and drop files to the terminal window will cause those files been transfered to remote host using SCP or SFTP put, remote files will be created in the current directory. 
 
 To copy file from server to a local folder, simple select the filename in the terminal windows, then chose "scp_to_folder.js" from script menu. 
 
-</td><td width="600">
-<img src="/tinyTerm/tinyTerm-4.gif" alt="scp integration" />
-</td></tr></table>
-
-
-## FTPd/TFTPd
-
+### FTPd/TFTPd
 A built in FTP server can be used for simple file transfer tasks, like software download to network devices. Only one user name "tiny" is allowed to login, with password "term". For security, user session to the FTP server is timed out in 1 minute without action, and FTP server will time out in 15 minutes without active connection.
 
 Similarly a built in TFTP server can be used for file transfer with simpler devices like cable modems. TFTP server times out after 5 minutes. 
 
-## Installation
-
-Windows 10 user should install from microsoft store to avoid smartscreen warnings
-	  
-Users with previous versions of windows, or prefer portable application "download zip", just extract all files to perfered location, double click on tinyTerm.exe or tinyTerm64.exe to run, no installation required, no dll needed.
-
-### License: open source GPL 3.0
 
 
-## Script Extension
+
+## Extending tinyTerm
 Built in xmlhttp interface at 127.0.0.1:8080 allows tinyTerm to be controled programmatically. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. 
 
-The script scp_to_folder.js referenced in the previous section, which retrieves the selected filename “tinyTerm64.exe” and uses “!scp” command to download from remote host, all operation are performed using xmlhttp://127.0.0.1:8080 to send command through tinyTerm. 
+The script scp_to_folder.js referenced in the previous section, is a perfect example of extending tinyTerm with scripting
 
 ```js
 // Javascript to download a highlighted file via scp.
