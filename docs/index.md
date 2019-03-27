@@ -7,12 +7,12 @@ Being small in size doesn't mean function set is small too, in addition to suppo
 <table>
 	<tr>
 	    <td>
-		<h4>command autocompletion<br>
-		    batch automation<br>
-		    scp integration<br>
-		    ftpd and tftpd<br>
-		    xmlhttp interface<br>
-		</h4>
+		<h3>command autocompletion<br/>
+		    batch automation<br/>
+		    scp integration<br/>
+		    ftpd and tftpd<br/>
+		    xmlhttp interface<br/>
+		</h3>
 	    </td>
 	    <td>
 		<img src="tinyTerm.gif">
