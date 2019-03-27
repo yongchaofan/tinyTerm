@@ -14,13 +14,13 @@ Being small in size doesn't mean function set is small too, in addition to suppo
 
 ![trailer](tinyTerm.gif)
 
-Current stable release is version 1.2, [license GPL 3.0](../blob/master/LICENSE)
+Current stable release is 1.2, [license GPL 3.0](../blob/master/LICENSE)
 
 Windows 10 user should install from microsoft store to avoid smartscreen warnings
 	  
 Users running earlier versions of Windows, or prefer the portable version, download and extract tinyTerm.zip
 
-
+---
 
 ## Usage notes
 
@@ -47,8 +47,7 @@ A built in FTP server can be used for simple file transfer tasks, like software 
 
 Similarly a built in TFTP server can be used for file transfer with simpler devices like cable modems. TFTP server times out after 5 minutes. 
 
-
-
+---
 
 ## Extending tinyTerm
 
