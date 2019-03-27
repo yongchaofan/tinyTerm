@@ -1,18 +1,17 @@
 ## Introduction
 
-As implied by the same, tinyTerm is designed to be the smallest terminal emulator available. How small? In release 1.2, the x86 executable is only 216KB, the x64 executable is only 255KB, and the exe is the whole package, there is no installation needed, no dll required. 
-
-Being small in size doesn't mean function set is small too, in addition to supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation to run unix utilities like top, vi and raspi-config etc, tinyTerm also sports a set of unique features:
+tinyTerm started as a simple telnet client used to work with telecom transport equipment using the TL1 command line user interface. Over the years it has grown to a full function terminal emulator with support of serial, telnet, ssh, sftp and netconf connections, xterm emulation plus some unique features like: --command autocompletion--, --scp integration-- and --batch automation--. 
 	
 <table>
 	<tr>
 	    <td>
 		<h3>
-			<li>command autocompletion</li>
-			<li>batch automation</li>
-			<li>scp integration</li>
-			<li>ftpd and tftpd</li>
-			<li>xmlhttp interface</li>
+			License: GPL 3.0<br/>
+			Stable release: 1.2<br/>
+			Installation: Microsoft Store<br/>
+			Portable app:<br/>
+				tinyTerm.exe(x86)
+				tinyTerm64.exe(x64)
 		</h3>
 	    </td>
 	    <td>
