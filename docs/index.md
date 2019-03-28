@@ -5,18 +5,18 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 <table>
 	<tr>
 	    <td>
-		<h3>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a><br/></h3>
-		<h3>Stable release</h3>: 1.2<br/>
-		    <h3>Installation: </h3> <a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a><br/>
-		<h3>Portable app:</h3>
-	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm.exe">tinyTerm.exe</a><br/>
-	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm64.exe">tinyTerm64.exe</a>
-	    </td>
-	    <td>
 		<video width="558" height="410" controls>
 			<source src="tinyTerm.mp4" type="video/mp4">
 			Your browser does not support the video tag.
 		</video>
+	    </td>
+	    <td>
+		<h4>License</h4>: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a><br/>
+		<h4>Stable release</h4>: 1.2<br/>
+		<h4>Installation: </h4> <a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a><br/>
+		<h4>Portable app:</h4>
+	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm.exe">tinyTerm.exe</a><br/>
+	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm64.exe">tinyTerm64.exe</a>
 	    </td>
 	</tr>
 </table>
