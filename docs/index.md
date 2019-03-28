@@ -52,18 +52,19 @@ tinyTerm is written in C with Win32 API, ssh functions provided by [libssh2](htt
 > 
 > To copy file from server to a local folder, select the filename in the terminal window, then chose "scp_to_folder.js" from script menu.
 > 
-> ### FTPd/TFTPd
+> ### FTPd/TFTPd/HTTPd
 > A built in FTP server can be used for simple file transfer tasks, like software download to network devices. Only one user name "tiny" is allowed to login, with password "term". For security, user session to the FTP server is timed out in 1 minute without action, and FTP server will time out in 15 minutes without active connection.
 > 
 > Similarly a built in TFTP server can be used for file transfer with simpler devices like cable modems. TFTP server times out after 5 minutes. 
-
+> 
+> A built in HTTP server is started as soon as tinyTerm is started, for the first instance of tinyTerm running, HTTPd listens at 127.0.0.1:8080, the second instance listens at 127.0.0.1:8081, the third instance listens at 127.0.0.1:8082, so on and so forth. Since it's listening on 127.0.0.1 only, the HTTPd will only accept connections from local machine, for the purpose of scripting. 
 ---
 
-## Extending tinyTerm
+## Scripting in tinyTerm
 
 Built in xmlhttp interface at 127.0.0.1:8080 allows tinyTerm to be controled programmatically. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. 
 
-The script scp_to_folder.js referenced in the previous section, is a perfect example of extending tinyTerm with scripting
+The script scp_to_folder.js referenced in the trailer, is a perfect example of extending tinyTerm with scripting
 
 ```js
 // Javascript to download a highlighted file via scp.
@@ -88,29 +89,29 @@ In line edit mode, when special characters “!” is typed at the beginning of 
 ## list of supported special commands:
 
 ### Connection
-    !com3:9600,n,8,1	connect to serial port com3 with 9600,n,8,1
+    !com3:9600,n,8,1	connect to serial port com3 with settings 9600,n,8,1
     !telnet 192.168.1.1	telnet to 192.168.1.1
-    !ssh pi@192.168.1.1	ssh to host 192.168.1.1
-    !sftp 192.168.1.1	sftp to host 192.168.1.1 with user admin
-    !netconf rtr1:830	netconf to port 830 of host 192.168.1.1
+    !ssh pi@piZero:2222	ssh to host piZero port 2222 with username pi
+    !sftp -P 2222 jun01	sftp to host jun01 port 2222
+    !netconf rtr1	netconf to port 830(default) of host rtr1
     !disconn		disconnect from current connection
-    !{DOS command}	execute command and display result, e.g. ping 192.168.1.1
-    !Find {string}	search for {string} in current scroll buffer
+    !{DOS command} 	execute command and display result, e.g. ping 192.168.1.1
+    !Find {string} 	search for {string} in scroll back buffer
 
 ### Automation
     !Clear		set clear scroll back buffer
-    !Prompt $%20	set command prompt to “$ “, for batch command execution
-    !Timeout 30		set time out to 30 seconds for batch command execution
-    !Wait 10		wait 10 seconds during batch command execution
-    !Waitfor 100%	wait for “100%” from during batch command execution
-    !Loop 2		repeat two times from start of script
+    !Prompt $%20	set command prompt to “$ “, for CLI script
+    !Timeout 30		set time out to 30 seconds for CLI script
+    !Wait 10		wait 10 seconds during execution of CLI script
+    !Waitfor 100%	wait for “100%” from host during execution of CLI script
+    !Loop 2		repeat two times from start of CLI script
     !Log test.log	start/stop logging with log file test.log
 
 ### Scripting
     !Disp test case #1	display “test case #1” in terminal window
     !Send exit		send “exit” to host
     !Recv		get all text received since last Send/Recv
-    !Echo		toggle local ech on/off
+    !Echo		toggle local echo on/off
     !Selection		get current selected text
 
 ### Options
