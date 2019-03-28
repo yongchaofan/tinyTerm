@@ -4,8 +4,8 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 	
 <table>
 	<tr>
-	    <td>
-		<video width="558" height="410" controls>
+	    <td width="568">
+		<video width="560" height="412" controls>
 			<source src="tinyTerm.mp4" type="video/mp4">
 			Your browser does not support the video tag.
 		</video>
