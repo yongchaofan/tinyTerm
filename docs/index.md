@@ -132,13 +132,13 @@ These commands can be used programatically for scripting or interactively in loc
     !FontSize 18	set font size to 18
 
 ### Extras
-    !Ftpd c:/tmp	start/stop ftp server using c:/tmp as root directory
-    !Tftpd c:/tmp	start/stop tftp server using c:/tmp as root directory
+    !Ftpd c:/tmp        start/stop ftp server using c:/tmp as root directory
+    !Tftpd c:/tmp       start/stop tftp server using c:/tmp as root directory
 
-    !scp tt.txt :t1.txt	secure copy local file tt.txt to remote host as t1.txt
-    !scp :*.txt d:/ 	secure copy remote files *.txt to local d:/
+    !scp tt.txt :t1.txt secure copy local file tt.txt to remote host as t1.txt
+    !scp :*.txt d:/     secure copy remote files *.txt to local d:/
 
     !tun 127.0.0.1:2222 127.0.0.1:22 
-    			start ssh2 tunnel from localhost port 2222 to remote host port 22
-    !tun		list all ssh2 tunnels 
-    !tun 3256		close ssh2 tunnel number 3256
+                        start ssh2 tunnel from localhost port 2222 to remote host port 22
+    !tun                list all ssh2 tunnels 
+    !tun 3256           close ssh2 tunnel number 3256
