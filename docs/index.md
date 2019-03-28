@@ -59,11 +59,19 @@ tinyTerm is written in C with Win32 API, ssh functions provided by [libssh2](htt
 > 
 > A built in HTTP server is started as soon as tinyTerm is started, for the first instance of tinyTerm running, HTTPd listens at 127.0.0.1:8080, the second instance listens at 127.0.0.1:8081, the third instance listens at 127.0.0.1:8082, so on and so forth. Since it's listening on 127.0.0.1 only, the HTTPd will only accept connections from local machine, for the purpose of scripting. 
 
----
 
-## Scripting in tinyTerm
+=============================================================================================
 
-Built in xmlhttp interface at 127.0.0.1:8080 allows tinyTerm to be controled programmatically. VBScript and JavaScript are two of the scripting languages that can take advantage of the xmlhttp interface. 
+## Scripting interface
+
+The Built in HTTP server will accept GET request from local machine, which mean any script running on the same machine can connect to tinyTerm and request either a file or the result of a tinyTerm command, 
+
+for example:
+	- http://127.0.0.1:8080/tinyTerm.html	will return tinyTerm.html from current working folder
+	- http://127.0.0.1:8080/?ls%20-al	will return the result of "ls -al" from remote host
+	- http://127.0.0.1:8080/?!Selection 	will return current selected text from scroll back buffer
+	
+Notice the "!" just before "Selection" in the last example, when a command is started with "!", it's being executed by tinyTerm instead of sent to remote host, There are about 30 such commands available in tinyTerm for the purpose of making connections, setting options, sending commands, scp files, turning up ssh2 tunnels, see appendix for the list of supported tinyTerm commands.
 
 The script scp_to_folder.js referenced in the trailer, is a perfect example of extending tinyTerm with scripting
 
@@ -85,9 +93,10 @@ function term( cmd )
 }
 ```
 
-In line edit mode, when special characters “!” is typed at the beginning of a command, the command will be executed by tinyTerm instead of sending to remote host, for functions like making connection, search scroll buffer, set terminal options, scp file transfer or ssh tunnel setup etc. 
 
-## list of supported special commands:
+
+## Appendix. list of supported tinyTerm commands:
+These commands can be used for scripting or used in line edit mode, with “!” at the beginning of a command, the command will be executed by tinyTerm instead of sending to remote host. 
 
 ### Connection
     !com3:9600,n,8,1	connect to serial port com3 with settings 9600,n,8,1
