@@ -1,6 +1,6 @@
 ## Introduction
 
-tinyTerm started as a simple telnet client used to work with telecom transport equipment using the TL1 command line user interface. Over the years it has grown to a full function terminal emulator with support of serial, telnet, ssh, sftp and netconf connections, xterm emulation plus unique features like: **command autocompletion**, **drag and drop to scp files**, **drag and drop to run scripts**, and **automate complex tasks** with any scripting language. 
+tinyTerm started as a simple telnet client used to work with telecom transport equipment through command line interface(TL1). Over time  it has grown to a full function terminal emulator supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation,  plus unique features like: **command autocompletion**, **integrated scp**, **batch automation**, and **scripting**. 
 	
 <table>
 	<tr>
