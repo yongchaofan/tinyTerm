@@ -28,12 +28,16 @@ With the grown set of features, tinyTerm still strives to be the smallest in siz
 ## Usage notes
 
 > ### Making Connection
-> Each time a connection is made using the connect dialog, an entry will be added to the Term menu, simply select the menu entry to make the same connection again. When choosing serial protocol in connection dialog, available serial ports will be auto detected and added to the ports dropdown list.
+> Each time a connection is made using the connect dialog, an entry will be added to the Term menu, simply select the menu entry to make the same connection again. 
+> 
+> For serial connections, available serial ports will be auto detected and added to the ports dropdown list in connection dialog.
+> 
+> for netconf connections, typing netconf messages is possible but not really practical, it's better to use a text or xml editor to compose the messages and then drag&drop to the terminal window. 
 > 
 > ### Command Autocompletion
 > When local edit mode is enabled, key presses are not sent to remote host until "Enter" key is pressed, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs. Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. 
 > 
-> Default command history file location is %USERPROFILE%\documents\tinyTerm\tinyTerm.hist, copy tinyTerm.hist to the same folder as tinyTerm.exe for portable usage. Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
+> Command history file is saved as %USERPROFILE%\documents\tinyTerm\tinyTerm.hist by default, copy tinyTerm.hist to the same folder as tinyTerm.exe for portable use. Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
 > 
 > ### Batch Automation
 > To automate the execution of commands, simply drag and drop a list of commands from text editor, or select "Run..." from Script menu and select a text file with all the commands to be executed, tinyTerm send one command at a time, wait for prompt string before sending the next command, to avoid overflowing the receive buffer of the remote host or network device. 
@@ -41,9 +45,9 @@ With the grown set of features, tinyTerm still strives to be the smallest in siz
 > Most command line interface system uses a prompt string to tell user it’s ready for the next command, for example "> " or "$ " used by Cisco routers. tinyTerm will auto detect the prompt string used by remote host when user is typing commands interactively, and use the detected prompt string during scripting. Additionally, prompt string can be set in the script using special command "!Prompt {str}", refer to appendix A for details and other special commands supported for scripting. 
 > 
 > ### SCP integration
-> When a SSH or SFTP session is established in tinyTerm, simply drag and drop files to the terminal window will cause those files been transfered to remote host using SCP or SFTP put, remote files will be created in the current directory. 
+> When a SSH or SFTP session is established in tinyTerm, simply drag and drop files to the terminal window will cause those files to be transfered to remote host using SCP or SFTP put, remote files will be created in the current directory. 
 > 
-> To copy file from server to a local folder, simple select the filename in the terminal windows, then chose "scp_to_folder.js" from script menu. 
+> To copy file from server to a local folder, select the filename in the terminal window, then chose "scp_to_folder.js" from script menu.
 > 
 > ### FTPd/TFTPd
 > A built in FTP server can be used for simple file transfer tasks, like software download to network devices. Only one user name "tiny" is allowed to login, with password "term". For security, user session to the FTP server is timed out in 1 minute without action, and FTP server will time out in 15 minutes without active connection.
