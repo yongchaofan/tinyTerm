@@ -97,7 +97,7 @@ function term( cmd )
 
 
 ## Appendix. list of supported tinyTerm commands:
-These commands can be used for scripting or used in line edit mode, with “!” at the beginning of a command, the command will be executed by tinyTerm instead of sending to remote host. 
+These commands can be used programatically for scripting or interactively in local edit mode.
 
 ### Connection
     !com3:9600,n,8,1	connect to serial port com3 with settings 9600,n,8,1
