@@ -58,15 +58,16 @@ tinyTerm is written in C with Win32 API, ssh functions provided by [libssh2](htt
 > Similarly a built in TFTP server can be used for file transfer with simpler devices like cable modems. TFTP server times out after 5 minutes. 
 > 
 > A built in HTTP server is started as soon as tinyTerm is started, for the first instance of tinyTerm running, HTTPd listens at 127.0.0.1:8080, the second instance listens at 127.0.0.1:8081, the third instance listens at 127.0.0.1:8082, so on and so forth. Since it's listening on 127.0.0.1 only, the HTTPd will only accept connections from local machine, for the purpose of scripting. 
+> 
 
-
-=============================================================================================
+___
 
 ## Scripting interface
 
 The Built in HTTP server will accept GET request from local machine, which mean any script running on the same machine can connect to tinyTerm and request either a file or the result of a tinyTerm command, 
 
 for example:
+
 	- http://127.0.0.1:8080/tinyTerm.html	will return tinyTerm.html from current working folder
 	- http://127.0.0.1:8080/?ls%20-al	will return the result of "ls -al" from remote host
 	- http://127.0.0.1:8080/?!Selection 	will return current selected text from scroll back buffer
