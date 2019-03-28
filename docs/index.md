@@ -27,13 +27,16 @@ tinyTerm is written in C with Win32 API, ssh functions provided by [libssh2](htt
 
 ## Usage notes
 
-> ### Making Connection
+> ### Terminal Emulation
 > Each time a connection is made using the connect dialog, an entry will be added to the Term menu, simply select the menu entry to make the same connection again. 
 > 
 > For serial connections, available serial ports will be auto detected and added to the ports dropdown list in connection dialog.
 > 
 > for netconf connections, typing netconf messages is possible but not really practical, it's better to use a text or xml editor to compose the messages and then drag&drop to the terminal window. 
 > 
+> Press left mouse button and drag to select text, selected text are copied to clipboard when left button is released. Right click to paste text from clipboard
+>
+> Scroll back buffer holds 8000 lines of text, the "Save all" function from Term menu allows user to save the whole buffer to a file. Use pageup key or mouse wheel to scroll back, scrollbar will appear when pageup is pressed, and will hide when scrolled all the way down. 
 > ### Command Autocompletion
 > When local edit mode is enabled, key presses are not sent to remote host until "Enter" key is pressed, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs. Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. 
 > 
