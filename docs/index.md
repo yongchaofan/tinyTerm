@@ -34,7 +34,7 @@ tinyTerm is written in C with Win32 API, ssh functions provided by [libssh2](htt
 > 
 > for netconf connections, typing netconf messages is possible but not really practical, it's better to use a text or xml editor to compose the messages and then drag&drop to the terminal window. 
 > 
-> Press left mouse button and drag to select text, selected text are copied to clipboard when left button is released. Right click to paste text from clipboard
+> Press left mouse button and drag to select text, selected text are copied to clipboard when left button is released. Double click to select and copy the whole word under mouse pointer. Right click to paste text from clipboard
 >
 > Scroll back buffer holds 8000 lines of text, the "Save all" function from Term menu allows user to save the whole buffer to a file. Use pageup key or mouse wheel to scroll back, scrollbar will appear when pageup is pressed, and will hide when scrolled all the way down. 
 > ### Command Autocompletion
@@ -58,6 +58,7 @@ tinyTerm is written in C with Win32 API, ssh functions provided by [libssh2](htt
 > Similarly a built in TFTP server can be used for file transfer with simpler devices like cable modems. TFTP server times out after 5 minutes. 
 > 
 > A built in HTTP server is started as soon as tinyTerm is started, for the first instance of tinyTerm running, HTTPd listens at 127.0.0.1:8080, the second instance listens at 127.0.0.1:8081, the third instance listens at 127.0.0.1:8082, so on and so forth. Since it's listening on 127.0.0.1 only, the HTTPd will only accept connections from local machine, for the purpose of scripting. 
+
 ---
 
 ## Scripting in tinyTerm
@@ -124,8 +125,8 @@ In line edit mode, when special characters “!” is typed at the beginning of 
     !Ftpd c:/tmp	start/stop ftp server using c:/tmp as root directory
     !Tftpd c:/tmp	start/stop tftp server using c:/tmp as root directory
 
-    !scp tt.txt :t1.txt	secure copy local file test.txt to remote host as test1.txt
-    !scp :t1.txt d:/ 	secure copy remote file test1.txt to local d:/test1.txt
+    !scp tt.txt :t1.txt	secure copy local file tt.txt to remote host as t1.txt
+    !scp :*.txt d:/ 	secure copy remote files *.txt to local d:/
 
     !tun 127.0.0.1:2222 127.0.0.1:22 
     			start ssh2 tunnel from localhost port 2222 to remote host port 22
