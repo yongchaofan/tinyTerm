@@ -21,7 +21,7 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 	</tr>
 </table>
 
-With the grown set of features, tinyTerm still strives to be the smallest in size, x86 executable is only 216KB, x64 exe at 255KB, the exe files is all that's needed to run tinyTerm, no external dll needed, no installation required. All functions implemented using C and Win32 API, ssh functions provided by [libssh2](http://libssh2.org), which is statically linked in the exe. 
+tinyTerm is written in C with Win32 API, ssh functions provided by [libssh2](http://libssh2.org).
 
 ---
 
