@@ -74,7 +74,7 @@ for example:
 	
 Notice the "!" just before "Selection" in the last example, when a command is started with "!", it's being executed by tinyTerm instead of sent to remote host, There are about 30 such commands available in tinyTerm for the purpose of making connections, setting options, sending commands, scp files, turning up ssh2 tunnels, see appendix for the list of supported tinyTerm commands.
 
-The script scp_to_folder.js referenced in the trailer, is a perfect example of extending tinyTerm with scripting
+The script scp_to_folder.js referenced in the trailer, is a perfect example of scripting tinyTerm
 
 ```js
 // Javascript to download a highlighted file via scp.
