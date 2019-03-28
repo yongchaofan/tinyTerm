@@ -100,36 +100,36 @@ function term( cmd )
 These commands can be used programatically for scripting or interactively in local edit mode.
 
 ### Connection
-    !com3:9600,n,8,1	connect to serial port com3 with settings 9600,n,8,1
-    !telnet 192.168.1.1	telnet to 192.168.1.1
-    !ssh pi@piZero:2222	ssh to host piZero port 2222 with username pi
-    !sftp -P 2222 jun01	sftp to host jun01 port 2222
-    !netconf rtr1	netconf to port 830(default) of host rtr1
-    !disconn		disconnect from current connection
-    !{DOS command} 	execute command and display result, e.g. ping 192.168.1.1
-    !Find {string} 	search for {string} in scroll back buffer
+    !com3:9600,n,8,1    connect to serial port com3 with settings 9600,n,8,1
+    !telnet 192.168.1.1 telnet to 192.168.1.1
+    !ssh pi@piZero:2222 ssh to host piZero port 2222 with username pi
+    !sftp -P 2222 jun01 sftp to host jun01 port 2222
+    !netconf rtr1       netconf to port 830(default) of host rtr1
+    !disconn            disconnect from current connection
+    !{DOS command}      execute command and display result, e.g. ping 192.168.1.1
+    !Find {string}      search for {string} in scroll back buffer
 
 ### Automation
-    !Clear		set clear scroll back buffer
-    !Prompt $%20	set command prompt to “$ “, for CLI script
-    !Timeout 30		set time out to 30 seconds for CLI script
-    !Wait 10		wait 10 seconds during execution of CLI script
-    !Waitfor 100%	wait for “100%” from host during execution of CLI script
-    !Loop 2		repeat two times from start of CLI script
-    !Log test.log	start/stop logging with log file test.log
+    !Clear              set clear scroll back buffer
+    !Prompt $%20        set command prompt to “$ “, for CLI script
+    !Timeout 30	        set time out to 30 seconds for CLI script
+    !Wait 10            wait 10 seconds during execution of CLI script
+    !Waitfor 100%       wait for “100%” from host during execution of CLI script
+    !Loop 2             repeat two times from start of CLI script
+    !Log test.log       start/stop logging with log file test.log
 
 ### Scripting
-    !Disp test case #1	display “test case #1” in terminal window
-    !Send exit		send “exit” to host
-    !Recv		get all text received since last Send/Recv
-    !Echo		toggle local echo on/off
-    !Selection		get current selected text
+    !Disp test case #1  display “test case #1” in terminal window
+    !Send exit          send “exit” to host
+    !Recv               get all text received since last Send/Recv
+    !Echo               toggle local echo on/off
+    !Selection          get current selected text
 
 ### Options
-    !TermSize 100x40	set terminal size to 100 cols x 40 rows
-    !Transparency 192	set window transparency level to 192/255
-    !FontFace Consolas	set font face to “Consolas”
-    !FontSize 18	set font size to 18
+    !TermSize 100x40    set terminal size to 100 cols x 40 rows
+    !Transparency 192   set window transparency level to 192/255
+    !FontFace Consolas  set font face to “Consolas”
+    !FontSize 18        set font size to 18
 
 ### Extras
     !Ftpd c:/tmp        start/stop ftp server using c:/tmp as root directory
