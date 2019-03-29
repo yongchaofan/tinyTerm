@@ -21,7 +21,7 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 	</tr>
 </table>
 
-tinyTerm is written in C with Win32 API, ssh functions provided by [libssh2](http://libssh2.org).
+tinyTerm is written in C with Win32 API, [libssh2](http://libssh2.org) used for SSH2 functions.
 
 ---
 
@@ -64,15 +64,15 @@ ___
 
 ## Scripting interface
 
-The Built in HTTP server will accept GET request from local machine, which mean any script running on the same machine can connect to tinyTerm and request either a file or the result of a tinyTerm command, 
+The Built in HTTP server will accept GET request from local machine, which means any program running on the same machine, be it a browser or a javascript or any other script, can connect to tinyTerm and request either a file or the result of a tinyTerm command, 
 
 for example:
 
-	- http://127.0.0.1:8080/tinyTerm.html	will return tinyTerm.html from current working folder
-	- http://127.0.0.1:8080/?ls%20-al	will return the result of "ls -al" from remote host
-	- http://127.0.0.1:8080/?!Selection 	will return current selected text from scroll back buffer
+	- http://127.0.0.1:8080/tinyTerm.html	return tinyTerm.html from current working folder
+	- http://127.0.0.1:8080/?ls%20-al	return the result of "ls -al" from remote host
+	- http://127.0.0.1:8080/?!Selection 	return current selected text from scroll back buffer
 	
-Notice the "!" just before "Selection" in the last example, when a command is started with "!", it's being executed by tinyTerm instead of sent to remote host, There are about 30 such commands available in tinyTerm for the purpose of making connections, setting options, sending commands, scp files, turning up ssh2 tunnels, see appendix for the list of supported tinyTerm commands.
+Notice the "!" just before "Selection" in the last example, when a command is started with "!", it's being executed by tinyTerm instead of sent to remote host, There are about 30 tinyTerm commands supported for the purpose of making connections, setting options, sending commands, scp files, turning up ssh2 tunnels, see appendix for the list.
 
 The script scp_to_folder.js referenced in the trailer, is a perfect example of scripting tinyTerm
 
