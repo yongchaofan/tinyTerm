@@ -64,7 +64,7 @@ ___
 
 ## Scripting interface
 
-The Built in HTTP server will accept GET request from local machine, which means any program running on the same machine, be it a browser or a javascript or any other script, can connect to tinyTerm and request either a file or the result of a tinyTerm command, 
+The Built in HTTP server will accept GET request from local machine, which means any program running on the same machine, be it a browser or a javascript or any other script, can connect to tinyTerm and request either a file or the result of a command, 
 
 for example:
 
