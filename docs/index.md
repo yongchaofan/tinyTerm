@@ -1,3 +1,6 @@
+**the Microsoft Store listing is make unavailable temporarily, because it was reported that when install from the store, making connection to unreachable host will cause tinyTerm to crash, the store listing will be enabled as soon as this problem is fixed. **
+** the portable exe download from this page is not affected by the crashing issue.**
+
 ## Introduction
 
 tinyTerm started as a simple telnet client used to work with telecom transport equipment through command line interface(TL1). Over time  it has grown to a full function terminal emulator supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation,  plus unique features like: **command autocompletion**, **scp integration**, **batch automation**, and **scripting**. 
