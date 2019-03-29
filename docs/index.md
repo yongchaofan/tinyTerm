@@ -1,4 +1,4 @@
-**the Microsoft Store listing is make unavailable temporarily, because it was reported that when install from the store, making connection to unreachable host will cause tinyTerm to crash, the store listing will be enabled as soon as this problem is fixed. **
+**the Microsoft Store listing is made unavailable temporarily, because it was reported that when install from the store, making connection to unreachable host will cause tinyTerm to crash, the store listing will be enabled as soon as this problem is fixed. **
 ** the portable exe download from this page is not affected by the crashing issue.**
 
 ## Introduction
