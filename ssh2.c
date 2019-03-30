@@ -1,10 +1,10 @@
 //
-// "$Id: ssh2.c 41840 2019-03-02 21:05:10 $"
+// "$Id: ssh2.c 41955 2019-03-30 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // ssh2.c is the host communication implementation for
-// ssh/sftp/netconf based on libssh2-1.8.1-20180930
+// ssh/sftp/netconf based on libssh2-1.9.0-20190315
 //
 // Copyright 2018-2019 by Yongchao Fan.
 //
@@ -22,8 +22,6 @@
 #include <time.h>
 #include <fcntl.h>
 #include <direct.h>
-//#include <dirent.h>
-//#include <fnmatch.h>
 #include <shlwapi.h>
 int fnmatch( char *pattern, char *file, int flag)
 {
@@ -282,23 +280,26 @@ int ssh_knownhost( HOST *ph )
 			p=ssh2_Gets( ph, "Update hostkey and continue with the risk?(Yes/No):",
 						TRUE);
 			if ( p!=NULL ) {
-				if ( strcmp(p, "Yes")==0 ) 
-					libssh2_knownhost_del(nh, knownhost);
+				if ( *p=='y' || *p=='Y' ) 
+					libssh2_knownhost_del(nh, knownhost);//fall through to add
 				else { 
 					rc = -4; 
-					term_Print( ph->term, "\033[32mDisconnected, stay safe\n");
 					break; 
 				}
 			}
+			else {
+				rc = -4; 
+				break; 
+			}
 		}
-		//fall through if hostkey type mismatch, or hostkey deleted for update
+		//fall through if hostkey type different, or hostkey deleted for update
 	case LIBSSH2_KNOWNHOST_CHECK_NOTFOUND:
 		if ( p == NULL ) {
 			term_Print( ph->term, "%s\n\033[33munknown hostkey!\n", keybuf);
 			p = ssh2_Gets( ph, "Add entry to .ssh/known_hosts?(Yes/No):", TRUE);
 		}
 		if ( p!=NULL ) {
-			if ( strcmp(p, "Yes")==0 ) {
+			if ( *p=='y' || *p=='Y' ) {
 				libssh2_knownhost_addc(nh, ph->hostname, "", key, 
 										len,"**tinyTerm**", 12,
 										LIBSSH2_KNOWNHOST_TYPE_PLAIN|
@@ -312,8 +313,13 @@ int ssh_knownhost( HOST *ph )
 					term_Print( ph->term, "\033[33mcouldn't write hostkey file\n");
 			}
 		}
+		else {
+			rc = -4;
+			break;
+		}
 	}
-
+	
+	if ( rc==-4 ) term_Print( ph->term, "\033[32mDisconnected, stay safe\n");
 	libssh2_knownhost_free(nh);
 	return rc;
 }
