@@ -21,8 +21,7 @@
 #include "tiny.h"
 #include <ws2tcpip.h>
 #include <windows.h>
-#include <direct.h>
-#include <fcntl.h>
+#include <io.h>
 #include <time.h>
 
 DWORD WINAPI stdio( void *pv );
@@ -676,8 +675,8 @@ DWORD WINAPI ftpd(LPVOID p)
 				struct _finddata_t  ffblk;
 				if ( *(param+strlen(param)-1)=='/') strcat(fn, "*.*");
 				if ( *param==0 ) strcat(fn, "\\*.*");
-				int nCode = _findfirst(fn, &ffblk);
-				if ( nCode==-1 ) {
+				intptr_t hFile = _findfirst(fn, &ffblk);
+				if ( hFile==-1 ) {
 					sock_send( "550 No such file or directory\n");
 					continue;
 				}
@@ -708,8 +707,8 @@ DWORD WINAPI ftpd(LPVOID p)
 											ffblk.size, ffblk.name);
 					}
 					send(s2, szBuf, strlen(szBuf), 0);
-				} while ( _findnext(nCode,&ffblk)==0 );
-				_findclose(nCode);
+				} while ( _findnext(hFile, &ffblk)==0 );
+				_findclose(hFile);
 				sock_send( "226 Transfer complete.\n");
 				closesocket(s2);
 			}
@@ -784,29 +783,31 @@ DWORD WINAPI ftpd(LPVOID p)
 			}
 			else if(stricmp("size", szBuf) == 0){
 				struct _finddata_t  ffblk;
-				int  nCode = _findfirst(fn, &ffblk);
-				if ( nCode==-1 )
-					sock_send( "550 No such file or directory\n");
-				else {
+				intptr_t  hFile = _findfirst(fn, &ffblk);
+				if ( hFile!=-1 )
+				{
 					sprintf(szBuf, "213 %lu\n", ffblk.size);
 					sock_send( szBuf );
-					_findclose(nCode);
+					_findclose(hFile);
 				}
+				else
+					sock_send( "550 No such file or directory\n");
 			}
 			else if(stricmp("mdtm", szBuf) == 0) {
 				struct _finddata_t ffblk;
-				int nCode = _findfirst(fn, &ffblk);
-				if ( nCode==-1 )
-					 sock_send( "550 No such file or directory\n");
-				else {
+				intptr_t hFile = _findfirst(fn, &ffblk);
+				if ( hFile!=-1 )
+				{
 					struct tm *t_mod = localtime( &ffblk.time_write);
 					sprintf(szBuf, "213 %4d%02d%02d%02d%02d%02d\n",
 							t_mod->tm_year+1900, t_mod->tm_mon+1,
 							t_mod->tm_mday, t_mod->tm_hour,
 							t_mod->tm_min, t_mod->tm_sec );
 					sock_send( szBuf );
-					_findclose(nCode);
+					_findclose(hFile);
 				}
+				else
+					 sock_send( "550 No such file or directory\n");
 			}
 			else if(stricmp("quit", szBuf) == 0){
 				sock_send( "221 Bye!\n");
@@ -833,7 +834,7 @@ BOOL ftp_Svr(char *root)
 		closesocket( ftp_s0 );
 		ftp_s0 = INVALID_SOCKET;
 	}
-	else {
+	else if ( root!=NULL ) {
 		if ( is_directory( root ) ) {
 			struct sockaddr_in serveraddr;
 			int addrsize=sizeof(serveraddr);
@@ -961,7 +962,7 @@ BOOL tftp_Svr( char *root )
 		closesocket( tftp_s0 );
 		tftp_s0 = INVALID_SOCKET;
 	}
-	else {
+	else if ( root!=NULL ) {
 		if ( is_directory( root ) ) {
 			tftp_s0 = socket(AF_INET, SOCK_DGRAM, 0);
 			tftp_s1 = socket(AF_INET, SOCK_DGRAM, 0);
