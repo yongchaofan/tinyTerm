@@ -1,6 +1,8 @@
 **The Microsoft Store listing is made unavailable temporarily, because it was reported that when installed from the store, making connection to unreachable host will cause tinyTerm to crash, the store listing will be enabled as soon as this problem is fixed.** 
 
-**The portable exe downloaded from this page is not affected by the crashing issue.**
+**Fix has been identified and submitted to Microsoft Store as release 1.2.1, store listing will be made available as soon as microsoft certification completes**
+
+**The portable exe downloaded from this page is not affected by the crashing issue, but it's also updated to releasae 1.2.1**
 
 ## Introduction
 
@@ -15,11 +17,11 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 		</video>
 	    </td>
 	    <td>
-		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.2</a></h4>
+		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.2.1</a></h4>
 		<h4>Appx package:<br/><a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a></h4>
 		<h4>Portable version:<br/>
-	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm.exe">tinyTerm.exe</a><br/>
-	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2/tinyTerm64.exe">tinyTerm64.exe</a></h4>
+	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2.1/tinyTerm.exe">tinyTerm.exe</a><br/>
+	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2.1/tinyTerm64.exe">tinyTerm64.exe</a></h4>
 		<h4>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a></h4>
 	    </td>
 	</tr>
