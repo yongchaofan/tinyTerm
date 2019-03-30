@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 28350 2019-03-15 15:05:10 $"
+// "$Id: host.c 28425 2019-03-15 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -70,7 +70,6 @@ void host_Open( HOST *ph, char *port )
 			reader = netconf;
 		}
 
-		tiny_Connecting();
 		ph->host_status=HOST_CONNECTING;
 		ph->hReaderThread = CreateThread(NULL, 0, reader, ph, 0, NULL);
 	}
@@ -134,7 +133,7 @@ DWORD WINAPI serial(void *pv)
 	ph->hSerial = CreateFileA( port, GENERIC_READ|GENERIC_WRITE, 0, NULL,
 												OPEN_EXISTING, 0, NULL);
 	if ( ph->hSerial==INVALID_HANDLE_VALUE ) {
-		term_Disp( ph->term, "Couldn't open comm port\n" );
+		term_Disp( ph->term, "Couldn't open serial port\n" );
 		goto comm_close;
 	}
 	COMMTIMEOUTS timeouts = { 1, 0, 1, 0, 0 };
@@ -144,7 +143,7 @@ DWORD WINAPI serial(void *pv)
 							//WriteTotalTimeoutMultiplier = 0
 							//WriteTotalTimeoutConstant = 0
 	if ( SetCommTimeouts( ph->hSerial, &timeouts)==0 ) {
-		term_Disp( ph->term, "couldn't set comm timeout\n" );
+		term_Disp( ph->term, "couldn't set serial port timeout\n" );
 		CloseHandle( ph->hSerial );
 		goto comm_close;
 	}
@@ -155,7 +154,7 @@ DWORD WINAPI serial(void *pv)
 	dcb.DCBlength = sizeof(dcb);
 	BuildCommDCBA(p, &dcb);
 	if ( SetCommState( ph->hSerial, &dcb )==0 ) {
-		term_Disp( ph->term, "Invalid comm port settings\n" );
+		term_Disp( ph->term, "Invalid serial port settings\n" );
 		CloseHandle( ph->hSerial );
 		goto comm_close;
 	}
@@ -164,6 +163,7 @@ DWORD WINAPI serial(void *pv)
 	ph->host_status=HOST_CONNECTED;
 	ph->host_type = SERIAL;
 	term_Title( ph->term, ph->hostname );
+	term_Disp( ph->term, "Connected\n");
 	ph->hExitEvent = CreateEventA( NULL, TRUE, FALSE, "COM exit" );
 	while ( WaitForSingleObject( ph->hExitEvent, 0 ) == WAIT_TIMEOUT ) {
 		char buf[256];
@@ -223,7 +223,8 @@ DWORD WINAPI telnet( void *pv )
 		ph->host_status=HOST_CONNECTED;
 		ph->host_type=TELNET;
 		term_Title( ph->term, ph->hostname );
-		
+		term_Disp(ph->term, "Connected\n");
+
 		char buf[1536];
 		int cnt;
 		while ( (cnt=recv(ph->sock, buf, 1500, 0)) > 0 ) {
@@ -236,7 +237,7 @@ DWORD WINAPI telnet( void *pv )
 		closesocket(ph->sock);
 	}
 	else
-		term_Disp( ph->term,  "connection failure!\r\n" );
+		term_Disp( ph->term,  "connection failure!\n" );
 
 	ph->host_status=HOST_IDLE;
 	ph->hReaderThread = NULL;
@@ -317,7 +318,7 @@ DWORD WINAPI stdio( void *pv)
 		ph->host_type = 0;
 	}
 	else
-		term_Disp( ph->term, "Couldn't create STDIO process\r\n" );
+		term_Disp( ph->term, "Couldn't create process\n" );
 
 	CloseHandle( ph->hStdioRead );
 	CloseHandle( ph->hStdioWrite );
@@ -328,7 +329,7 @@ DWORD WINAPI stdio( void *pv)
 void stdio_Close(HOST *ph)
 {
 	if ( WaitForSingleObject(piStd.hProcess, 100)==WAIT_TIMEOUT ) {
-		term_Disp( ph->term, "Terminating stdio process...\r\n" );
+		term_Disp( ph->term, "Terminating process...\n" );
 		TerminateProcess(piStd.hProcess,0);
 	}
 	CloseHandle(piStd.hThread);
@@ -368,7 +369,7 @@ void httpFile( int s1, char *file)
 	strftime( timebuf, sizeof(timebuf), RFC1123FMT, gmtime( &now ) );
 
     struct stat sb;
-	if ( stat( file, &sb ) ==-1 ) {
+	if ( stat( file, &sb )==-1 || strstr(file, ".." )!=NULL ) {
 		len=sprintf(reply, "HTTP/1.1 404 not found\nDate: %s\nServer: tinyTerm_httpd\n", timebuf);
 		len+=sprintf(reply+len, "Content-Type: text/html\nContent-Length: 14\n\n");
 	    send(s1, reply, len, 0);

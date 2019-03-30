@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 37553 2019-03-20 14:35:10 $"
+// "$Id: tiny.c 38088 2019-03-20 14:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -22,10 +22,11 @@
 #include <windowsx.h>
 #include <shlobj.h>
 #include <process.h>
+#include <direct.h>
 #include <fcntl.h>
 #include <time.h>
 #include <versionhelpers.h>
-#define HOST_TIMER		64
+
 #define ID_SCRIPT0		1000
 #define ID_CONNECT0		2000
 #define WM_DPICHANGED	0x02E0
@@ -37,11 +38,12 @@ int fontsize = 16;
 WCHAR wsFontFace[256] = L"Courier New";
 WCHAR Title[256] = L"    Term    Script    Options                     ";
 
+char *cwd = NULL;			//stores current working directory
 const char *homedir;
 const char WELCOME[]="\n\
 \ttinyTerm is a simple, small and scriptable terminal emulator,\n\n\
 \ta serial/telnet/ssh/sftp/netconf client with unique features:\n\n\n\
-\t    * ultra small 256KB portable exe\n\n\
+\t    * small portable exe less than 256KB\n\n\
 \t    * command history and autocompletion\n\n\
 \t    * text based batch command automation\n\n\
 \t    * drag and drop to transfer files via scp\n\n\
@@ -147,7 +149,8 @@ WCHAR *fileDialog( WCHAR *szFilter, DWORD dwFlags )
 		ret = GetSaveFileName(&ofn);
 	else
 		ret = GetOpenFileName(&ofn);
-
+	if ( cwd!=NULL ) _chdir( cwd );		//GetFilename changes working directory
+										//change it back before return
 	return ret ? wname : NULL;
 }
 char *getFolderName(WCHAR *wtitle)
@@ -380,10 +383,6 @@ static BOOL bScrollbar = FALSE;
 void tiny_Beep()
 {
 	PlaySound(L"Default Beep", NULL, SND_ALIAS|SND_ASYNC);
-}
-void tiny_Connecting()
-{
-	SetTimer(hwndMain, HOST_TIMER, 1000, NULL);
 }
 void tiny_Font( HWND hwnd )
 {
@@ -666,16 +665,14 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 			term_Logg( pt, NULL );
 		menu_Check( ID_LOGG, pt->bLogging );
 		break;
-	case ID_SAVE:
-		{
-			WCHAR *wfn = fileDialog(L"logfile\0*.log\0All\0*.*\0\0",
-				OFN_PATHMUSTEXIST|OFN_NOREADONLYRETURN|OFN_OVERWRITEPROMPT);
-			if ( wfn!=NULL ) {
-				char fn[MAX_PATH];
-				wchar_to_utf8(wfn, wcslen(wfn)+1, fn, MAX_PATH);
-				term_Save( pt, fn );
+	case ID_COPYALL:
+			pt->sel_left = 0;
+			pt->sel_right = pt->cursor_x;
+			if ( OpenClipboard(hwndMain) ) {
+				EmptyClipboard( );
+				CopyText();
+				CloseClipboard( );
 			}
-		}
 		break;
 	case ID_ECHO:	//toggle local echo
 		menu_Check( ID_ECHO, term_Echo(pt) );
@@ -846,12 +843,6 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		break;
 	case WM_KEYDOWN:
 		term_Keydown( pt, wParam );
-		break;
-	case WM_TIMER:
-		if ( host_Status( pt->host )==HOST_CONNECTING )
-			term_Disp( pt, "." );
-		else
-			KillTimer(hwndMain, HOST_TIMER);
 		break;
 	case WM_ACTIVATE:
 		SetFocus( bEdit? hwndCmd : hwndMain );
@@ -1092,6 +1083,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 			}
 		}
 	}
+	cwd = _getcwd( NULL, 0 );
 
 	WIN32_FIND_DATA FindFileData;
 	HANDLE hFind = FindFirstFile(L"script\\*.*", &FindFileData);
@@ -1117,8 +1109,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 			DispatchMessage(&msg);
 		}
 	}
-	if ( pt->bLogging ) term_Logg( pt, NULL );
 
+	if ( pt->bLogging ) term_Logg( pt, NULL );
+	if ( cwd!=NULL ) free( cwd );
 	LoadDict( hist_fn );
 	SaveDict( hist_fn );
 	autocomplete_Destroy( );

@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5759 2019-03-15 15:05:10 $"
+// "$Id: tiny.h 5734 2019-03-15 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -192,7 +192,6 @@ void tiny_Beep();
 void tiny_Scroll();
 void tiny_Redraw_Line();		//redraw cursor line only
 void tiny_Redraw_Term();		//redraw whole term window
-void tiny_Connecting();
 void tiny_Title( char *buf );
 BOOL tiny_Edit(BOOL e);			//return BOOL to indicate if status changed
 char *tiny_Gets(char *prompt, BOOL bEcho);
