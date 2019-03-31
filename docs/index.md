@@ -1,6 +1,4 @@
-**The Microsoft Store listing is made unavailable temporarily, because it was reported that when installed from the store, making connection to unreachable host will cause tinyTerm to crash, the store listing will be enabled as soon as this problem is fixed.** 
-
-**Fix has been identified and submitted to Microsoft Store as release 1.2.1, store listing will be made available as soon as microsoft certification completes**
+**The Microsoft Store listing is made unavailable temporarily, because it was reported that when installed from the store, making connection to unreachable host will cause tinyTerm to crash. Fix has been identified and submitted to Microsoft Store as release 1.2.1, store listing will be upated once microsoft certification completes**
 
 **The portable exe downloaded from this page is not affected by the crashing issue, but it's also updated to releasae 1.2.1 for other bug fixes**
 
