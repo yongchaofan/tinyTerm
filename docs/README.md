@@ -19,9 +19,8 @@ Makefiles are provided for building with MSYS2+MingW64/32, also a cmd file for b
     Makefile    building 32bit tinyTerm.exe for Windows 7/10 using wincng crypto
     Makefile64  building 64bit tinyTerm64.exe for Windows 7/10 using wincng crypto
     MakefileXP  building 32bit tinyTermXP.exe for Windows XP/7/10 using mbedtls crypto
-    cl64.cmd    x64 build command for Visual Studio
-    cl86.cmd    x86 build command for Visual Studio
-
+    vs_cl.cmd   command for Visual Studio 2017 build tool
+    
 ### Librarys
     libssh2 using any daily snapshot after March, 2018 for full support of WinCNG crypto functions
             ./configure --with-crypto=wincng
