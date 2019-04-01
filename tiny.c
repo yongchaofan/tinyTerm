@@ -666,13 +666,14 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		menu_Check( ID_LOGG, pt->bLogging );
 		break;
 	case ID_COPYALL:
+		if ( OpenClipboard(hwndMain) ) {
+			EmptyClipboard( );
 			pt->sel_left = 0;
 			pt->sel_right = pt->cursor_x;
-			if ( OpenClipboard(hwndMain) ) {
-				EmptyClipboard( );
-				CopyText();
-				CloseClipboard( );
-			}
+			CopyText( );
+			tiny_Redraw_Term( );
+			CloseClipboard( );
+		}
 		break;
 	case ID_ECHO:	//toggle local echo
 		menu_Check( ID_ECHO, term_Echo(pt) );
@@ -689,7 +690,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 			SetFocus(hwndMain);
 		}
 		menu_Check( ID_EDIT, bEdit);
-		tiny_Redraw_Term(  );
+		tiny_Redraw_Term( );
 		break;
 	case ID_TRANSP:
 		if ( lParam>0 && lParam<256 ) 
@@ -739,18 +740,17 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		break;
 	default:
 		if ( wParam>ID_SCRIPT0 && wParam<=ID_SCRIPT0+iScriptCount ) {
-			WCHAR wfn[MAX_PATH+256];
-			utf8_to_wchar(homedir, -1, wfn, MAX_PATH);
-			wcscat(wfn, L"\\Documents\\tinyTerm\\script\\");
-			GetMenuString(hMenu[SCRIPT], wParam, wfn+wcslen(wfn), 256, 0);
+			WCHAR wfn[256];
+			wcscpy(wfn, L"script\\");
+			GetMenuString(hMenu[SCRIPT], wParam, wfn+wcslen(wfn), 248, 0);
 			OpenScript(wfn);
 			break;
 		}
 		if ( wParam>ID_CONNECT0 && wParam<=ID_CONNECT0+iConnectCount ) {
-			WCHAR cmd[256];
-			cmd[0]=L'!';
-			GetMenuString(hMenu[TTERM], wParam, cmd+1, 248, 0);
-			cmd_Disp(cmd);
+			WCHAR wcmd[256];
+			wcmd[0]=L'!';
+			GetMenuString(hMenu[TTERM], wParam, wcmd+1, 248, 0);
+			cmd_Disp(wcmd);
 			cmd_Enter();
 			break;
 		}
