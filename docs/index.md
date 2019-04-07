@@ -13,11 +13,11 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 		</video>
 	    </td>
 	    <td>
-		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.2.1</a></h4>
+		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.3</a></h4>
 		<h4>Appx package:<br/><a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a></h4>
 		<h4>Portable version:<br/>
-	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2.1/tinyTerm.exe">tinyTerm.exe</a><br/>
-	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.2.1/tinyTerm64.exe">tinyTerm64.exe</a></h4>
+	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.3/tinyTerm.exe">tinyTerm.exe</a><br/>
+	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.3/tinyTerm64.exe">tinyTerm64.exe</a></h4>
 		<h4>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a></h4>
 	    </td>
 	</tr>
@@ -130,10 +130,11 @@ These commands can be used programatically for scripting or interactively in loc
     !Selection          get current selected text
 
 ### Options
-    !TermSize 100x40    set terminal size to 100 cols x 40 rows
-    !Transparency 192   set window transparency level to 192/255
-    !FontFace Consolas  set font face to “Consolas”
-    !FontSize 18        set font size to 18
+    ~TermSize 100x40    set terminal size to 100 cols x 40 rows
+    ~Transparency 192   set window transparency level to 192/255
+    ~LocalEdit		Enable local edit
+    ~FontFace Consolas  set font face to “Consolas”
+    ~FontSize 18        set font size to 18
 
 ### Extras
     !Ftpd c:/tmp        start/stop ftp server using c:/tmp as root directory
