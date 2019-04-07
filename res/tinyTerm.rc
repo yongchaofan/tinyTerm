@@ -55,6 +55,7 @@ IDMENU_MAIN MENU
 }
 IDACCEL_MAIN ACCELERATORS
 {
+  "a", ID_COPYALL,  ALT
   "c", ID_CONNECT, 	ALT
   "e", ID_EDIT, 	ALT
   "f", ID_FONT,     ALT
@@ -79,8 +80,8 @@ CAPTION "Connect Dialog"
 }
 
 1 VERSIONINFO						// Version Information
-    FILEVERSION     1,2,0,0
-    PRODUCTVERSION  1,2,0,0
+    FILEVERSION     1,3,0,0
+    PRODUCTVERSION  1,3,0,0
     FILEOS          VOS__WINDOWS32
     FILETYPE        VFT_APP
     FILESUBTYPE     VFT2_UNKNOWN
@@ -94,7 +95,7 @@ CAPTION "Connect Dialog"
             VALUE "FileDescription", "Tiny Terminal Emulator"
             VALUE "LegalCopyright", "©2018-2019 Yongchao Fan"
             VALUE "ProductName", "tinyTerm"
-            VALUE "ProductVersion", "1.2.0.0"
+            VALUE "ProductVersion", "1.3.0.0"
         }
     }
     BLOCK "VarFileInfo"
