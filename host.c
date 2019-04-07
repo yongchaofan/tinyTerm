@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 28425 2019-03-15 15:05:10 $"
+// "$Id: host.c 28544 2019-03-15 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -34,6 +34,7 @@ void stdio_Close( HOST *ph );
 
 void host_Construct( HOST *ph )
 {
+	ph->sock = 0;
 	ph->host_type = 0;
 	ph->host_status=HOST_IDLE;
 	ph->homedir[0]=0;
@@ -112,6 +113,7 @@ void host_Close( HOST *ph )
 	case SSH:
 	case NETCONF:ssh2_Close( ph );
 	case TELNET: closesocket(ph->sock); break;
+	default: if ( ph->sock!=0 ) closesocket(ph->sock);
 	}
 }
 void host_Destory()
@@ -217,11 +219,11 @@ DWORD WINAPI telnet( void *pv )
 		*p++=0; 
 		ph->port=atoi(p);
 	}
+	term_Title( ph->term, ph->hostname );
 
 	if ( ( ph->sock = tcp(ph->hostname, ph->port) )!=-1 ) {
 		ph->host_status=HOST_CONNECTED;
 		ph->host_type=TELNET;
-		term_Title( ph->term, ph->hostname );
 		term_Disp(ph->term, "Connected\n");
 
 		char buf[1536];
@@ -230,16 +232,16 @@ DWORD WINAPI telnet( void *pv )
 			term_Parse( ph->term, buf, cnt );
 		}
 
-		term_Title( ph->term, "");
 		ph->host_type = 0;
-
 		closesocket(ph->sock);
 	}
 	else
 		term_Disp( ph->term,  "connection failure!\n" );
 
+	term_Title( ph->term, "");
 	ph->host_status=HOST_IDLE;
 	ph->hReaderThread = NULL;
+	ph->sock = 0;
 	return 1;
 }
 

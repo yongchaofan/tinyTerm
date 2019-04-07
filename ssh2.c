@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 41955 2019-03-30 21:05:10 $"
+// "$Id: ssh2.c 42060 2019-03-30 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -405,6 +405,8 @@ DWORD WINAPI ssh( void *pv )
 
 	ph->port = 22;
 	if ( ssh_parameters( ph, port )<0 ) goto TCP_Close;
+	term_Title( ph->term, ph->hostname );
+	
 	if ( (ph->sock=tcp(ph->hostname, ph->port))==-1 ) {
 		term_Disp( ph->term, "connection failure\n");
 		goto TCP_Close;
@@ -456,7 +458,7 @@ DWORD WINAPI ssh( void *pv )
 
 	ph->host_type=SSH;
 	ph->host_status=HOST_CONNECTED;
-	term_Title( ph->term, ph->hostname );
+	term_Title( ph->term, ph->hostname );		//to send term size
 	while ( libssh2_channel_eof(ph->channel) == 0 ) {
 		char buf[4096];
 		if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
@@ -481,7 +483,6 @@ DWORD WINAPI ssh( void *pv )
 	}
 	tun_closeall( ph );
 	ph->host_type = 0;
-	term_Title( ph->term, "");
 
 Channel_Close:
 	libssh2_channel_close(ph->channel);
@@ -494,8 +495,10 @@ Session_Close:
 	closesocket(ph->sock);
 
 TCP_Close:
+	term_Title( ph->term, "");
 	ph->host_status=HOST_IDLE;
 	ph->hReaderThread = NULL;
+	ph->sock = 0;
 
 	return 1;
 }
@@ -1271,10 +1274,10 @@ int sftp_cmd( HOST *ph, char *cmd )
 	else if ( strncmp(cmd, "ren",3)==0)  sftp_ren(ph, src, dst);
 	else if ( strncmp(cmd, "get",3)==0 ) sftp_get(ph, src, p2);
 	else if ( strncmp(cmd, "put",3)==0 ) sftp_put(ph, p1, dst);
-	else if ( strncmp(cmd, "bye",3)==0 ) return -1;
-	else term_Print( ph->term, "\033[31m%s is not supported command, try %s\n\t%s\n",
-				cmd, "\033[37mlcd, lpwd, cd, pwd,",
-				"ls, dir, get, put, ren, rm, del, mkdir, rmdir, bye");
+	else if ( *cmd ) term_Print( ph->term, 
+						"\033[31m%s is not supported command, try %s\n\t%s\n",
+						cmd, "\033[37mlcd, lpwd, cd, pwd,",
+						"ls, dir, get, put, ren, rm, del, mkdir, rmdir, bye");
 	return 0;
 }
 DWORD WINAPI sftp( void *pv )
@@ -1285,6 +1288,8 @@ DWORD WINAPI sftp( void *pv )
 
 	ph->port = 22;
 	if ( ssh_parameters( ph, port )<0 ) goto TCP_Close;
+	term_Title( ph->term, ph->hostname );
+	
 	if ( (ph->sock=tcp(ph->hostname, ph->port))==-1 ) {
 		term_Disp( ph->term, "connection failure\n");
 		goto TCP_Close;
@@ -1314,24 +1319,25 @@ DWORD WINAPI sftp( void *pv )
 
 	ph->host_type=SFTP;
 	ph->host_status=HOST_CONNECTED;
-	term_Title( ph->term, ph->hostname );
 	char prompt[4096], *cmd;
 	while ( rc!=-1 ) {
 		sprintf(prompt, "sftp %s> ", ph->realpath);
 		cmd = ssh2_Gets( ph, prompt, TRUE );
 		if ( cmd!=NULL ) {
-			if ( *cmd ) 
-				if ( sftp_cmd( ph, cmd )==-1 ) break;
+			if ( strncmp(cmd, "bye",3)==0 ) {
+				term_Disp(ph->term, "logout\n"); 
+				break;
+			}
+			sftp_cmd( ph, cmd );
 		}
 		else {
-			term_Disp( ph->term, "\033[31m\nTime Out\033[37m");
+			term_Disp( ph->term, "\033[31m\nTime Out\n\033[37m");
 			break;
 		}
 	}
 
 	libssh2_sftp_shutdown(ph->sftp);
 	ph->host_type = 0;
-	term_Title( ph->term, "" );
 
 sftp_Close:
 	libssh2_session_disconnect(ph->session, "Normal Shutdown");
@@ -1339,8 +1345,10 @@ sftp_Close:
 	closesocket(ph->sock);
 
 TCP_Close:
+	term_Title( ph->term, "" );
 	ph->host_status=HOST_IDLE;
 	ph->hReaderThread = NULL;
+	ph->sock = 0;
 	return 1;
 }
 /*********************************confHost*******************************/
@@ -1360,6 +1368,8 @@ DWORD WINAPI netconf( void *pv )
 
 	ph->port = 830;
 	if ( ssh_parameters( ph, port )<0 ) goto TCP_Close;
+	term_Title( ph->term, ph->hostname);
+	
 	if ( (ph->sock=tcp(ph->hostname, ph->port))==-1 ) {
 		term_Disp( ph->term, "connection failure\n");
 		goto TCP_Close;
@@ -1392,7 +1402,6 @@ DWORD WINAPI netconf( void *pv )
 	libssh2_session_set_blocking(ph->session, 0);
 	libssh2_channel_write( ph->channel, IETF_HELLO, strlen(IETF_HELLO) );
 
-	term_Title( ph->term, ph->hostname);
 	ph->host_status=HOST_CONNECTED;
 	ph->host_type=NETCONF;
 	ph->msg_id = 0;
@@ -1426,7 +1435,6 @@ DWORD WINAPI netconf( void *pv )
 		}
 	}
 	ph->host_type = 0;
-	term_Title( ph->term, "" );
 
 Channel_Close:
 	libssh2_channel_close(ph->channel);
@@ -1439,9 +1447,10 @@ Session_Close:
 	closesocket(ph->sock);
 
 TCP_Close:
+	term_Title( ph->term, "" );
 	ph->host_status=HOST_IDLE;
 	ph->hReaderThread = NULL;
-
+	ph->sock = 0;
 	return 1;
 }
 void netconf_Send(	HOST *ph, char *msg, int len)

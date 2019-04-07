@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 30356 2019-03-20 15:05:10 $"
+// "$Id: term.c 30340 2019-03-20 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -290,7 +290,7 @@ void term_Title( TERM *pt, char *title )
 	else
 	{
 		pt->title[0] = 0;
-		term_Disp(pt, "\n\033[31mDisconnected. Press Enter to restart\n\033[37m");
+		term_Disp(pt, "\n\033[31mPress Enter to reconnect\n\n\033[37m");
 	}
 	tiny_Title(pt->title);
 }
@@ -352,7 +352,7 @@ void term_Logg( TERM *pt, char *fn )
 	if ( pt->bLogging ) {
 		fclose( pt->fpLogFile );
 		pt->bLogging = FALSE;
-		term_Print( pt, "\n\033[33m%s logging stopped\n", fn );
+		term_Print( pt, "\n\033[33m logging stopped\n" );
 	}
 	else if ( fn!=NULL ) {
 		if ( *fn==' ' ) fn++;
