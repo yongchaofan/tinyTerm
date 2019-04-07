@@ -454,9 +454,9 @@ DWORD WINAPI ssh( void *pv )
 	libssh2_session_set_blocking(ph->session, 0);
 //	libssh2_keepalive_config(ph->session, FALSE, 60);
 
-	term_Title( ph->term, ph->hostname );
-	ph->host_status=HOST_CONNECTED;
 	ph->host_type=SSH;
+	ph->host_status=HOST_CONNECTED;
+	term_Title( ph->term, ph->hostname );
 	while ( libssh2_channel_eof(ph->channel) == 0 ) {
 		char buf[4096];
 		if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
@@ -1312,9 +1312,9 @@ DWORD WINAPI sftp( void *pv )
 		*ph->realpath=0;
 	strcpy( ph->homepath, ph->realpath );
 
-	term_Title( ph->term, ph->hostname );
-	ph->host_status=HOST_CONNECTED;
 	ph->host_type=SFTP;
+	ph->host_status=HOST_CONNECTED;
+	term_Title( ph->term, ph->hostname );
 	char prompt[4096], *cmd;
 	while ( rc!=-1 ) {
 		sprintf(prompt, "sftp %s> ", ph->realpath);
