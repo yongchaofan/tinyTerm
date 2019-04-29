@@ -1,5 +1,5 @@
 //
-// "$Id: tinyTerm.rc 3071 2019-03-15 21:05:10 $"
+// "$Id: tinyTerm.rc 3018 2019-04-21 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -23,47 +23,48 @@
 
 IDICON_TL1	ICON	"TL1.ico"
 
-
 IDMENU_MAIN MENU
 {
 	POPUP "&Term"
 	{
-		MENUITEM "&Connect...\tAlt+C",  ID_CONNECT
-		MENUITEM "&Disconnect\tAlt+D",  ID_DISCONN, GRAYED
-		MENUITEM "Copy &all  \tAlt+A",  ID_COPYALL
-		MENUITEM "&Log...    \tAlt+L",  ID_LOGG
-		MENUITEM "&About",			    ID_ABOUT
+		MENUITEM "&Connect...",		ID_CONNECT
+		MENUITEM "&Disconnect",		ID_DISCONN, GRAYED
+		MENUITEM "Local &Echo",		ID_ECHO
+		MENUITEM "&Logging...",		ID_LOGG
 		MENUITEM SEPARATOR
+		MENUITEM "&Ftpd...",		ID_FTPD
+		MENUITEM "&Tftpd...",		ID_TFTPD
 	}
 	POPUP "&Script"
 	{
-		MENUITEM "&Run...", 		ID_SCRUN
-		MENUITEM "&Pause", 			ID_SCPAUSE, GRAYED
-		MENUITEM "&Stop", 			ID_SCQUIT, 	GRAYED
-		MENUITEM "&Ftpd...", 		ID_FTPD
-		MENUITEM "&Tftpd...", 		ID_TFTPD
+		MENUITEM "&Run...", 		ID_RUN
 		MENUITEM SEPARATOR
 	}
 	POPUP "&Options"
 	{
-		MENUITEM "&Local Echo",		ID_ECHO
-		MENUITEM "Local &Edit\tAlt+E", ID_EDIT
 		MENUITEM "&Font...\tAlt+F",	ID_FONT
-		MENUITEM "&Zoom\tAlt+Z", 	ID_ZOOM
+		MENUITEM "&Local Edit\tAlt+E", ID_EDIT
 		MENUITEM "&Tranparent", 	ID_TRANSP
+		MENUITEM "&About tinyTerm",	ID_ABOUT
+	}
+	POPUP "&Context"
+	{
+		MENUITEM "&Copy    \tAlt+C",ID_COPY
+		MENUITEM "&Paste   \tAlt+P",ID_PASTE
+		MENUITEM "Copy &All\tAlt+A",ID_SELALL
+		MENUITEM "&Middle click",	ID_MIDDLE
 	}
 }
 IDACCEL_MAIN ACCELERATORS
 {
-  "a", ID_COPYALL,  ALT
-  "c", ID_CONNECT, 	ALT
-  "e", ID_EDIT, 	ALT
-  "f", ID_FONT,     ALT
-  "l", ID_LOGG,	    ALT
-  "z", ID_ZOOM,     ALT
-  "t", ID_TERM,     ALT
-  "s", ID_SCRIPT,   ALT
-  "o", ID_OPTIONS,  ALT
+  "a", ID_SELALL,	ALT
+  "c", ID_COPY,		ALT
+  "p", ID_PASTE,	ALT
+  "e", ID_EDIT,		ALT
+  "f", ID_FONT,		ALT
+  "t", ID_TERM,		ALT
+  "s", ID_SCRIPT,	ALT
+  "o", ID_OPTIONS,	ALT
  }
 
 IDD_CONNECT DIALOG 45, 30, 150, 100	// Connection Dialog
@@ -79,9 +80,9 @@ CAPTION "Connect Dialog"
     PUSHBUTTON    "Cancel", IDCANCEL,  20, 75, 50, 16, 0, WS_EX_LEFT
 }
 
-1 VERSIONINFO						// Version Information
-    FILEVERSION     1,3,0,0
-    PRODUCTVERSION  1,3,0,0
+1 VERSIONINFO
+    FILEVERSION     1,5,0,0
+    PRODUCTVERSION  1,5,0,0
     FILEOS          VOS__WINDOWS32
     FILETYPE        VFT_APP
     FILESUBTYPE     VFT2_UNKNOWN
@@ -95,7 +96,7 @@ CAPTION "Connect Dialog"
             VALUE "FileDescription", "Tiny Terminal Emulator"
             VALUE "LegalCopyright", "©2018-2019 Yongchao Fan"
             VALUE "ProductName", "tinyTerm"
-            VALUE "ProductVersion", "1.3.0.0"
+            VALUE "ProductVersion", "1.5.0.0"
         }
     }
     BLOCK "VarFileInfo"
