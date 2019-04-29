@@ -11,11 +11,11 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 		</video>
 	    </td>
 	    <td>
-		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.3</a></h4>
+		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.5</a></h4>
 		<h4>Appx package:<br/><a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a></h4>
 		<h4>Portable version:<br/>
-	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.3/tinyTerm.exe">tinyTerm.exe</a><br/>
-	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.3/tinyTerm64.exe">tinyTerm64.exe</a></h4>
+	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.5/tinyTerm.exe">tinyTerm.exe</a><br/>
+	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.5/tinyTerm64.exe">tinyTerm64.exe</a></h4>
 		<h4>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a></h4>
 	    </td>
 	</tr>
@@ -107,8 +107,8 @@ These commands can be used programatically for scripting or interactively in loc
     !ssh pi@piZero:2222 ssh to host piZero port 2222 with username pi
     !sftp -P 2222 jun01 sftp to host jun01 port 2222
     !netconf rtr1       netconf to port 830(default) of host rtr1
+    !{command}		run DOS command like ping, ipconfig, tracert etc.
     !disconn            disconnect from current connection
-    !{DOS command}      execute command and display result, e.g. ping 192.168.1.1
     !Find {string}      search for {string} in scroll back buffer
 
 ### Automation
@@ -117,7 +117,6 @@ These commands can be used programatically for scripting or interactively in loc
     !Timeout 30	        set time out to 30 seconds for CLI script
     !Wait 10            wait 10 seconds during execution of CLI script
     !Waitfor 100%       wait for “100%” from host during execution of CLI script
-    !Loop 2             repeat two times from start of CLI script
     !Log test.log       start/stop logging with log file test.log
 
 ### Scripting
