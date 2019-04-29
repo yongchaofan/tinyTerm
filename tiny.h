@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5734 2019-03-30 08:05:10 $"
+// "$Id: tiny.h 5651 2019-04-26 08:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -21,8 +21,6 @@
 #include <libssh2.h>
 #include <libssh2_sftp.h>
 
-#define TERMLINES	25
-#define TERMCOLS	80
 #define MAXLINES	8192
 #define BUFFERSIZE	8192*64
 
@@ -43,7 +41,8 @@ typedef struct tagHOST {
 	int host_status;
 
 	char cmdline[256];
-	SOCKET sock;					//for tcp connection used by telnet/ssh reader
+	char tunline[256];
+	SOCKET sock;					//for tcp/ssh reader
 	HANDLE hExitEvent, hSerial;		//for serial reader
 	HANDLE hStdioRead, hStdioWrite;	//for stdio reader
 	HANDLE hReaderThread;			//reader thread handle
@@ -56,7 +55,7 @@ typedef struct tagHOST {
 	char *hostname;
 	char homedir[MAX_PATH];
 	char keys[256];
-	int cursor, bReturn, bPassword;
+	int cursor, bReturn, bPassword, bGets;
 	HANDLE mtx;						//ssh2 reading/writing mutex
 	LIBSSH2_SESSION *session;
 	LIBSSH2_CHANNEL *channel;
@@ -112,7 +111,7 @@ typedef struct tagTERM {
 #define TELNET 	3
 #define SSH		4
 #define SFTP	5
-#define NETCONF	6
+#define NETCONF 6
 
 BOOL isUTF8c(char c);	//check if a byte is a UTF8 continuation byte
 int utf8_to_wchar(const char *buf, int cnt, WCHAR *wbuf, int wcnt);
@@ -126,6 +125,7 @@ void drop_Destroy( HWND hwnd );
 int autocomplete_Init( HWND hWnd );
 int autocomplete_Destroy( );
 int autocomplete_Add( WCHAR *cmd );
+int autocomplete_Del( WCHAR *cmd );
 WCHAR *autocomplete_Prev( );
 WCHAR *autocomplete_First( );
 WCHAR *autocomplete_Next( );
@@ -154,8 +154,7 @@ void ssh2_Close( HOST *ph );
 void ssh2_Tun( HOST *ph, char *cmd );
 void scp_read( HOST *ph, char *lpath, char *rfiles );
 void scp_write( HOST *ph, char *lpath, char *rpath );
-void netconf_Send( HOST *ph, char *msg, int len );
-int sftp_cmd( HOST *ph, char *cmd );
+void sftp_put( HOST *ph, char *src, char *dst );
 
 
 /****************term.c****************/
@@ -177,7 +176,8 @@ void term_Save( TERM *pt, char *fn );
 void term_Srch( TERM *pt, char *sstr );
 void term_Disp( TERM *pt, char *buf );
 void term_Send( TERM *pt, char *buf, int len );
-int term_Recv( TERM *pt, char **preply );	//get new text since last Disp/Send/Recv
+int term_Recv( TERM *pt, char **preply );
+
 void term_Learn_Prompt( TERM *pt );
 char *term_Mark_Prompt( TERM *pt );
 int term_Waitfor_Prompt(TERM *pt );

@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 28544 2019-03-15 15:05:10 $"
+// "$Id: host.c 28739 2019-04-26 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -12,11 +12,11 @@
 // This library is free software distributed under GNU GPL 3.0,
 // see the license at:
 //
-//	   https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
+// https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
 //
 // Please report all bugs and problems on the following page:
 //
-//	   https://github.com/yongchaofan/tinyTerm/issues/new
+// https://github.com/yongchaofan/tinyTerm/issues/new
 //
 #include "tiny.h"
 #include <ws2tcpip.h>
@@ -29,7 +29,6 @@ DWORD WINAPI serial( void *pv );
 DWORD WINAPI telnet( void *pv );
 DWORD WINAPI ssh( void *pv );
 DWORD WINAPI sftp( void *pv );
-DWORD WINAPI netconf( void *pv );
 void stdio_Close( HOST *ph );
 
 void host_Construct( HOST *ph )
@@ -46,13 +45,13 @@ void host_Open( HOST *ph, char *port )
 	{
 		if ( port!=NULL ) 
 		{
-			strncpy(ph->cmdline, port, 255);
+			ph->cmdline[0] = 0;
+			if ( strncmp(port, "netconf", 7)==0 )
+				strcpy(ph->cmdline, "ssh -s ");
+			strncat(ph->cmdline, port, 255);
 			ph->cmdline[255] = 0;
 		}
-		else
-		{
-			port = ph->cmdline;
-		}
+		port = ph->cmdline;
 		
 		LPTHREAD_START_ROUTINE reader = stdio;
 		if ( strnicmp(port, "com",3)==0 ) 
@@ -66,30 +65,29 @@ void host_Open( HOST *ph, char *port )
 		else if ( strncmp(port, "sftp", 4)==0 ){
 			reader = sftp;
 		}
-		else if ( strncmp(port, "netconf", 7)==0 ) {
-			reader = netconf;
-		}
 
 		ph->host_status=HOST_CONNECTING;
 		ph->hReaderThread = CreateThread(NULL, 0, reader, ph, 0, NULL);
 	}
 	else {
-		if ( strnicmp(port, "disconn", 7)==0 ) 
-			host_Close( ph );
+		if ( strnicmp(port, "disconn", 7)==0 ) host_Close( ph );
 	}
-	
 }
 void host_Send( HOST *ph, char *buf, int len )
 {
 	DWORD dwWrite;
 	switch ( ph->host_type ) {
-	case STDIO: WriteFile( ph->hStdioWrite, buf, len, &dwWrite, NULL ); break;
+	case STDIO: if ( *buf==3 && len==1 ) //CTRL+C
+					stdio_Close(ph);
+				else
+					WriteFile( ph->hStdioWrite, buf, len, &dwWrite, NULL ); 
+				break;
 	case SERIAL:WriteFile( ph->hSerial, buf, len, &dwWrite, NULL ); break;
-	case TELNET:send( ph->sock, buf, len, 0); break;
+	case TELNET:if ( ph->sock>0 ) send( ph->sock, buf, len, 0); break;
+	case SSH:
 	case SFTP:
-	case SSH:	ssh2_Send( ph, buf, len ); break;
-	case NETCONF: netconf_Send( ph, buf, len ); break;
-	default:	if ( host_Status( ph )!=HOST_IDLE )	ssh2_Send( ph, buf, len);
+	case NETCONF: ssh2_Send( ph, buf, len ); break;
+	default:	if ( ph->host_status!=HOST_IDLE ) ssh2_Send( ph, buf, len);
 	}
 }
 void host_Send_Size( HOST *ph, int w, int h )
@@ -107,11 +105,12 @@ int host_Type( HOST *ph )
 void host_Close( HOST *ph )
 {
 	switch ( ph->host_type ) {
-	case STDIO:	 stdio_Close( ph ); break;
-	case SERIAL: SetEvent( ph->hExitEvent ); break;
-	case SFTP:	 ssh2_Send(ph, "\r",1); ssh2_Send(ph, "bye\r",4); break;
+	case STDIO:	stdio_Close( ph ); break;
+	case SERIAL:SetEvent( ph->hExitEvent ); break;
+	case SFTP:	ssh2_Send(ph, "\r",1);
+				ssh2_Send(ph, "bye\r",4); break;
 	case SSH:
-	case NETCONF:ssh2_Close( ph );
+	case NETCONF:ssh2_Close( ph ); break;
 	case TELNET: closesocket(ph->sock); break;
 	default: if ( ph->sock!=0 ) closesocket(ph->sock);
 	}
@@ -160,11 +159,10 @@ DWORD WINAPI serial(void *pv)
 		goto comm_close;
 	}
 
-	ph->hostname = ph->cmdline;
-	ph->host_status=HOST_CONNECTED;
 	ph->host_type = SERIAL;
-	term_Title( ph->term, ph->hostname );
-	term_Disp( ph->term, "Connected\n");
+	ph->host_status=HOST_CONNECTED;
+	term_Title( ph->term, ph->cmdline );
+	term_Disp( ph->term, "connected\n" );
 	ph->hExitEvent = CreateEventA( NULL, TRUE, FALSE, "COM exit" );
 	while ( WaitForSingleObject( ph->hExitEvent, 0 ) == WAIT_TIMEOUT ) {
 		char buf[256];
@@ -182,12 +180,13 @@ DWORD WINAPI serial(void *pv)
 	}
 	CloseHandle( ph->hExitEvent );
 	CloseHandle( ph->hSerial );
-	term_Title( ph->term, "" );
 	ph->host_type = 0;
+	term_Disp( ph->term, "disconnected\n" );
 
 comm_close:
 	ph->host_status=HOST_IDLE;
 	ph->hReaderThread = NULL;
+	term_Title( ph->term, "" );
 	return 1;
 }
 
@@ -219,12 +218,12 @@ DWORD WINAPI telnet( void *pv )
 		*p++=0; 
 		ph->port=atoi(p);
 	}
-	term_Title( ph->term, ph->hostname );
 
-	if ( ( ph->sock = tcp(ph->hostname, ph->port) )!=-1 ) {
-		ph->host_status=HOST_CONNECTED;
+	if ( ( ph->sock = tcp(ph->hostname, ph->port) )!=-1 ) 
+	{
 		ph->host_type=TELNET;
-		term_Disp(ph->term, "Connected\n");
+		ph->host_status=HOST_CONNECTED;
+		term_Title( ph->term, ph->hostname );
 
 		char buf[1536];
 		int cnt;
@@ -234,14 +233,15 @@ DWORD WINAPI telnet( void *pv )
 
 		ph->host_type = 0;
 		closesocket(ph->sock);
+		term_Disp( ph->term, "disconnected\n" );
 	}
 	else
 		term_Disp( ph->term,  "connection failure!\n" );
 
-	term_Title( ph->term, "");
 	ph->host_status=HOST_IDLE;
 	ph->hReaderThread = NULL;
 	ph->sock = 0;
+	term_Title( ph->term, "" );
 	return 1;
 }
 
@@ -253,7 +253,6 @@ DWORD WINAPI stdio( void *pv)
 	HANDLE Stdin_Rd, Stdin_Wr ;
 	HANDLE Stdout_Rd, Stdout_Wr, Stderr_Wr;
 	memset( &piStd, 0, sizeof(PROCESS_INFORMATION) );
-	//Set up PROCESS_INFORMATION
 
 	SECURITY_ATTRIBUTES saAttr;
 	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
@@ -267,14 +266,14 @@ DWORD WINAPI stdio( void *pv)
 	SetHandleInformation(Stdin_Wr, HANDLE_FLAG_INHERIT, 0);
 	// Ensure the write handle to the pipe for STDIN is not inherited
 	DuplicateHandle(GetCurrentProcess(),Stdout_Wr,
-                    GetCurrentProcess(),&Stderr_Wr,0,
-            		TRUE,DUPLICATE_SAME_ACCESS);
+					GetCurrentProcess(),&Stderr_Wr,0,
+					TRUE,DUPLICATE_SAME_ACCESS);
 	DuplicateHandle(GetCurrentProcess(),Stdout_Rd,
-                    GetCurrentProcess(),&ph->hStdioRead,0,
-            		TRUE,DUPLICATE_SAME_ACCESS);
+					GetCurrentProcess(),&ph->hStdioRead,0,
+					TRUE,DUPLICATE_SAME_ACCESS);
 	DuplicateHandle(GetCurrentProcess(),Stdin_Wr,
-                    GetCurrentProcess(),&ph->hStdioWrite,0,
-            		TRUE,DUPLICATE_SAME_ACCESS);
+					GetCurrentProcess(),&ph->hStdioWrite,0,
+					TRUE,DUPLICATE_SAME_ACCESS);
 	CloseHandle( Stdin_Wr );
 	CloseHandle( Stdout_Rd );
 
@@ -300,8 +299,9 @@ DWORD WINAPI stdio( void *pv)
 		CloseHandle( Stdout_Wr );
 		CloseHandle( Stderr_Wr );
 
-		ph->host_status=HOST_CONNECTED;
 		ph->host_type = STDIO;
+		ph->host_status=HOST_CONNECTED;
+		term_Title( ph->term, ph->cmdline );
 		while ( TRUE ) {
 			DWORD dwCCH;
 			char buf[1536];
@@ -319,20 +319,19 @@ DWORD WINAPI stdio( void *pv)
 		ph->host_type = 0;
 	}
 	else
-		term_Disp( ph->term, "Couldn't create process\n" );
+		term_Disp( ph->term, "Invalid command\n" );
 
 	CloseHandle( ph->hStdioRead );
 	CloseHandle( ph->hStdioWrite );
 	ph->host_status=HOST_IDLE;
 	ph->hReaderThread = NULL;
+	term_Title( ph->term, "");
 	return 1;
 }
 void stdio_Close(HOST *ph)
 {
-	if ( WaitForSingleObject(piStd.hProcess, 100)==WAIT_TIMEOUT ) {
-		term_Disp( ph->term, "Terminating process...\n" );
+	if ( WaitForSingleObject(piStd.hProcess, 100)==WAIT_TIMEOUT )
 		TerminateProcess(piStd.hProcess,0);
-	}
 	CloseHandle(piStd.hThread);
 	CloseHandle(piStd.hProcess);
 }
@@ -354,12 +353,10 @@ const char *mime[]={"text/plain",
 					"image/png",
 					"text/css"
 					};
-const char HEADER[]="HTTP/1.1 200 Ok\
-					\nServer: tinyTerm-httpd\
-					\nAccess-Control-Allow-Origin: *\
-					\nContent-Type: text/plain\
-					\nContent-length: %d\
-					\nCache-Control: no-cache\n\n";
+const char HEADER[]="HTTP/1.1 200 Ok\nServer: tinyTerm\n\
+Access-Control-Allow-Origin: *\nContent-Type: text/plain\n\
+Cache-Control: no-cache\nContent-length: %d\n\n";
+
 void httpFile( int s1, char *file)
 {
 	char reply[4096], timebuf[128];
@@ -371,18 +368,19 @@ void httpFile( int s1, char *file)
 
     struct stat sb;
 	if ( stat( file, &sb )==-1 || strstr(file, ".." )!=NULL ) {
-		len=sprintf(reply, "HTTP/1.1 404 not found\nDate: %s\nServer: tinyTerm_httpd\n", timebuf);
-		len+=sprintf(reply+len, "Content-Type: text/html\nContent-Length: 14\n\n");
-	    send(s1, reply, len, 0);
-	    len=sprintf(reply, "file not found");
+		len=sprintf(reply, "HTTP/1.1 404 not found\nDate: %s\n", timebuf);
+		len+=sprintf(reply+len, "Server: tinyTerm\nConnection: close\n");
+	    len+=sprintf(reply+len, "Content-Type: text/html\nContent-Length: 14");
+	    len+=sprintf(reply+len, "\n\nfile not found");
 		send(s1, reply, len, 0);
 		return;
 	}
 
 	FILE *fp = fopen( file, "rb" );	
 	if ( fp!=NULL ) {
-		len=sprintf(reply, "HTTP/1.1 200 Ok\nDate: %s\nServer: tinyTerm_httpd\n", timebuf);
-
+		len=sprintf(reply, "HTTP/1.1 200 Ok\nDate: %s\n", timebuf);
+		len+=sprintf(reply+len, "Server: tinyTerm\nConnection: close\n");
+		
 		const char *filext=file+strlen(file)-1;
 		while ( *filext!='.' ) filext--;
 		for ( i=0, j=0; j<8; j++ ) if ( strcmp(filext, exts[j])==0 ) i=j;
@@ -422,11 +420,7 @@ DWORD WINAPI httpd( void *pv )
 
 	while ( TRUE ) {
 		SOCKET http_s1 = accept(http_s0, (struct sockaddr*)&cltaddr, &addrsize);
-		if ( http_s1 == INVALID_SOCKET ) {
-			cmd_Disp_utf8("httpd terminated");
-			break;
-		}
-		cmd_Disp_utf8( "http connected" );
+		if ( http_s1 == INVALID_SOCKET ) break;
 		cmdlen=recv(http_s1, buf, 4095, 0);
 		if ( cmdlen>0 ) {
 			if ( strncmp(buf, "GET /", 5)!=0 ) {//TCP connection
@@ -454,24 +448,25 @@ DWORD WINAPI httpd( void *pv )
 					char *p=strchr(cmd, ' ');
 					if ( p!=NULL ) *p = 0;
 					url_decode(cmd);
-					cmd_Disp_utf8(cmd);
 
 					if ( *cmd=='?' ) {	//get CGI, cmd+1 points to command
+						cmd_Disp_utf8(cmd+1);
 						replen = term_Cmd( pt,  cmd+1, &reply );
 						int len = sprintf( buf, HEADER, replen );
 						send( http_s1, buf, len, 0 );
 						if ( replen>0 ) send( http_s1, reply, replen, 0 );
 					}
 					else {				//get file, cmd points to filename
+						cmd_Disp_utf8(cmd);
 						httpFile(http_s1, cmd);
 					}
 					cmdlen = recv(http_s1, buf, 4095, 0);
 				} while ( cmdlen>0 );
 			}
 		}
-		cmd_Disp_utf8( "http disconnected" );
 		shutdown(http_s1, SD_SEND);
 		closesocket(http_s1);
+		cmd_Disp_utf8("");
 	}
 	return 0;
 }
@@ -552,7 +547,7 @@ DWORD WINAPI ftpd(LPVOID p)
 	int addrsize=sizeof(clientaddr);
 
 	strcpy( rootDir, (char*)p );
-	term_Disp( pt,  "FTPd started\r\n" );
+	term_Print( pt,  "FTPd started at %s\r\n", rootDir );
 
 	int ret0, ret1;
 	while( (ret0=sock_select(ftp_s0, 900)) == 1 ) {
@@ -873,7 +868,7 @@ void tftp_Read( FILE *fp )
 		dataBuf[0]=0; dataBuf[1]=3;
 		dataBuf[2]=(nCnt>>8)&0xff; dataBuf[3]=nCnt&0xff;
 		send(tftp_s1, dataBuf, nLen+4, 0);
-		term_Disp( pt, "#");
+		if ( nCnt%512==0 ) term_Disp( pt, "#");
 		if ( sock_select( tftp_s1, 5 ) == 1 ) {
 			if ( recv(tftp_s1, ackBuf, 516, 0)==SOCKET_ERROR ) break;
 			if ( ackBuf[1]==4 && ackBuf[2]==dataBuf[2] &&
@@ -887,6 +882,7 @@ void tftp_Read( FILE *fp )
 		}
 		else if ( ++nRetry==5 ) break;
 	} while ( len==512 );
+	if ( nCnt>=512 ) term_Disp(pt, "\n");
 }
 void tftp_Write( FILE *fp )
 {
@@ -901,17 +897,19 @@ void tftp_Write( FILE *fp )
 		if ( sock_select( tftp_s1, 5) == 1 ) {
 			nLen = recv(tftp_s1, dataBuf, 516, 0);
 			if ( nLen == SOCKET_ERROR ) break;
-			ntmp=dataBuf[2];
-			ntmp=(ntmp<<8)+dataBuf[3];
+			ntmp=(unsigned char)dataBuf[2];
+			ntmp=(ntmp<<8)+(unsigned char)dataBuf[3];
 			if ( dataBuf[1]==3 && ntmp==nCnt+1 ) {
 				fwrite(dataBuf+4, 1, nLen-4, fp);
 				nRetry=0;
 				nCnt++;
+				if ( nCnt%512==0 ) term_Disp( pt, "#");
 			}
 			else if ( ++nRetry==5 ) break;
 		}
 		else if ( ++nRetry==5 ) break;
 	}
+	if ( nCnt>=512 ) term_Disp(pt, "\n");
 }
 DWORD WINAPI tftpd(LPVOID p)
 {
@@ -921,7 +919,8 @@ DWORD WINAPI tftpd(LPVOID p)
 
 	char rootDir[MAX_PATH], fn[MAX_PATH];
 	strcpy( rootDir, (char *)p );
-	term_Disp( pt,  "TFTPd started\r\n" );
+	strcat( rootDir, "\\");
+	term_Print( pt,  "TFTPd started at %s\r\n", rootDir );
 
 	int ret;
 	while ( (ret=sock_select( tftp_s0, 300 )) == 1 ) {
@@ -931,11 +930,13 @@ DWORD WINAPI tftpd(LPVOID p)
 		connect(tftp_s1, (struct sockaddr *)&clientaddr, addrsize);
 		if ( dataBuf[1]==1  || dataBuf[1]==2 ) {
 			BOOL bRead = dataBuf[1]==1;
-			term_Print( pt, "TFTPd: %cRQ from %s\n", bRead?'R':'W',
-									inet_ntoa(clientaddr.sin_addr) );
+			term_Print( pt, "TFTPd: %cRQ %s from %s\n", bRead?'R':'W',
+							dataBuf+2, inet_ntoa(clientaddr.sin_addr) );
 			strcpy(fn, rootDir);
 			strcat(fn, dataBuf+2);
-			FILE *fp = fopen_utf8(fn,  bRead?"rb":"wb");
+			FILE *fp = NULL;
+			if ( strstr(fn, "..")==NULL ) 
+				fp = fopen_utf8(fn,  bRead?"rb":"wb");
 			if ( fp == NULL ) {
 				dataBuf[3]=dataBuf[1]; dataBuf[0]=0;
 				dataBuf[1]=5; dataBuf[2]=0;
