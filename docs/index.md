@@ -12,6 +12,7 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 	    </td>
 	    <td>
 		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.5</a></h4>
+		<h4><a href="https://github.com/yongchaofan/tinyTerm/releases">Release history</a></h4>
 		<h4>Appx package:<br/><a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a></h4>
 		<h4>Portable version:<br/>
 	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.5/tinyTerm.exe">tinyTerm.exe</a><br/>
