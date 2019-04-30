@@ -119,9 +119,9 @@ These commands can be used programatically for scripting or interactively in loc
 ### Automation
     !Clear              set clear scroll back buffer
     !Prompt $%20        set command prompt to “$ “, for CLI script
-    !Timeout 30	        set time out to 30 seconds for CLI script
+    !Timeout 30         set time out to 30 seconds for CLI script
     !Wait 10            wait 10 seconds during execution of CLI script
-    !Loop 5		repeat the list of commands 5 times
+    !Loop 5             repeat the list of commands 5 times
     !Waitfor 100%       wait for “100%” from host during execution of CLI script
     !Log test.log       start/stop logging with log file test.log
 
@@ -135,7 +135,7 @@ These commands can be used programatically for scripting or interactively in loc
 ### Options
     ~TermSize 100x40    set terminal size to 100 cols x 40 rows
     ~Transparency 192   set window transparency level to 192/255
-    ~LocalEdit		Enable local edit
+    ~LocalEdit          Enable local edit
     ~FontFace Consolas  set font face to “Consolas”
     ~FontSize 18        set font size to 18
 
