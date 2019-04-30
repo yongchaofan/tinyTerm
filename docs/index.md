@@ -11,12 +11,12 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 		</video>
 	    </td>
 	    <td>
-		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.5</a></h4>
+		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.5.1</a></h4>
 		<h4><a href="https://github.com/yongchaofan/tinyTerm/releases">Release history</a></h4>
 		<h4>Appx package:<br/><a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a></h4>
 		<h4>Portable version:<br/>
-	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.5/tinyTerm.exe">tinyTerm.exe</a><br/>
-	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.5/tinyTerm64.exe">tinyTerm64.exe</a></h4>
+	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.5.1/tinyTerm.exe">tinyTerm.exe</a><br/>
+	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.5.1/tinyTerm64.exe">tinyTerm64.exe</a></h4>
 		<h4>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a></h4>
 	    </td>
 	</tr>
@@ -33,20 +33,25 @@ Windows 10 user should install from Microsoft Store, users on older versions of 
 > ### Terminal Emulation
 > Each time a connection is made using the connect dialog, an entry will be added to the Term menu, simply select the menu entry to make the same connection again. 
 > 
+> When local edit is enabled, user is presented with a "tinyTerm >" prompt, simply type commands like "telnet 192.168.1.1" or "ssh admin@172.16.1.1" to make connection, or type commands like "ipconfig", "ping 192.168.1.1", "tracert google.com" to execute
+>
 > For serial connections, available serial ports will be auto detected and added to the ports dropdown list in connection dialog.
 > 
 > for netconf connections, typing netconf messages is possible but not really practical, it's better to use a text or xml editor to compose the messages and then drag&drop to the terminal window. 
 > 
-> Press left mouse button and drag to select text, selected text are copied to clipboard when left button is released. Double click to select and copy the whole word under mouse pointer. Right click to paste text from clipboard
+> Press and drag left mouse button to select text, left double click to select a word, middle click to paste selected text without copying to clipboard, right click to get context menu for copy, paste, copy all and paste selection(i.e. middle click). 
 >
-> Scroll back buffer holds 8000 lines of text, the "Save all" function from Term menu allows user to save the whole buffer to a file. Use pageup key or mouse wheel to scroll back, scrollbar will appear when pageup is pressed, and will hide when scrolled all the way down. 
+> Scroll buffer holds 8192 lines of text, use pageup key or mouse wheel to scroll back, scrollbar will appear when scrolled back, and will hide when scrolled all the way down. 
+>
 > ### Command Autocompletion
 > When local edit mode is enabled, key presses are not sent to remote host until "Enter" key is pressed, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs. Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. 
 > 
 > Command history file is saved as %USERPROFILE%\documents\tinyTerm\tinyTerm.hist by default, copy tinyTerm.hist to the same folder as tinyTerm.exe for portable use. Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
 > 
+> Command history file is not only used for auto completion, user interface options like window size, font size and font face, local edit mode, transparency are saved in the history file on exit, and loaded from the history file at next start. Plus the added Term and Script menu entries are saved in the history file too, so they can be restored at sebsequent sessions.
+>
 > ### Batch Automation
-> To automate the execution of commands, simply drag and drop a list of commands from text editor, or select "Run..." from Script menu and select a text file with all the commands to be executed, tinyTerm send one command at a time, wait for prompt string before sending the next command, to avoid overflowing the receive buffer of the remote host or network device. 
+> To automate the execution of batch commands, simply drag and drop a list of commands from text editor, or select "Run..." from Script menu and select a text file with all the commands to be executed, tinyTerm send one command at a time, wait for prompt string before sending the next command, to avoid overflowing the receive buffer of the remote host or network device. 
 > 
 > Most command line interface system uses a prompt string to tell user it’s ready for the next command, for example "> " or "$ " used by Cisco routers. tinyTerm will auto detect the prompt string used by remote host when user is typing commands interactively, and use the detected prompt string during scripting. Additionally, prompt string can be set in the script using special command "!Prompt {str}", refer to appendix A for details and other special commands supported for scripting. 
 > 
