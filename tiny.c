@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 37578 2019-04-28 23:35:10 $"
+// "$Id: tiny.c 39163 2019-04-29 21:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -46,7 +46,7 @@ const char WELCOME[]="\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\n\n\n\
 \tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\n\n\n\
-\tVerision 1.5, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
+\tVerision 1.5.1, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
 const char SCP_TO_FOLDER[]="\
 var xml = new ActiveXObject(\"Microsoft.XMLHTTP\");\n\
 var port = \"8080/?\";\n\
@@ -82,6 +82,7 @@ static int iTransparency = 255;
 static int iConnectCount=0, iScriptCount=0, httport;
 static BOOL bFocus = TRUE, bLocalEdit = FALSE;
 static BOOL bFTPd = FALSE, bTFTPd = FALSE;
+static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
 
 void CopyText( );
 void PasteText( );
@@ -786,6 +787,20 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		}
 		break;
 	}
+	case ID_PAUSE: 
+		bScriptPause = TRUE;
+		if ( IDOK==MessageBox(hwndTerm, 
+						L"script paused, OK to continue, Cancel to quit", 
+						L"Script", MB_OKCANCEL|MB_ICONASTERISK) ){
+			bScriptPause = FALSE;
+			break;
+		}
+//fall through to quit
+	case ID_QUIT:
+		bScriptPause = bScriptRun = FALSE;
+		MessageBox(hwndTerm, L"script stopped", L"Script", 
+								MB_OK|MB_ICONASTERISK);
+		break;
 	case ID_TERM:
 		menu_Popup(TTERM);
 		break;
@@ -1272,15 +1287,61 @@ void DropFiles(HDROP hDrop)
 }
 DWORD WINAPI scripter( void *cmds )
 {
-	char *p1=(char *)cmds, *p;
-	while ( (p=p1)!=NULL ) {
-		p1=strchr(p, 0x0a);
-		if ( p1!=NULL ) *p1++ = 0;
-		cmd_Disp_utf8(p);
-		term_Cmd( pt, p, NULL );
-		Sleep(500);
+	if ( bScriptRun ) {
+		MessageBox(hwndTerm, L"another script is running", L"Script", 
+														MB_OK|MB_ICONSTOP);
+		return 0;
 	}
+
+	char *p0=(char *)cmds, *p1;
+	int iLoopCnt = -1, iWaitCnt = 0;
+	bScriptRun=TRUE; bScriptPause = FALSE;
+	menu_Enable( ID_RUN, FALSE);
+	menu_Enable( ID_PAUSE, TRUE);
+	menu_Enable( ID_QUIT, TRUE);
+	while ( bScriptRun )
+	{
+		Sleep(100); 
+		if ( iWaitCnt>0 ) {
+			if ( (--iWaitCnt)%10==0 ) {
+				WCHAR wait[16];
+				wsprintf(wait, L"Wait %d  ", iWaitCnt/10);
+				cmd_Disp(iWaitCnt==0 ? L"": wait);
+			}
+		}
+		if ( iWaitCnt || bScriptPause ) continue; 
+
+		p1=strchr(p0, 0x0a);
+		if ( p1==NULL) { 
+			term_Send( pt, p0, strlen(p0) );
+			break;
+		}
+
+		if ( *p0!='!' ) {
+			term_Send( pt, p0, p1-p0 );
+			term_Waitfor_Prompt( pt );
+		}
+		else if ( strncmp( p0, "!Wait ", 6)==0 ) {
+			iWaitCnt = atoi(p0+6)*10;
+		}
+		else if ( strncmp( p0, "!Loop ", 6)==0 ) {
+			if ( iLoopCnt<0 ) iLoopCnt = atoi( p0+6 );
+			if ( --iLoopCnt>0 ) p1 = (char*)cmds-1;
+		}
+		else {
+			char cmd[256];
+			strncpy(cmd, p0, p1-p0);
+			cmd[p1-p0] = 0;
+			term_Cmd(pt, cmd, NULL);
+		}
+		p0 = p1+1;
+	}
+
 	free(cmds);
+	bScriptRun = bScriptPause = FALSE;
+	menu_Enable( ID_RUN, TRUE);
+	menu_Enable( ID_PAUSE, FALSE);
+	menu_Enable( ID_QUIT, FALSE);
 	return 0;
 }
 void DropScript( char *cmds )
@@ -1301,12 +1362,14 @@ void OpenScript( WCHAR *wfn )
 	if ( autocomplete_Add(wport) ) menu_Add(wport+1);
 
 	int len = wcslen(wfn);
-	if ( wcscmp(wfn+len-3, L".js")==0 || wcscmp(wfn+len-4, L".vbs")==0 ) {
+	if ( wcscmp(wfn+len-3, L".js")==0 
+		|| wcscmp(wfn+len-4, L".vbs")==0 ) {
 		term_Learn_Prompt( pt );
 		wsprintf(wport, L"%d", httport);
 		ShellExecute( NULL, L"Open", wfn, wport, NULL, SW_SHOW );
 	}
-	else if ( wcscmp(wfn+len-5, L".html")==0) {
+	else if ( wcscmp(wfn+len-5, L".html")==0)
+	{
 		wsprintf(wport, L"http://127.0.0.1:%d/%s", httport, wfn);
 		ShellExecute( NULL, L"Open", wport, NULL, NULL, SW_SHOW );
 	}
@@ -1314,12 +1377,15 @@ void OpenScript( WCHAR *wfn )
 		struct _stat sb;
 		if ( _wstat(wfn, &sb)==0 ) {
 			char *tl1s = (char *)malloc(sb.st_size+1);
-			if ( tl1s!=NULL ) {
+			if ( tl1s!=NULL )
+			{
 				FILE *fpScript = _wfopen( wfn, L"rb" );
-				if ( fpScript != NULL ) {
+				if ( fpScript != NULL )
+				{
 					int lsize = fread( tl1s, 1, sb.st_size, fpScript );
 					fclose( fpScript );
-					if ( lsize > 0 ) {
+					if ( lsize > 0 )
+					{
 						tl1s[lsize]=0;
 						DropScript(tl1s);
 						return;
