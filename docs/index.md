@@ -1,7 +1,8 @@
 ## Introduction
 
 tinyTerm started as a simple telnet client used to work with telecom transport equipment through command line interface(TL1). Over time  it has grown to a full function terminal emulator supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation,  plus unique features like: **command autocompletion**, **scp integration**, **batch automation**, and **scripting**. 
-	
+
+Windows 10 user should install from Microsoft Store, users on older versions of Windows, or prefer portable apps download exe files.
 <table>
 	<tr>
 	    <td width="568">
@@ -23,8 +24,6 @@ tinyTerm started as a simple telnet client used to work with telecom transport e
 </table>
 
 tinyTerm is written in C with Win32 API, [libssh2](http://libssh2.org) used for SSH2 functions.
-
-Windows 10 user should install from Microsoft Store, users on older versions of Windows, or prefer portable apps download exe files.
 
 ---
 
