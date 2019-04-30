@@ -113,7 +113,6 @@ These commands can be used programatically for scripting or interactively in loc
     !ssh pi@piZero:2222 ssh to host piZero port 2222 with username pi
     !sftp -P 2222 jun01 sftp to host jun01 port 2222
     !netconf rtr1       netconf to port 830(default) of host rtr1
-    !{command}		run DOS command like ping, ipconfig, tracert etc.
     !disconn            disconnect from current connection
     !Find {string}      search for {string} in scroll back buffer
 
@@ -122,6 +121,7 @@ These commands can be used programatically for scripting or interactively in loc
     !Prompt $%20        set command prompt to “$ “, for CLI script
     !Timeout 30	        set time out to 30 seconds for CLI script
     !Wait 10            wait 10 seconds during execution of CLI script
+    !Loop 5		repeat the list of commands 5 times
     !Waitfor 100%       wait for “100%” from host during execution of CLI script
     !Log test.log       start/stop logging with log file test.log
 
