@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 30383 2019-04-28 15:05:10 $"
+// "$Id: term.c 30519 2019-05-08 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -281,11 +281,15 @@ void term_Title( TERM *pt, char *title )
 	{
 		strncpy(pt->title, title, 63);
 		pt->title[63] = 0;
-		host_Send_Size( pt->host, pt->size_x, pt->size_y);
+		if ( host_Status(pt->host)==HOST_CONNECTED ) {
+			host_Send_Size( pt->host, pt->size_x, pt->size_y);
+			if ( host_Type(pt->host)==NETCONF ) pt->bEcho = TRUE;
+		}
 	}
 	else
 	{
 		pt->title[0] = 0;
+		pt->bEcho = FALSE;
 	}
 	tiny_Title(pt->title);
 }

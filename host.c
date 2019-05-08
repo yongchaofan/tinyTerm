@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 28739 2019-04-26 15:05:10 $"
+// "$Id: host.c 28699 2019-05-08 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -48,11 +48,11 @@ void host_Open( HOST *ph, char *port )
 			ph->cmdline[0] = 0;
 			if ( strncmp(port, "netconf", 7)==0 )
 				strcpy(ph->cmdline, "ssh -s ");
-			strncat(ph->cmdline, port, 255);
+			strncat(ph->cmdline, port, 248);
 			ph->cmdline[255] = 0;
 		}
 		port = ph->cmdline;
-		
+
 		LPTHREAD_START_ROUTINE reader = stdio;
 		if ( strnicmp(port, "com",3)==0 ) 
 			reader = serial;
@@ -219,6 +219,7 @@ DWORD WINAPI telnet( void *pv )
 		ph->port=atoi(p);
 	}
 
+	term_Title( ph->term, ph->hostname );
 	if ( ( ph->sock = tcp(ph->hostname, ph->port) )!=-1 ) 
 	{
 		ph->host_type=TELNET;
@@ -450,14 +451,12 @@ DWORD WINAPI httpd( void *pv )
 					url_decode(cmd);
 
 					if ( *cmd=='?' ) {	//get CGI, cmd+1 points to command
-						cmd_Disp_utf8(cmd+1);
 						replen = term_Cmd( pt,  cmd+1, &reply );
 						int len = sprintf( buf, HEADER, replen );
 						send( http_s1, buf, len, 0 );
 						if ( replen>0 ) send( http_s1, reply, replen, 0 );
 					}
 					else {				//get file, cmd points to filename
-						cmd_Disp_utf8(cmd);
 						httpFile(http_s1, cmd);
 					}
 					cmdlen = recv(http_s1, buf, 4095, 0);
@@ -466,7 +465,6 @@ DWORD WINAPI httpd( void *pv )
 		}
 		shutdown(http_s1, SD_SEND);
 		closesocket(http_s1);
-		cmd_Disp_utf8("");
 	}
 	return 0;
 }
