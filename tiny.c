@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 39198 2019-05-08 21:35:10 $"
+// "$Id: tiny.c 39961 2019-05-12 21:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -80,9 +80,9 @@ TERM *pt;
 static int iFontHeight, iFontWidth;
 static int iTransparency = 255;
 static int iConnectCount=0, iScriptCount=0, httport;
-static BOOL bFocus = TRUE, bLocalEdit = FALSE;
-static BOOL bFTPd = FALSE, bTFTPd = FALSE;
+static BOOL bFocus=TRUE, bLocalEdit=FALSE, bScrollbar=FALSE;
 static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
+static BOOL bFTPd=FALSE, bTFTPd=FALSE;
 
 void CopyText( );
 void PasteText( );
@@ -286,7 +286,7 @@ void menu_Size()
 	menuRect.left = menuRect.right = 0;
 	DrawText(wndDC, L"Options", 7, &menuRect, DT_CALCRECT);
 	menuX[3] = menuX[2]+(menuRect.right-menuRect.left)*(dpi/96);
-		
+
 	if ( oldFont ) SelectObject( wndDC, oldFont );
 	ReleaseDC(hwndTerm, wndDC);
 }
@@ -298,7 +298,7 @@ void menu_Init()
 	hMenu[OPTION] = GetSubMenu(hMainMenu, 2);
 	hMenu[CONTEX] = GetSubMenu(hMainMenu, 3);
 	menu_Size();
-	
+
 	if ( !LoadDict( "tinyTerm.hist" ) )
 	{
 		_chdir(getenv("USERPROFILE"));
@@ -353,9 +353,7 @@ void cmd_Enter(WCHAR *wcmd)
 	char cmd[256];
 	int cnt = wchar_to_utf8(wcmd, -1, cmd, 256);
 	int added = autocomplete_Add(wcmd);
-	switch ( *cmd ) {
-	case '~':tiny_Cmd( cmd ); break;
-	case '!':
+	if ( *cmd=='!' ) {
 		if ( added ) menu_Add(wcmd+1);
 		if ( strncmp(cmd+1,"scp ",4)==0 && host_Type(pt->host)==SSH )
 			CreateThread(NULL, 0, scper, strdup(cmd+5), 0, NULL);
@@ -363,57 +361,50 @@ void cmd_Enter(WCHAR *wcmd)
 			CreateThread(NULL, 0, tuner, strdup(cmd+4), 0, NULL);
 		else
 			term_Cmd( pt, cmd, NULL );
-		break;
-	default: if ( host_Status( pt->host )!=HOST_IDLE ) {
-				cmd[cnt-1] = '\r';
-				term_Send( pt, cmd, cnt ); 
-			 }
-			 else {
-				term_Print(pt, "\033[33m%s\n", cmd); 
-				host_Open(pt->host, cmd);
-			}
+	}
+	else {
+		if ( host_Status( pt->host )!=HOST_IDLE ) {
+			cmd[cnt-1] = '\r';
+			term_Send( pt, cmd, cnt ); 
+		}
+		else {
+			term_Print(pt, "\033[33m%s\n", cmd); 
+			host_Open(pt->host, cmd);
+		}
 	}
 }
 WNDPROC wpOrigCmdProc;
 LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 								WPARAM wParam, LPARAM lParam)
 {
+	WCHAR wcmd[256];
 	if ( uMsg==WM_KEYDOWN )
 	{
-		WCHAR wcmd[256];
 		if ( GetKeyState(VK_CONTROL) & 0x8000 ) 			//CTRL+
 		{
-			if ( wParam==VK_DELETE ) {
-				if ( SendMessage(hwndCmd, WM_GETTEXT, 256, (LPARAM)wcmd)>0 ) {
-					autocomplete_Del(wcmd);
-					cmd_Disp(autocomplete_Next());
-					return 1;
-				}
-			}
-			else {
-				char cmd = 0;
-				if ( wParam==54 ) cmd = 30;						//^
-				if ( wParam>64 && wParam<91 ) cmd = wParam-64;	//A-Z
-				if ( wParam>218&&wParam<222 ) cmd = wParam-192;	//[\]
-				if ( cmd ) {
-					term_Send( pt, &cmd, 1 );
-					return 1;
-				}
+			char cmd = 0;
+			if ( wParam==54 ) cmd = 30;						//^
+			if ( wParam>64 && wParam<91 ) cmd = wParam-64;	//A-Z
+			if ( wParam>218&&wParam<222 ) cmd = wParam-192;	//[\]
+			if ( cmd ) {
+				term_Send( pt, &cmd, 1 );
+				return 1;
 			}
 		}
 		else 
 		{
 			switch ( wParam ) 
 			{
-			case VK_UP: 	cmd_Disp(autocomplete_Prev()); break;
-			case VK_DOWN:	cmd_Disp(autocomplete_Next()); break;
-			case VK_NEXT:
-			case VK_PRIOR:	term_Keydown(pt, wParam); break;
-			case VK_RETURN:
-				if ( SendMessage(hwndCmd, WM_GETTEXT, 256, (LPARAM)wcmd)>0 ) {
-					SetWindowText(hwndCmd, L"");
-					cmd_Enter(wcmd);
+			case VK_UP:   cmd_Disp(autocomplete_Prev()); break;
+			case VK_DOWN: cmd_Disp(autocomplete_Next()); break;
+			case VK_BACK: 
+				if ( GetWindowText(hwndCmd, wcmd, 256)==0 ) {
+					term_Send(pt, "\b", 1);
+					return 1;
 				}
+				break;
+			case VK_RETURN:
+				if ( GetWindowText(hwndCmd, wcmd, 256)>=0 ) cmd_Enter(wcmd);
 				break;
 			}
 		}
@@ -439,33 +430,38 @@ void tiny_Redraw_Term()
 void tiny_Title( char *buf )
 {
 	utf8_to_wchar(buf, -1, Title+50, 200);
-	Title[250] = 0;
 	SetWindowText(hwndTerm, Title);
-	if ( *buf ) {
+	if ( host_Status(pt->host)==HOST_IDLE )
+	{
+		if ( bLocalEdit )
+			term_Disp(pt, TINYTERM);
+		else
+			term_Print(pt, "\n\033[33mPress Enter to reconnect\n");
+		menu_Enable( ID_CONNECT, TRUE);
+		menu_Enable( ID_DISCONN, FALSE);
+		menu_Check( ID_ECHO, pt->bEcho);
+	}
+	else {
 		menu_Enable( ID_CONNECT, FALSE);
 		menu_Enable( ID_DISCONN, TRUE);
 		menu_Check( ID_ECHO, pt->bEcho);
 	}
-	else { 
-		menu_Enable( ID_CONNECT, TRUE);
-		menu_Enable( ID_DISCONN, FALSE);
-		menu_Check( ID_ECHO, FALSE);
-		if ( bLocalEdit ) 
-			term_Disp(pt, TINYTERM);
-		else
-			term_Print(pt, "\n\033[33mPress Enter to reconnect\n");
-	}
 }
-void tiny_Scroll()
+void tiny_Scroll( int lines )
 {
-static BOOL bScrollbar = FALSE;
-	if ( pt->scroll_y ) {
+	pt->screen_y -= lines;
+	if ( pt->screen_y<0 || pt->screen_y>pt->cursor_y ) {
+		pt->screen_y += lines;
+		return;
+	}
+	if ( pt->screen_y<pt->cursor_y-pt->size_y+1 ) {
+		SetScrollRange(hwndTerm, SB_VERT, 0, pt->cursor_y, TRUE);
+		SetScrollPos(hwndTerm, SB_VERT, pt->screen_y, TRUE);
 		if ( !bScrollbar ) {
 			bScrollbar = TRUE;
 			ShowScrollBar(hwndTerm, SB_VERT, TRUE);
+			pt->screen_y -= lines;			//first pageup fix
 		}
-		SetScrollRange(hwndTerm, SB_VERT, 0, pt->cursor_y, TRUE);
-		SetScrollPos(hwndTerm, SB_VERT, pt->cursor_y+pt->scroll_y, TRUE);
 	}
 	else {
 		if ( bScrollbar ) {
@@ -473,8 +469,7 @@ static BOOL bScrollbar = FALSE;
 			ShowScrollBar(hwndTerm, SB_VERT, FALSE);
 		}
 	}
-
-	tiny_Redraw_Term(  );
+	tiny_Redraw_Term( );
 }
 void tiny_Beep()
 {
@@ -491,7 +486,7 @@ void tiny_Paint(HDC hDC, RECT rcPaint)
 	WCHAR wbuf[1024];
 	RECT text_rect = {0, 0, 0, 0};
 	SelectObject(hDC, hTermFont);
-	int y = pt->screen_y+pt->scroll_y; if ( y<0 ) y = 0;
+	int y = pt->screen_y;
 	int sel_min = min(pt->sel_left, pt->sel_right);
 	int sel_max = max(pt->sel_left, pt->sel_right);
 	int dx, dy=rcPaint.top;
@@ -543,23 +538,20 @@ void tiny_Paint(HDC hDC, RECT rcPaint)
 
 	int cnt = utf8_to_wchar(pt->buff+pt->line[pt->cursor_y],
 							pt->cursor_x-pt->line[pt->cursor_y], wbuf, 1024);
-	if ( cnt>0 ) {
-		DrawText(hDC, wbuf, cnt, &text_rect, DT_CALCRECT|DT_NOPREFIX);
-	}
-	else {
-		text_rect.left = text_rect.right = 0;
-	}
+	DrawText(hDC, wbuf, cnt, &text_rect, DT_CALCRECT|DT_NOPREFIX);
+
 	if ( bLocalEdit ) {
-		MoveWindow(hwndCmd, text_rect.right,
-							(pt->cursor_y-pt->screen_y)*iFontHeight,
-							termRect.right-text_rect.right, iFontHeight, TRUE );
+		MoveWindow( hwndCmd, text_rect.right,
+					(pt->cursor_y-pt->screen_y)*iFontHeight,
+					termRect.right-text_rect.right, iFontHeight, TRUE );
 	}
 	else {
-		if ( bFocus ) {
-			SetCaretPos( text_rect.right+1,
-					(pt->cursor_y-pt->screen_y)*iFontHeight+iFontHeight*3/4);
-			pt->bCursor ? ShowCaret(hwndTerm) : HideCaret(hwndTerm);
-		}
+		SetCaretPos( text_rect.right+1,
+				(pt->cursor_y-pt->screen_y)*iFontHeight+iFontHeight*3/4);
+		if ( pt->bCursor && bFocus)
+			ShowCaret(hwndTerm);
+		else
+			HideCaret(hwndTerm);
 	}
 }
 const WCHAR *PROTOCOLS[]={L"Serial ", L"telnet ", L"ssh ", L"sftp ", L"netconf "};
@@ -745,10 +737,30 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		if ( pt->sel_left!=pt->sel_right ) 
 			term_Send(pt, pt->buff+pt->sel_left, pt->sel_right-pt->sel_left);
 		break;
-	case ID_ECHO:	//toggle local echo
-		menu_Check( ID_ECHO, term_Echo(pt) );
+	case ID_DELETE: {
+		WCHAR wcmd[256];
+		if ( GetWindowText(hwndCmd, wcmd, 256)>0 ) {
+			autocomplete_Del(wcmd);
+			cmd_Disp(autocomplete_Next());
+		}
 		break;
-	case ID_EDIT:	//toggle local edit
+	}
+	case ID_TAB: 
+		if ( bLocalEdit ) {
+			char cmd[256];
+			WCHAR wcmd[256];
+			Edit_ReplaceSel(hwndCmd, L"");
+			GetWindowText(hwndCmd, wcmd, 256);
+			SetWindowText(hwndCmd, L"");
+			int cnt = wchar_to_utf8(wcmd, -1, cmd, 256);
+			term_Send(pt, cmd, cnt-1);
+		}
+		term_Send(pt, LOWORD(wParam)==ID_TAB?"\t":"?", 1);
+		break;
+	case ID_PRIOR: tiny_Scroll( pt->size_y-1 ); break;
+	case ID_NEXT:  tiny_Scroll( 1-pt->size_y ); break;
+	case ID_ECHO:  menu_Check( ID_ECHO, term_Echo(pt) ); break;
+	case ID_EDIT:
 		bLocalEdit = !bLocalEdit;
 		SetFocus(bLocalEdit ? hwndCmd : hwndTerm);
 		if ( !bLocalEdit ) 
@@ -765,7 +777,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 			iTransparency = lParam;
 		else
 			iTransparency =  (iTransparency==255) ? 224 : 255;
-		SetLayeredWindowAttributes(hwndTerm,0,iTransparency,LWA_ALPHA);
+		SetLayeredWindowAttributes(hwndTerm, 0, iTransparency, LWA_ALPHA);
 		menu_Check( ID_TRANSP, iTransparency!=255 );
 		break;
 	case ID_FONT:
@@ -839,9 +851,9 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 
 	switch (msg) {
 	case WM_CREATE:
-		hwndCmd = CreateWindow(L"EDIT", NULL,
-							WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL|ES_NOHIDESEL,
-							0, 0, 1, 1, hwnd, (HMENU)0, hInst, NULL);
+		hwndCmd = CreateWindow(L"EDIT", NULL, WS_CHILD|WS_VISIBLE 
+							|ES_AUTOHSCROLL|ES_NOHIDESEL, 0, 0, 1, 1, 
+							hwnd, (HMENU)0, hInst, NULL);
 		wpOrigCmdProc = (WNDPROC)SetWindowLongPtr(hwndCmd,
 							GWLP_WNDPROC, (LONG_PTR)CmdEditProc);
 		SendMessage( hwndCmd, WM_SETFONT, (WPARAM)hTermFont, TRUE );
@@ -921,42 +933,43 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		}
 		break;
 	case WM_KEYDOWN:
-		term_Keydown( pt, wParam );
+		switch( wParam ) {
+		case VK_DELETE:term_Send(pt, "\177",1); break;
+		case VK_UP:    term_Send(pt, pt->bAppCursor?"\033OA":"\033[A",3); break;
+		case VK_DOWN:  term_Send(pt, pt->bAppCursor?"\033OB":"\033[B",3); break;
+		case VK_RIGHT: term_Send(pt, pt->bAppCursor?"\033OC":"\033[C",3); break;
+		case VK_LEFT:  term_Send(pt, pt->bAppCursor?"\033OD":"\033[D",3); break;
+		case VK_HOME:  term_Send(pt, pt->bAppCursor?"\033OH":"\033[H",3); break;
+		case VK_END:   term_Send(pt, pt->bAppCursor?"\033OF":"\033[F",3); break;
+		}
+		if ( bScrollbar ) tiny_Scroll(pt->screen_y-(pt->cursor_y-pt->size_y+1));
 		break;
 	case WM_ACTIVATE:
 		SetFocus( bLocalEdit? hwndCmd : hwndTerm );
 		tiny_Redraw_Term(  );
 		break;
-	case WM_VSCROLL: {
-			int yPos;
-	  SCROLLINFO si; 
-			si.cbSize = sizeof (si);
-	  si.fMask	= SIF_ALL;
-			si.nPage = pt->size_y-1;
-	  GetScrollInfo (hwnd, SB_VERT, &si);
-
-	  yPos = si.nPos;
-	  switch (LOWORD (wParam))
-	  {
-		case SB_LINEUP:		si.nPos -= 1; break;
-		case SB_LINEDOWN: si.nPos += 1; break;
-		case SB_PAGEUP:	  si.nPos -= si.nPage; break;
-		case SB_PAGEDOWN: si.nPos += si.nPage; break;
-		case SB_THUMBTRACK:si.nPos = si.nTrackPos; break;
-		default:break; 
-	  }
-	  si.fMask = SIF_POS;
-	  SetScrollInfo (hwnd, SB_VERT, &si, TRUE);
-	  GetScrollInfo (hwnd, SB_VERT, &si);
-	  if (si.nPos != yPos) term_Scroll(pt, yPos-si.nPos);
+	case WM_VSCROLL: 
+		switch ( LOWORD (wParam) )
+		{
+		case SB_LINEUP:   tiny_Scroll( 1 ); break;
+		case SB_LINEDOWN: tiny_Scroll(-1 ); break;
+		case SB_PAGEUP:   tiny_Scroll( pt->size_y-1 ); break;
+		case SB_PAGEDOWN: tiny_Scroll( 1-pt->size_y ); break;
+		case SB_THUMBTRACK: {
+				SCROLLINFO si; 
+				si.cbSize = sizeof (si);
+				si.fMask = SIF_ALL;
+				GetScrollInfo (hwnd, SB_VERT, &si);
+				tiny_Scroll(si.nPos-si.nTrackPos);
+			}
 		}
 		break;
 	case WM_MOUSEWHEEL:
-		term_Scroll( pt, GET_WHEEL_DELTA_WPARAM(wParam)/40 );
+		tiny_Scroll( GET_WHEEL_DELTA_WPARAM(wParam)/40 );
 		break;
 	case WM_LBUTTONDBLCLK: {
 		int x = GET_X_LPARAM(lParam)/iFontWidth;
-		int y = (GET_Y_LPARAM(lParam)+2)/iFontHeight+pt->screen_y+pt->scroll_y;
+		int y = (GET_Y_LPARAM(lParam)+2)/iFontHeight+pt->screen_y;
 		pt->sel_left = pt->line[y]+x;
 		pt->sel_right = pt->sel_left;
 		while ( --pt->sel_left>pt->line[y] )
@@ -976,7 +989,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	case WM_LBUTTONDOWN: {
 		int x = GET_X_LPARAM(lParam)/iFontWidth;
 		int y = (GET_Y_LPARAM(lParam)+2)/iFontHeight;
-		y += pt->screen_y + pt->scroll_y;
+		y += pt->screen_y;
 		pt->sel_left = min(pt->line[y]+x, pt->line[y+1]);
 		while ( isUTF8c(pt->buff[pt->sel_left]) ) pt->sel_left--;
 		pt->sel_right = pt->sel_left;
@@ -988,17 +1001,17 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			int x = GET_X_LPARAM(lParam)/iFontWidth;
 			int y = (GET_Y_LPARAM(lParam)+2)/iFontHeight;
 			if ( y<0 ) {
-				pt->scroll_y += y*2;
-				if ( pt->scroll_y<-pt->screen_y ) pt->scroll_y = -pt->screen_y;
+				pt->screen_y += y*2;
+				if ( pt->screen_y<0 ) pt->screen_y = 0;
 			}
 			if ( y>pt->size_y) {
-				pt->scroll_y += (y-pt->size_y)*2;
-				if ( pt->scroll_y>0 ) pt->scroll_y=0;
+				pt->screen_y += (y-pt->size_y)*2;
+				if ( pt->screen_y>pt->cursor_y ) pt->screen_y=pt->cursor_y;
 			}
-			y += pt->screen_y+pt->scroll_y;
+			y += pt->screen_y;
 			pt->sel_right = min(pt->line[y]+x, pt->line[y+1]);
 			while ( isUTF8c(pt->buff[pt->sel_right]) ) pt->sel_right++;
-			tiny_Redraw_Term(  );
+			tiny_Redraw_Term( );
 		}
 		break;
 	case WM_LBUTTONUP:
@@ -1095,7 +1108,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	wc.lpszMenuName = 0;
 	if ( !RegisterClassEx(&wc) ) return 0;
 	hInst = hInstance;
-	
+
 	OleInitialize( NULL );
 	WSADATA wsaData;
 	WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -1122,7 +1135,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	ReleaseDC(0, sysDC);
 	
 	dwBkBrush = (HBRUSH)GetStockObject(BLACK_BRUSH);
-	hwndTerm = CreateWindowEx( WS_EX_LAYERED, L"TWnd", Title,
+	hwndTerm = CreateWindowEx( WS_EX_LAYERED,L"TWnd", Title,
 						WS_TILEDWINDOW|WS_VSCROLL, 
 						CW_USEDEFAULT, CW_USEDEFAULT,
 						CW_USEDEFAULT, CW_USEDEFAULT,
@@ -1138,7 +1151,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	}
 	else 
 		host_Open( pt->host, lpCmdLine );
-	
+
 	HACCEL haccel = LoadAccelerators(hInst, MAKEINTRESOURCE(IDACCEL_MAIN));
 	MSG msg;
 	while ( GetMessage(&msg, NULL, 0, 0) )
@@ -1153,11 +1166,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	if ( pt->bLogging ) term_Logg( pt, NULL );
 	SaveDict( "tinyTerm.hist" );
 	autocomplete_Destroy( );
-	
+
 	http_Svr("127.0.0.1");
-	OleUninitialize();
 	libssh2_exit();
 	WSACleanup();
+	OleUninitialize();
 
 	return 0;
 }
@@ -1303,9 +1316,8 @@ DWORD WINAPI scripter( void *cmds )
 	menu_Enable( ID_RUN, FALSE);
 	menu_Enable( ID_PAUSE, TRUE);
 	menu_Enable( ID_QUIT, TRUE);
-	while ( bScriptRun )
+	while ( bScriptRun && p0!=NULL )
 	{
-		Sleep(100); 
 		if ( iWaitCnt>0 ) {
 			if ( (--iWaitCnt)%10==0 ) {
 				WCHAR wait[16];
@@ -1313,17 +1325,19 @@ DWORD WINAPI scripter( void *cmds )
 				cmd_Disp(iWaitCnt==0 ? L"": wait);
 			}
 		}
-		if ( iWaitCnt || bScriptPause ) continue; 
+		if ( iWaitCnt || bScriptPause ) { Sleep(100); continue; }
 
 		p1=strchr(p0, 0x0a);
-		if ( p1==NULL) { 
-			term_Send( pt, p0, strlen(p0) );
-			break;
-		}
+		int len = ( p1==NULL ? strlen(p0) : (p1++)-p0 ); 
 
 		if ( *p0!='!' ) {
-			term_Send( pt, p0, p1-p0 );
-			term_Waitfor_Prompt( pt );
+			if ( host_Status(pt->host)==HOST_IDLE ) {
+				term_Parse(pt, p0, len+1);
+			}
+			else {
+				term_Send( pt, p0, len );
+				term_Waitfor_Prompt( pt );
+			}
 		}
 		else if ( strncmp( p0, "!Wait ", 6)==0 ) {
 			iWaitCnt = atoi(p0+6)*10;
@@ -1334,11 +1348,11 @@ DWORD WINAPI scripter( void *cmds )
 		}
 		else {
 			char cmd[256];
-			strncpy(cmd, p0, p1-p0);
-			cmd[p1-p0] = 0;
+			strncpy(cmd, p0, len);
+			cmd[len] = 0;
 			term_Cmd(pt, cmd, NULL);
 		}
-		p0 = p1+1;
+		p0 = p1;
 	}
 
 	free(cmds);

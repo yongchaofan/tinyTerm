@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5651 2019-04-26 08:05:10 $"
+// "$Id: tiny.h 5468 2019-05-12 22:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -10,11 +10,11 @@
 // This library is free software distributed under GNU GPL 3.0,
 // see the license at:
 //
-//     https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
+//		https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE
 //
 // Please report all bugs and problems on the following page:
 //
-//     https://github.com/yongchaofan/tinyTerm/issues/new
+//		https://github.com/yongchaofan/tinyTerm/issues/new
 //
 #include <stdio.h>
 #include <sys/stat.h>
@@ -42,12 +42,11 @@ typedef struct tagHOST {
 
 	char cmdline[256];
 	char tunline[256];
-	SOCKET sock;					//for tcp/ssh reader
+	SOCKET sock;					//for tcp/ssh/sftp reader
+	short port;
 	HANDLE hExitEvent, hSerial;		//for serial reader
 	HANDLE hStdioRead, hStdioWrite;	//for stdio reader
-	HANDLE hReaderThread;			//reader thread handle
 
-	short port;						//ssh/sftp/netconf host
 	char *subsystem;
 	char *username;
 	char *password;
@@ -56,6 +55,7 @@ typedef struct tagHOST {
 	char homedir[MAX_PATH];
 	char keys[256];
 	int cursor, bReturn, bPassword, bGets;
+
 	HANDLE mtx;						//ssh2 reading/writing mutex
 	LIBSSH2_SESSION *session;
 	LIBSSH2_CHANNEL *channel;
@@ -65,7 +65,6 @@ typedef struct tagHOST {
 	LIBSSH2_SFTP *sftp;				//sftp host
 	char homepath[MAX_PATH];
 	char realpath[MAX_PATH];
-	int msg_id;						//netconf host
 
 	struct tagTERM *term;
 } HOST;
@@ -75,7 +74,7 @@ typedef struct tagTERM {
 	int *line;
 	int size_x, size_y;
 	int cursor_x, cursor_y;
-	int screen_y, scroll_y;
+	int screen_y;
 	int sel_left, sel_right;
 	BOOL bLogging, bEcho, bCursor, bAlterScreen;
 	BOOL bAppCursor, bGraphic, bEscape, bTitle, bInsert;
@@ -106,9 +105,9 @@ typedef struct tagTERM {
 #define HOST_AUTHENTICATING	2
 #define HOST_CONNECTED		4
 
-#define STDIO  	1
-#define SERIAL 	2
-#define TELNET 	3
+#define STDIO	1
+#define SERIAL	2
+#define TELNET	3
 #define SSH		4
 #define SFTP	5
 #define NETCONF 6
@@ -126,9 +125,9 @@ int autocomplete_Init( HWND hWnd );
 int autocomplete_Destroy( );
 int autocomplete_Add( WCHAR *cmd );
 int autocomplete_Del( WCHAR *cmd );
-WCHAR *autocomplete_Prev( );
 WCHAR *autocomplete_First( );
 WCHAR *autocomplete_Next( );
+WCHAR *autocomplete_Prev( );
 
 /****************host.c****************/
 void host_Construct( HOST *ph );
@@ -149,34 +148,31 @@ BOOL tftp_Svr( char *root );
 void ssh2_Construct( HOST *ph );
 void ssh2_Size( HOST *ph, int w, int h );
 void ssh2_Send( HOST *ph, char *buf, int len );
-char *ssh2_Gets( HOST *ph, char *prompt, BOOL bEcho);
+char *ssh2_Gets( HOST *ph, char *prompt, BOOL bEcho );
 void ssh2_Close( HOST *ph );
 void ssh2_Tun( HOST *ph, char *cmd );
 void scp_read( HOST *ph, char *lpath, char *rfiles );
 void scp_write( HOST *ph, char *lpath, char *rpath );
 void sftp_put( HOST *ph, char *src, char *dst );
 
-
 /****************term.c****************/
-void host_callback( void *term, char *buf, int len);
+void host_callback( void *term, char *buf, int len );
 BOOL term_Construct( TERM *pt );
 void term_Desstruct( TERM *pt );
 void term_Clear( TERM *pt );
 void term_Size( TERM *pt, int x, int y );
 void term_Title( TERM *pt, char *title );
-void term_Parse( TERM *pt, char *buf, int len );
-void term_Parse_XML( TERM *pt, char *xml, int len );
 void term_Print( TERM *pt, const char *fmt, ... );
-void term_Scroll( TERM *pt, int lines);
-void term_Keydown( TERM *pt, DWORD key );
+void term_Parse( TERM *pt, const char *buf, int len );
+void term_Parse_XML( TERM *pt, const char *xml, int len );
 
 BOOL term_Echo( TERM *pt );
 void term_Logg( TERM *pt, char *fn );
 void term_Save( TERM *pt, char *fn );
-void term_Srch( TERM *pt, char *sstr );
-void term_Disp( TERM *pt, char *buf );
+void term_Disp( TERM *pt, const char *buf );
 void term_Send( TERM *pt, char *buf, int len );
-int term_Recv( TERM *pt, char **preply );
+int  term_Recv( TERM *pt, char **preply );
+int  term_Srch( TERM *pt, char *sstr );
 
 void term_Learn_Prompt( TERM *pt );
 char *term_Mark_Prompt( TERM *pt );
@@ -189,7 +185,7 @@ int term_Cmd( TERM *pt, char *cmd, char **preply );
 /****************tiny.c****************/
 void cmd_Disp_utf8(char *buf);
 void tiny_Beep();
-void tiny_Scroll();
+void tiny_Scroll(int lines);
 void tiny_Redraw_Line();		//redraw cursor line only
 void tiny_Redraw_Term();		//redraw whole term window
 void tiny_Title( char *buf );

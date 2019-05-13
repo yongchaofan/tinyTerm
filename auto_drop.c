@@ -1,5 +1,5 @@
 //
-// "$Id: auto_drop.c 18024 2019-04-27 11:05:10 $"
+// "$Id: auto_drop.c 17982 2019-05-09 23:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -23,8 +23,9 @@
 #include <ole2.h>
 #include <shlwapi.h>
 #include <shldisp.h>
-DEFINE_GUID(CLSID_AutoComplete, 0x00bb2763, 0x6a77, 0x11d0, 0xa5, 0x35,
-								0x00, 0xc0, 0x4f, 0xd7, 0xd0, 0x62);
+#include <shlguid.h>
+//DEFINE_GUID(CLSID_AutoComplete, 0x00bb2763, 0x6a77, 0x11d0, 0xa5, 0x35,
+//									0x00, 0xc0, 0x4f, 0xd7, 0xd0, 0x62);
 //
 //impletemention of IEnumString interface,
 //provided to IAutoCompelte for command history
@@ -55,7 +56,8 @@ STDMETHODIMP_(ULONG) CAutoEnumString_Release(IEnumString *this)
 	return --self->m_Ref;
 }
 
-STDMETHODIMP CAutoEnumString_QueryInterface(IEnumString *this, REFIID iid, void **ppv)
+STDMETHODIMP CAutoEnumString_QueryInterface(IEnumString *this,
+											REFIID iid, void **ppv)
 {
 	CAutoEnumString *self = (CAutoEnumString *)this;
 	if ( IsEqualIID(iid, &IID_IUnknown) || IsEqualIID(iid, &IID_IEnumString) ){
@@ -69,7 +71,8 @@ STDMETHODIMP CAutoEnumString_QueryInterface(IEnumString *this, REFIID iid, void 
 	return S_OK;
 }
 
-STDMETHODIMP CAutoEnumString_Next(IEnumString *this, ULONG celt, LPOLESTR *rgelt, ULONG *pceltFetched)
+STDMETHODIMP CAutoEnumString_Next(IEnumString *this, ULONG celt,
+									LPOLESTR *rgelt, ULONG *pceltFetched)
 {
 	CAutoEnumString *self = (CAutoEnumString *)this;
 	if (rgelt == NULL || (celt != 1 && pceltFetched == NULL)) return E_POINTER;
@@ -134,8 +137,7 @@ void CAutoEnumString_Construct(CAutoEnumString* this)
 void CAutoEnumString_Destruct(CAutoEnumString* this)
 {
 	if ( this->m_count>0 )
-		for (int i=0; i<this->m_count; i++)
-			free(this->m_arString[i]);
+		for (int i=0; i<this->m_count; i++) free(this->m_arString[i]);
 	if ( this->m_arString ) free(this->m_arString);
 }
 int CAutoEnumString_AddString(CAutoEnumString* this, LPOLESTR lpszStr)
@@ -168,8 +170,8 @@ int CAutoEnumString_DelString(CAutoEnumString* this, LPOLESTR lpszStr)
 	for ( int cur=0; cur<this->m_count; cur++ ) {
 		if ( wcscmp(this->m_arString[cur], lpszStr) == 0 ) {
 			free(this->m_arString[cur]);
-			this->m_arString[cur] = _wcsdup(L" ");
-			return cur;
+			this->m_arString[cur] = _wcsdup(L"");
+			return this->m_rtrvCur = cur;
 		}
 	} 
 	return 0;
@@ -177,9 +179,9 @@ int CAutoEnumString_DelString(CAutoEnumString* this, LPOLESTR lpszStr)
 LPOLESTR CAutoEnumString_prevString(CAutoEnumString* this)
 {
 	if ( this->m_count>0 && this->m_rtrvCur>0)
-		return this->m_arString[--this->m_rtrvCur];
+		return this->m_arString[this->m_rtrvCur--];
 	else
-		return L"";
+		return NULL;
 }
 LPOLESTR CAutoEnumString_firstString(CAutoEnumString* this)
 {
@@ -187,14 +189,14 @@ LPOLESTR CAutoEnumString_firstString(CAutoEnumString* this)
 	if ( this->m_count>0 ) 
 		return this->m_arString[0];
 	else
-		return L"";
+		return NULL;
 }
 LPOLESTR CAutoEnumString_nextString(CAutoEnumString* this)
 {
 	if ( this->m_rtrvCur < this->m_count-1 )
 		return this->m_arString[++this->m_rtrvCur];
 	else 
-		return L"";
+		return NULL;
 }
 //
 //	AutoComplete implementation
@@ -210,10 +212,9 @@ void autocomplete_Init(HWND hwndCmd)
 
 	if ( pauto ) {
 		IAutoComplete2 *pauto2 = NULL;
-		pauto->lpVtbl->QueryInterface(pauto, &IID_IAutoComplete2, 
-											(PVOID*)&pauto2);
+		pauto->lpVtbl->QueryInterface(pauto,&IID_IAutoComplete2,(PVOID*)&pauto2);
 		if ( pauto2 ) {
-			pauto2->lpVtbl->SetOptions(pauto2, ACO_AUTOSUGGEST|ACO_AUTOAPPEND );
+			pauto2->lpVtbl->SetOptions(pauto2, ACO_AUTOSUGGEST|ACO_AUTOAPPEND);
 			pauto2->lpVtbl->Release(pauto2);
 		}
 		CAutoEnumString_Construct( &cmdHistory );
@@ -269,7 +270,6 @@ typedef struct {
 	LONG m_nNumFormats;
 	LONG m_lRefCount;
 } WB_IDataObject;
-
 
 typedef struct {
 	IEnumFORMATETC ief;
@@ -497,16 +497,14 @@ idroptarget_queryinterface (WB_IDropTarget *This,
 								LPVOID *ppvObject)
 {
 	*ppvObject = NULL;
-	if ( IsEqualIID (riid, &IID_IUnknown) 
-		|| IsEqualIID (riid, &IID_IDropTarget)) 
+	if ( IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IDropTarget) ) 
 	{
 		idroptarget_addref (This);
 		*ppvObject = This;
 		return S_OK;
 	}
-	else {
+	else
 		return E_NOINTERFACE;
-	}
 }
 //
 //	IUnknown::Release
@@ -514,16 +512,14 @@ idroptarget_queryinterface (WB_IDropTarget *This,
 static ULONG STDMETHODCALLTYPE
 idroptarget_release (WB_IDropTarget* This)
 {
-
 	LONG count = InterlockedDecrement(&This->m_lRefCount);
 
 	if(count == 0) {
 		LocalFree(This);
 		return 0;
 	}
-	else {
+	else
 		return count;
-	}
 }
 //
 //	IDropTarget::DragEnter
@@ -626,7 +622,7 @@ WB_IDropTarget * WB_IDropTarget_new(HWND hwnd)
 
 	result = (WB_IDropTarget *)LocalAlloc(LPTR, sizeof(WB_IDropTarget));
 	result->idt.lpVtbl = (IDropTargetVtbl*)&idt_vtbl;
-	result->m_lRefCount  = 1;
+	result->m_lRefCount = 1;
 	result->m_hWnd = hwnd;
 	result->m_fAllowDrop = FALSE;
 
@@ -642,22 +638,17 @@ HRESULT CreateDropTarget(HWND hwnd, WB_IDropTarget **ppDropTarget)
 void RegisterDropWindow(HWND hwnd, WB_IDropTarget **ppDropTarget)
 {
 	WB_IDropTarget *pDropTarget;
-	CreateDropTarget(hwnd, &pDropTarget);
-	// acquire a strong lock
+	CreateDropTarget(hwnd, &pDropTarget);		// acquire a strong lock
 	CoLockObjectExternal((struct IUnknown*)pDropTarget, TRUE, FALSE);
-	// tell OLE that the window is a drop target
 	RegisterDragDrop(hwnd, (LPDROPTARGET)pDropTarget);
 	*ppDropTarget = pDropTarget;
 }
 
 void UnregisterDropWindow(HWND hwnd, IDropTarget *pDropTarget)
 {
-	// remove drag+drop
-	RevokeDragDrop(hwnd);
-	// remove the strong lock
+	RevokeDragDrop(hwnd);						// remove the strong lock
 	CoLockObjectExternal((struct IUnknown*)pDropTarget, FALSE, TRUE);
-	// release our own reference
-	pDropTarget->lpVtbl->Release(pDropTarget);
+	pDropTarget->lpVtbl->Release(pDropTarget);	// release our own reference
 }
 
 static IDropTarget *pDropTarget;

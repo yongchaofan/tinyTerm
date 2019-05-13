@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 30519 2019-05-08 15:05:10 $"
+// "$Id: term.c 29468 2019-05-08 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -20,8 +20,8 @@
 #include "tiny.h"
 #include <windows.h>
 
-unsigned char * vt100_Escape( TERM *pt, unsigned char *sz, int cnt );
-unsigned char * telnet_Options( TERM *pt, unsigned char *p, int cnt );
+const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt );
+const unsigned char *telnet_Options(TERM *pt, const unsigned char *p, int cnt );
 
 BOOL term_Construct( TERM *pt )
 {
@@ -60,7 +60,7 @@ void term_Clear( TERM *pt )
 	memset( pt->line, 0, MAXLINES*sizeof(int) );
 	pt->c_attr = 7;
 	pt->cursor_y = pt->cursor_x = 0;
-	pt->scroll_y = pt->screen_y = 0;
+	pt->screen_y = 0;
 	pt->sel_left = pt->sel_right = 0;
 	pt->bAlterScreen = FALSE;
 	pt->bAppCursor = FALSE;
@@ -85,7 +85,6 @@ void term_Size( TERM *pt, int x, int y )
 	if ( !pt->bAlterScreen ) {
 		pt->screen_y = pt->cursor_y-pt->size_y+1;
 		if ( pt->screen_y<0 ) pt->screen_y = 0;
-		pt->scroll_y = 0;
 	}
 	host_Send_Size( pt->host, pt->size_x, pt->size_y );
 	tiny_Redraw_Term(  );
@@ -113,40 +112,15 @@ void term_nextLine(TERM *pt)
 			pt->line[i] = pt->line[i+1024]-len;
 		while ( i<MAXLINES ) pt->line[i++] = 0;
 		pt->screen_y -= 1024;
-		pt->scroll_y = 0;
 	}
 
-	if ( pt->scroll_y<0 ) pt->scroll_y--;
-	if ( pt->screen_y<pt->cursor_y-pt->size_y+1 ) 
+	if ( pt->screen_y==pt->cursor_y-pt->size_y ) 
 		pt->screen_y = pt->cursor_y-pt->size_y+1;
 }
-void term_Scroll( TERM *pt, int lines )
+void term_Parse( TERM *pt, const char *buf, int len )
 {
-	int old_scroll_y = pt->scroll_y;
-	pt->scroll_y -= lines;
-	if ( pt->scroll_y<-pt->screen_y ) pt->scroll_y = -pt->screen_y;
-	if ( pt->scroll_y>0 ) pt->scroll_y = 0;
-	if ( old_scroll_y!=pt->scroll_y ) tiny_Scroll();
-}
-void term_Keydown( TERM *pt, DWORD key )
-{
-	switch( key ) {
-	case VK_PRIOR:  term_Scroll(pt, pt->size_y-1); break;
-	case VK_NEXT:   term_Scroll(pt, 1-pt->size_y); break;
-	case VK_UP:    	term_Send(pt, pt->bAppCursor?"\033OA":"\033[A",3); break;
-	case VK_DOWN:  	term_Send(pt, pt->bAppCursor?"\033OB":"\033[B",3); break;
-	case VK_RIGHT: 	term_Send(pt, pt->bAppCursor?"\033OC":"\033[C",3); break;
-	case VK_LEFT:  	term_Send(pt, pt->bAppCursor?"\033OD":"\033[D",3); break;
-	case VK_HOME:	term_Send(pt, pt->bAppCursor?"\033OH":"\033[H",3); break;
-	case VK_END:	term_Send(pt, pt->bAppCursor?"\033OF":"\033[F",3); break;
-	case VK_DELETE:	term_Send(pt, "\177",1); break;
-	default:		if ( pt->scroll_y!=0 ) term_Scroll(pt, pt->scroll_y);
-	}
-}
-void term_Parse( TERM *pt, char *buf, int len )
-{
-	unsigned char *p=(unsigned char *)buf;
-	unsigned char *zz = p+len;
+	const unsigned char *p=(const unsigned char *)buf;
+	const unsigned char *zz = p+len;
 	int old_cursor_y = pt->cursor_y;
 
 	if ( pt->bLogging ) fwrite( buf, 1, len, pt->fpLogFile );
@@ -181,7 +155,7 @@ void term_Parse( TERM *pt, char *buf, int len )
 					break;
 		case 0x0a:	if ( pt->bAlterScreen ) {// scroll down if reached bottom
 						if ( pt->cursor_y==pt->roll_bot+pt->screen_y )
-							vt100_Escape(pt, (unsigned char *)"D", 1);
+							vt100_Escape(pt, "D", 1);
 						else {
 							int x = pt->cursor_x - pt->line[pt->cursor_y];
 							pt->cursor_x = pt->line[++pt->cursor_y] + x;
@@ -236,7 +210,7 @@ void term_Parse( TERM *pt, char *buf, int len )
 						default: c = ' ';
 					}
 					if ( pt->bInsert ) 
-						vt100_Escape(pt, (unsigned char *)"[1@", 3);
+						vt100_Escape(pt, "[1@", 3);
 					if ( pt->cursor_x-pt->line[pt->cursor_y]>=pt->size_x ) 
 					{
 						int char_cnt=0;
@@ -277,20 +251,22 @@ BOOL term_Echo(TERM *pt)
 }
 void term_Title( TERM *pt, char *title )
 {
-	if ( *title )
+	switch ( host_Status(pt->host) )
 	{
-		strncpy(pt->title, title, 63);
-		pt->title[63] = 0;
-		if ( host_Status(pt->host)==HOST_CONNECTED ) {
-			host_Send_Size( pt->host, pt->size_x, pt->size_y);
-			if ( host_Type(pt->host)==NETCONF ) pt->bEcho = TRUE;
-		}
-	}
-	else
-	{
+	case HOST_IDLE:
 		pt->title[0] = 0;
 		pt->bEcho = FALSE;
+		break;
+	case HOST_CONNECTING:
+		term_Disp(pt, "Trying...");
+		break;
+	case HOST_CONNECTED:
+		host_Send_Size( pt->host, pt->size_x, pt->size_y);
+		if ( host_Type(pt->host)==NETCONF ) pt->bEcho = TRUE;
+		break;
 	}
+	strncpy(pt->title, title, 63);
+	pt->title[63] = 0;
 	tiny_Title(pt->title);
 }
 void term_Print( TERM *pt, const char *fmt, ... )
@@ -303,7 +279,7 @@ void term_Print( TERM *pt, const char *fmt, ... )
 	term_Parse(pt, buff, len);
 	term_Parse(pt, "\033[37m", 5);
 }
-void term_Disp( TERM *pt, char *msg )
+void term_Disp( TERM *pt, const char *msg )
 {
 	pt->tl1text = pt->buff+pt->cursor_x;
 	term_Parse( pt, msg, strlen(msg) );
@@ -311,14 +287,12 @@ void term_Disp( TERM *pt, char *msg )
 void term_Send( TERM *pt, char *buf, int len )
 {
 	if ( pt->bEcho ) 
-		if ( strncmp(buf, "<?xml ", 6)==0 ) 
+		if ( host_Type(pt->host)==NETCONF ) 
 			term_Parse_XML( pt, buf, len );
 		else
 			term_Parse(pt, buf, len);
 	if ( host_Status(pt->host)!=HOST_IDLE ) 
 		host_Send( pt->host, buf, len );
-	else 
-		term_Parse( pt, buf, len );
 }
 int term_Recv( TERM *pt, char **pTL1text )
 {
@@ -367,25 +341,23 @@ void term_Logg( TERM *pt, char *fn )
 	}
 }
 
-void term_Srch( TERM *pt, char *sstr )
+int term_Srch( TERM *pt, char *sstr )
 {
 	int l = strlen(sstr);
 	char *p = pt->buff+pt->sel_left;
 	if ( pt->sel_left==pt->sel_right ) p = pt->buff+pt->cursor_x;
 	while ( --p>=pt->buff+l ) {
 		int i;
-		for ( i=l-1; i>=0; i--)
-			if ( sstr[i]!=p[i-l] ) break;
-		if ( i==-1 ) {
+		for ( i=l-1; i>=0; i--) if ( sstr[i]!=p[i-l] ) break;
+		if ( i==-1 ) {			//found a match
 			pt->sel_left = p-l-pt->buff;
 			pt->sel_right = p-pt->buff;
-			while (pt->line[pt->screen_y+pt->scroll_y]>pt->sel_left ) 
-				pt->scroll_y--;
-			break;
+			for ( i=pt->screen_y; pt->line[i]>pt->sel_left; i-- );
+			tiny_Scroll( pt->screen_y-i );
+			return TRUE;
 		}
 	}
-	if ( p<pt->buff+l ) pt->sel_left = pt->sel_right = pt->scroll_y = 0;
-	tiny_Redraw_Term(  );
+	return FALSE;
 }
 int term_TL1( TERM *pt, char *cmd, char **pTl1Text )
 {
@@ -580,9 +552,9 @@ int term_Cmd( TERM *pt, char *cmd, char **preply )
 	}
 	return rc;
 }
-unsigned char *vt100_Escape( TERM *pt, unsigned char *sz, int cnt )
+const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 {
-	unsigned char *zz = sz+cnt;
+	const unsigned char *zz = sz+cnt;
 
 	pt->bEscape = TRUE;
 	while ( sz<zz && pt->bEscape ) 
@@ -926,10 +898,10 @@ unsigned char *vt100_Escape( TERM *pt, unsigned char *sz, int cnt )
 	}
 	return sz;
 }
-void term_Parse_XML( TERM *pt, char *msg, int len)
+void term_Parse_XML( TERM *pt, const char *msg, int len)
 {
-	char *p=msg, *q;
-	char spaces[256]="\r\n                                               \
+	const char *p=msg, *q;
+	const char spaces[256]="\r\n                                               \
                                                                               ";
 	if ( strncmp(msg, "<?xml ", 6)==0 ) {
 		pt->xmlIndent = 0;
@@ -997,11 +969,11 @@ void term_Parse_XML( TERM *pt, char *msg, int len)
 unsigned char TERMTYPE[]={  0xff, 0xfa, 0x18, 0x00, 
 							0x76, 0x74, 0x31, 0x30, 0x30, //vt100
 							0xff, 0xf0};
-unsigned char * telnet_Options( TERM *pt, unsigned char *p, int cnt )
+const unsigned char *telnet_Options( TERM *pt, const unsigned char *p, int cnt )
 {
-	unsigned char *q = p+cnt;
+	const unsigned char *q = p+cnt;
 	while ( *p==0xff && p<q ) {
-		UCHAR negoreq[]={0xff,0,0,0, 0xff, 0xf0};
+		unsigned char negoreq[]={0xff,0,0,0, 0xff, 0xf0};
 		switch ( p[1] ) {
 		case TNO_DONT:
 		case TNO_WONT:
@@ -1014,7 +986,7 @@ unsigned char * telnet_Options( TERM *pt, unsigned char *p, int cnt )
 				negoreq[1]=TNO_WILL; 
 				if ( p[2]==TNO_ECHO ) pt->bEcho = TRUE;
 			}
-			term_Send( pt, (char*)negoreq, 3);
+			term_Send( pt, (char *)negoreq, 3);
 			p+=3;
 			break;
 		case TNO_WILL:
@@ -1029,7 +1001,7 @@ unsigned char * telnet_Options( TERM *pt, unsigned char *p, int cnt )
 		case TNO_SUB:
 			negoreq[1]=TNO_SUB; negoreq[2]=p[2];
 			if ( p[2]==TNO_TERMTYPE ) {
-				term_Send( pt, (char*)TERMTYPE, sizeof(TERMTYPE));
+				term_Send( pt, (char *)TERMTYPE, sizeof(TERMTYPE));
 			}
 			if ( p[2]==TNO_NEWENV ) {
 				term_Send( pt, (char*)negoreq, 6);

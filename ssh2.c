@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40330 2019-05-08 19:05:10 $"
+// "$Id: ssh2.c 40436 2019-05-12 19:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -30,10 +30,10 @@ int fnmatch( char *pattern, char *file, int flag)
 /****************************************************************************
  * local dirent implementation for compiling on vs2017
  ****************************************************************************/
-#define DT_UNKNOWN 0
-#define DT_DIR     1
-#define DT_REG     2
-#define DT_LNK     3
+#define DT_UNKNOWN	0
+#define DT_DIR		1
+#define DT_REG		2
+#define DT_LNK		3
 
 struct dirent {
 	unsigned char d_type;
@@ -105,9 +105,7 @@ void ssh2_Construct( HOST *ph )
 	ph->session = NULL;
 	ph->channel  =NULL;
 	ph->sftp = NULL;
-	ph->msg_id = 0;
 	ph->bReturn = TRUE;
-	ph->hReaderThread = NULL;	//reader thread handle
 	ph->mtx = CreateMutex( NULL, FALSE, L"channel mutex" );
 	ph->tunnel_list = NULL;
 	ph->mtx_tun = CreateMutex( NULL, FALSE, L"tunnel mutex" );
@@ -133,7 +131,7 @@ char *ssh2_Gets( HOST *ph, char *prompt, BOOL bEcho)
 	ph->keys[0]=0;
 	ph->cursor=0;
 	int old_cursor=0;
-	for ( int i=0; i<1800&&ph->bGets; i++ ) {
+	for ( int i=0; i<600&&ph->bGets; i++ ) {
 		if ( ph->bReturn ) break;
 		if ( ph->cursor>old_cursor ) { old_cursor=ph->cursor; i=0; }
 		Sleep(100);
@@ -435,6 +433,7 @@ DWORD WINAPI ssh( void *pv )
 		term_Disp( ph->term, "\033[31mconnection failure!\n");
 		goto TCP_Close;
 	}
+	term_Disp( ph->term, "\r" );
 
 	ph->session = libssh2_session_init();
 	do {
@@ -444,10 +443,9 @@ DWORD WINAPI ssh( void *pv )
 		term_Disp( ph->term, "\033[31msession failure!\n");
 		goto Session_Close;
 	}
-
 	const char *banner = libssh2_session_banner_get(ph->session);
-	if ( banner!=NULL ) term_Print( ph->term, "\r%s\n", banner);
-	
+	if ( banner!=NULL ) term_Disp( ph->term, banner);
+
 	ph->host_status=HOST_AUTHENTICATING;
 	if ( ssh_knownhost( ph )<0 ) {
 		term_Disp( ph->term, "\033[31mverification failure!\n" );
@@ -525,9 +523,8 @@ Session_Close:
 	closesocket(ph->sock);
 
 TCP_Close:
-	ph->host_status=HOST_IDLE;
-	ph->hReaderThread = NULL;
 	ph->sock = 0;
+	ph->host_status=HOST_IDLE;
 	term_Title( ph->term, "");
 	return 1;
 }
@@ -1330,6 +1327,7 @@ DWORD WINAPI sftp( void *pv )
 		term_Disp( ph->term, "\033[31mconnection failure\n");
 		goto TCP_Close;
 	}
+	term_Disp( ph->term, "\r" );
 
 	ph->session = libssh2_session_init();
 	int rc;
@@ -1340,6 +1338,8 @@ DWORD WINAPI sftp( void *pv )
 		term_Disp( ph->term, "\033[31msession failure!\n");
 		goto sftp_Close;
 	}
+	const char *banner = libssh2_session_banner_get(ph->session);
+	if ( banner!=NULL ) term_Disp( ph->term, banner);
 
 	ph->host_status=HOST_AUTHENTICATING;
 	if ( ssh_knownhost( ph )<0 ) {
@@ -1362,20 +1362,24 @@ DWORD WINAPI sftp( void *pv )
 	ph->host_type=SFTP;
 	ph->host_status=HOST_CONNECTED;
 	char prompt[4096], *cmd;
+	int timeout_cnt = 0;
 	while ( TRUE ) {
 		sprintf(prompt, "sftp %s> ", ph->realpath);
 		cmd = ssh2_Gets( ph, prompt, TRUE );
+		term_Disp( ph->term, "\n" );
 		if ( cmd!=NULL ) {
-			term_Disp( ph->term, "\n" );
 			if ( strncmp(cmd, "bye",3)==0 ) {
 				term_Disp(ph->term, "logout\n"); 
 				break;
 			}
 			sftp_cmd( ph, cmd );
+			timeout_cnt=0;
 		}
 		else {
-			term_Disp( ph->term, "\033[31m\nTime Out\n\033[37m");
-			break;
+			if ( ++timeout_cnt==5 ) {
+				term_Disp( ph->term, "\033[31mTime Out\n\033[37m");
+				break;
+			}
 		}
 	}
 	libssh2_sftp_shutdown(ph->sftp);
@@ -1387,9 +1391,8 @@ sftp_Close:
 	closesocket(ph->sock);
 
 TCP_Close:
-	ph->host_status=HOST_IDLE;
-	ph->hReaderThread = NULL;
 	ph->sock = 0;
+	ph->host_status=HOST_IDLE;
 	term_Title( ph->term, "" );
 	return 1;
 }

@@ -1,11 +1,11 @@
 //
-// "$Id: host.c 28699 2019-05-08 21:05:10 $"
+// "$Id: host.c 28633 2019-05-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // host.c is the host communication implementation
 // serial communication is based on WIN32 API.
-// telnet communication is based on posix socket API
+// telnet communication is based on socket API
 //
 // Copyright 2018-2019 by Yongchao Fan.
 //
@@ -41,7 +41,7 @@ void host_Construct( HOST *ph )
 }
 void host_Open( HOST *ph, char *port )
 {
-	if ( ph->hReaderThread==NULL ) 
+	if ( ph->host_status==HOST_IDLE ) 
 	{
 		if ( port!=NULL ) 
 		{
@@ -67,7 +67,7 @@ void host_Open( HOST *ph, char *port )
 		}
 
 		ph->host_status=HOST_CONNECTING;
-		ph->hReaderThread = CreateThread(NULL, 0, reader, ph, 0, NULL);
+		CreateThread(NULL, 0, reader, ph, 0, NULL);
 	}
 	else {
 		if ( strnicmp(port, "disconn", 7)==0 ) host_Close( ph );
@@ -185,7 +185,6 @@ DWORD WINAPI serial(void *pv)
 
 comm_close:
 	ph->host_status=HOST_IDLE;
-	ph->hReaderThread = NULL;
 	term_Title( ph->term, "" );
 	return 1;
 }
@@ -225,6 +224,7 @@ DWORD WINAPI telnet( void *pv )
 		ph->host_type=TELNET;
 		ph->host_status=HOST_CONNECTED;
 		term_Title( ph->term, ph->hostname );
+		term_Disp( ph->term, "Connected\n" );
 
 		char buf[1536];
 		int cnt;
@@ -239,9 +239,8 @@ DWORD WINAPI telnet( void *pv )
 	else
 		term_Disp( ph->term,  "connection failure!\n" );
 
-	ph->host_status=HOST_IDLE;
-	ph->hReaderThread = NULL;
 	ph->sock = 0;
+	ph->host_status=HOST_IDLE;
 	term_Title( ph->term, "" );
 	return 1;
 }
@@ -325,7 +324,6 @@ DWORD WINAPI stdio( void *pv)
 	CloseHandle( ph->hStdioRead );
 	CloseHandle( ph->hStdioWrite );
 	ph->host_status=HOST_IDLE;
-	ph->hReaderThread = NULL;
 	term_Title( ph->term, "");
 	return 1;
 }
