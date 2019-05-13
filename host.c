@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 28633 2019-05-12 21:05:10 $"
+// "$Id: host.c 29144 2019-05-12 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -190,20 +190,35 @@ comm_close:
 }
 
 /***************Telnet*******************************/
-SOCKET tcp( char *host, short port )
+int host_tcp( HOST *ph )
 {
+	int rc = 0;
 	struct addrinfo *ainfo;
-	if ( getaddrinfo(host, NULL, NULL, &ainfo)!=0 ) return -1;
-	((struct sockaddr_in *)(ainfo->ai_addr))->sin_port = htons(port);
+	if ( getaddrinfo(ph->hostname, NULL, NULL, &ainfo)!=0 ) {
+		term_Disp(ph->term, "invalid ip address or hostname\n");
+		return -1;
+	}
+	((struct sockaddr_in *)(ainfo->ai_addr))->sin_port = htons(ph->port);
 
-	SOCKET s = socket(ainfo->ai_family, SOCK_STREAM, 0);
-	if ( connect(s, ainfo->ai_addr, ainfo->ai_addrlen)==SOCKET_ERROR ) {
-		closesocket(s);
-		s = -1;
+	ph->sock= socket(ainfo->ai_family, SOCK_STREAM, 0);
+	term_Disp(ph->term, "Trying...");
+	if ( connect(ph->sock, ainfo->ai_addr, ainfo->ai_addrlen)!=SOCKET_ERROR )
+		term_Disp(ph->term, "connected\n");
+	else {
+		switch ( WSAGetLastError() ) {
+		case WSAEHOSTUNREACH:
+		case WSAENETUNREACH: term_Disp(ph->term,"host unreachable!\n"); break;
+		case WSAECONNRESET:  term_Disp(ph->term,"connection reset!\n"); break;
+		case WSAETIMEDOUT:   term_Disp(ph->term,"connection timeout!\n");break;
+		case WSAECONNREFUSED:term_Disp(ph->term,"connection refused!\n");break;
+		default: term_Disp( ph->term,  "connection failure!\n" );
+		}
+		closesocket(ph->sock);
+		rc = -1;
 	}
 	freeaddrinfo(ainfo);
 
-	return s;
+	return rc;
 }
 DWORD WINAPI telnet( void *pv )
 {
@@ -213,18 +228,18 @@ DWORD WINAPI telnet( void *pv )
 	ph->hostname = port;
 	ph->port = 23;
 	char *p=strchr(port, ':');
-	if ( p!=NULL ) {
+	char *q=strrchr(port, ':');
+	if ( p!=NULL && p==q ) {
 		*p++=0; 
 		ph->port=atoi(p);
 	}
 
 	term_Title( ph->term, ph->hostname );
-	if ( ( ph->sock = tcp(ph->hostname, ph->port) )!=-1 ) 
+	if ( host_tcp(ph)!=-1 ) 
 	{
 		ph->host_type=TELNET;
 		ph->host_status=HOST_CONNECTED;
 		term_Title( ph->term, ph->hostname );
-		term_Disp( ph->term, "Connected\n" );
 
 		char buf[1536];
 		int cnt;
@@ -236,8 +251,6 @@ DWORD WINAPI telnet( void *pv )
 		closesocket(ph->sock);
 		term_Disp( ph->term, "disconnected\n" );
 	}
-	else
-		term_Disp( ph->term,  "connection failure!\n" );
 
 	ph->sock = 0;
 	ph->host_status=HOST_IDLE;

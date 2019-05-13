@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 39961 2019-05-12 21:35:10 $"
+// "$Id: tiny.c 40006 2019-05-12 21:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -1306,7 +1306,7 @@ DWORD WINAPI scripter( void *cmds )
 {
 	if ( bScriptRun ) {
 		MessageBox(hwndTerm, L"another script is running", L"Script", 
-														MB_OK|MB_ICONSTOP);
+					MB_OK|MB_ICONSTOP);
 		return 0;
 	}
 
@@ -1330,27 +1330,28 @@ DWORD WINAPI scripter( void *cmds )
 		p1=strchr(p0, 0x0a);
 		int len = ( p1==NULL ? strlen(p0) : (p1++)-p0 ); 
 
-		if ( *p0!='!' ) {
-			if ( host_Status(pt->host)==HOST_IDLE ) {
-				term_Parse(pt, p0, len+1);
-			}
-			else {
-				term_Send( pt, p0, len );
-				term_Waitfor_Prompt( pt );
-			}
-		}
-		else if ( strncmp( p0, "!Wait ", 6)==0 ) {
+		if ( strncmp( p0, "!Wait ", 6)==0 ) {
 			iWaitCnt = atoi(p0+6)*10;
 		}
 		else if ( strncmp( p0, "!Loop ", 6)==0 ) {
 			if ( iLoopCnt<0 ) iLoopCnt = atoi( p0+6 );
 			if ( --iLoopCnt>0 ) p1 = (char*)cmds-1;
 		}
-		else {
+		else if ( *p0=='!' ) {
 			char cmd[256];
 			strncpy(cmd, p0, len);
 			cmd[len] = 0;
 			term_Cmd(pt, cmd, NULL);
+		}
+		else {
+			if ( host_Status(pt->host)==HOST_IDLE ) {
+				term_Parse(pt, p0, len+1);
+			}
+			else if ( len>0 && *p0!='#' ) {
+				term_Mark_Prompt( pt );
+				term_Send( pt, p0, len );
+				term_Waitfor_Prompt( pt );
+			}
 		}
 		p0 = p1;
 	}

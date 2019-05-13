@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 29468 2019-05-08 15:05:10 $"
+// "$Id: term.c 29483 2019-05-08 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -258,7 +258,6 @@ void term_Title( TERM *pt, char *title )
 		pt->bEcho = FALSE;
 		break;
 	case HOST_CONNECTING:
-		term_Disp(pt, "Trying...");
 		break;
 	case HOST_CONNECTED:
 		host_Send_Size( pt->host, pt->size_x, pt->size_y);
@@ -546,7 +545,8 @@ int term_Cmd( TERM *pt, char *cmd, char **preply )
 	}
 	else 
 	{
-		term_Print(pt, "\033[33m%s\n", cmd); 
+		if ( host_Status( pt->host )==HOST_IDLE )
+			term_Print(pt, "\033[33m%s\n", cmd); 
 		term_Mark_Prompt( pt );
 		host_Open( pt->host, cmd );
 	}

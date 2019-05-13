@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40436 2019-05-12 19:05:10 $"
+// "$Id: ssh2.c 40276 2019-05-12 19:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -232,7 +232,8 @@ int ssh_parameters(  HOST *ph, char *p )
 		return -1;
 	}
 	p = strchr(ph->hostname, ':');
-	if ( p!=NULL ) {
+	char *q = strrchr(ph->hostname, ':');
+	if ( p!=NULL && p==q ) {
 		*p = 0;
 		ph->port = atoi(p+1);
 	}
@@ -417,23 +418,15 @@ DWORD WINAPI ssh( void *pv )
 	strcpy( port, ph->cmdline+4 );
 
 	ph->port = 22;
-	ph->sock = -1;
-	ph->session = NULL;
-	ph->channel = NULL;
 	if ( strstr(port, "-s netconf")!=NULL ) ph->port = 830;
 	if ( ssh_parameters( ph, port )<0 ) {
 		term_Disp( ph->term, "\033[31minvalid parameters!\n");
 		goto TCP_Close;
 	}
 
-	BOOL bSSH = (ph->subsystem==NULL);
-	ph->host_type = ( bSSH ) ? SSH : NETCONF;
+	ph->host_type = ( ph->subsystem==NULL ) ? SSH : NETCONF;
 	term_Title( ph->term, ph->hostname );
-	if ( (ph->sock=tcp(ph->hostname, ph->port))==-1 ) {
-		term_Disp( ph->term, "\033[31mconnection failure!\n");
-		goto TCP_Close;
-	}
-	term_Disp( ph->term, "\r" );
+	if ( host_tcp(ph)==-1 ) goto TCP_Close;
 
 	ph->session = libssh2_session_init();
 	do {
@@ -455,11 +448,12 @@ DWORD WINAPI ssh( void *pv )
 		term_Disp( ph->term,"\033[31mauthentication failure!\n" );
 		goto Session_Close;
 	}
-	if (!(ph->channel = libssh2_channel_open_session(ph->session))) {
+	ph->channel = libssh2_channel_open_session(ph->session);
+	if ( !ph->channel ) {
 		term_Disp( ph->term, "\033[31mchannel failure!\n");
 		goto Session_Close;
 	}
-	if ( bSSH ) {
+	if ( ph->subsystem==NULL ) {
 		if (libssh2_channel_request_pty(ph->channel, "xterm")) {
 			term_Disp( ph->term, "\033[31mpty failure! \n");
 			goto Channel_Close;
@@ -487,7 +481,7 @@ DWORD WINAPI ssh( void *pv )
 			ReleaseMutex(ph->mtx);
 			if ( cch >= 0 ) {
 				buf[cch] = 0;
-				if ( bSSH ) 
+				if ( ph->subsystem==NULL ) 
 					term_Parse( ph->term, buf, cch );
 				else
 					term_Parse_XML( ph->term, buf, cch);
@@ -1320,14 +1314,13 @@ DWORD WINAPI sftp( void *pv )
 	strcpy( port, ph->cmdline+5 );
 
 	ph->port = 22;
-	if ( ssh_parameters( ph, port )<0 ) goto TCP_Close;
-
-	term_Title( ph->term, ph->hostname );
-	if ( (ph->sock=tcp(ph->hostname, ph->port))==-1 ) {
-		term_Disp( ph->term, "\033[31mconnection failure\n");
+	if ( ssh_parameters( ph, port )<0 ) {
+		term_Disp( ph->term, "\033[31minvalid parameters!\n");
 		goto TCP_Close;
 	}
-	term_Disp( ph->term, "\r" );
+
+	term_Title( ph->term, ph->hostname );
+	if ( host_tcp(ph)==-1 ) goto TCP_Close;
 
 	ph->session = libssh2_session_init();
 	int rc;
@@ -1351,7 +1344,8 @@ DWORD WINAPI sftp( void *pv )
 		goto sftp_Close;
 	}
 
-	if ( !(ph->sftp=libssh2_sftp_init(ph->session)) ) {
+	ph->sftp = libssh2_sftp_init(ph->session);
+	if ( !ph->sftp ) {
 		term_Disp( ph->term, "\033[31msubsystem failure!\n");
 		goto sftp_Close;
 	}
