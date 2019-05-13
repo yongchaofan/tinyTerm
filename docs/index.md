@@ -43,7 +43,7 @@ tinyTerm is written in C with Win32 API, [libssh2](http://libssh2.org) used for 
 > Scroll buffer holds 8192 lines of text, use pageup key or mouse wheel to scroll back, scrollbar will appear when scrolled back, and will hide when scrolled all the way down. 
 >
 > ### Command Autocompletion
-> When local edit mode is enabled, key presses are not sent to remote host until "Enter" key is pressed, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs. Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. 
+> When local edit mode is enabled, key presses are not sent to remote host until "Enter" or "Tab" key is pressed, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs. Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. 
 > 
 > Command history file is saved as %USERPROFILE%\documents\tinyTerm\tinyTerm.hist by default, copy tinyTerm.hist to the same folder as tinyTerm.exe for portable use. Since the command history file is just a plain text file, user can edit the file outside of tinyTerm to put additional commands in the list for command auto-completion. For example put all command TL1 commands in the history list to use as a dictionary.
 > 
