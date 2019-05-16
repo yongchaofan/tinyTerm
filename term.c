@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 29483 2019-05-08 15:05:10 $"
+// "$Id: term.c 29745 2019-05-15 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -40,7 +40,7 @@ BOOL term_Construct( TERM *pt )
 	pt->attr = (char *)malloc(BUFFERSIZE);
 	pt->line = (int * )malloc(MAXLINES*sizeof(int));
 
-	if ( pt->buff!=NULL && pt->attr!=NULL && pt->line!=NULL ) 
+	if ( pt->buff!=NULL && pt->attr!=NULL && pt->line!=NULL )
 	{
 		term_Clear( pt );
 		return TRUE;
@@ -83,8 +83,7 @@ void term_Size( TERM *pt, int x, int y )
 	pt->roll_top = 0;
 	pt->roll_bot = pt->size_y-1;
 	if ( !pt->bAlterScreen ) {
-		pt->screen_y = pt->cursor_y-pt->size_y+1;
-		if ( pt->screen_y<0 ) pt->screen_y = 0;
+		pt->screen_y = max(0, pt->cursor_y-pt->size_y+1);
 	}
 	host_Send_Size( pt->host, pt->size_x, pt->size_y );
 	tiny_Redraw_Term(  );
@@ -92,8 +91,9 @@ void term_Size( TERM *pt, int x, int y )
 void term_nextLine(TERM *pt)
 {
 	pt->line[++pt->cursor_y] = pt->cursor_x;
-	if ( pt->line[pt->cursor_y+1]<pt->cursor_x ) 
+	if ( pt->line[pt->cursor_y+1]<pt->cursor_x )
 		pt->line[pt->cursor_y+1]=pt->cursor_x;
+	if ( pt->screen_y==pt->cursor_y-pt->size_y ) pt->screen_y++;
 
 	if ( pt->cursor_x>=BUFFERSIZE-1024 || pt->cursor_y==MAXLINES-2 ) {
 		int i, len = pt->line[1024];
@@ -104,6 +104,8 @@ void term_nextLine(TERM *pt)
 		}
 		pt->cursor_x -= len;
 		pt->cursor_y -= 1024;
+		pt->screen_y -= 1024;
+		if ( pt->screen_y<0 ) pt->screen_y = 0;
 		memmove( pt->buff, pt->buff+len, BUFFERSIZE-len );
 		memset(pt->buff+pt->cursor_x, 0, BUFFERSIZE-pt->cursor_x);
 		memmove( pt->attr, pt->attr+len, BUFFERSIZE-len );
@@ -111,11 +113,7 @@ void term_nextLine(TERM *pt)
 		for ( i=0; i<pt->cursor_y+2; i++ ) 
 			pt->line[i] = pt->line[i+1024]-len;
 		while ( i<MAXLINES ) pt->line[i++] = 0;
-		pt->screen_y -= 1024;
 	}
-
-	if ( pt->screen_y==pt->cursor_y-pt->size_y ) 
-		pt->screen_y = pt->cursor_y-pt->size_y+1;
 }
 void term_Parse( TERM *pt, const char *buf, int len )
 {
@@ -688,9 +686,9 @@ const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 								pt->size_x);
 					}
 					for ( int i=0; i<n0; i++ ) {
-						memset( pt->buff+pt->line[pt->cursor_y+i], ' ', 
+						memset( pt->buff+pt->line[pt->cursor_y+i], ' ',
 								pt->size_x);
-						memset( pt->attr+pt->line[pt->cursor_y+i],   0, 
+						memset( pt->attr+pt->line[pt->cursor_y+i],   0,
 								pt->size_x);
 					}
 					break;
@@ -790,6 +788,15 @@ const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 							pt->save_edit = tiny_Edit(FALSE);
 							pt->screen_y = pt->cursor_y;
 							pt->cursor_x = pt->line[pt->cursor_y];
+							for ( int i=0; i<pt->size_y; i++ ) 
+							{
+								memset( pt->buff+pt->cursor_x,' ',pt->size_x );
+								memset( pt->attr+pt->cursor_x,  0,pt->size_x );
+								pt->cursor_x += pt->size_x;
+								term_nextLine( pt );
+							}
+							pt->cursor_y = --pt->screen_y; 
+							pt->cursor_x = pt->line[pt->cursor_y];
 						}
 					}
 					break;
@@ -806,17 +813,17 @@ const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 							pt->cursor_x = pt->line[pt->cursor_y];
 							for ( int i=1; i<=pt->size_y+1; i++ )
 								pt->line[pt->cursor_y+i] = 0;
-							pt->screen_y = pt->cursor_y-pt->size_y+1;
-							if ( pt->screen_y<0 ) pt->screen_y=0;
+							pt->screen_y = max(0, pt->cursor_y-pt->size_y+1);
 						}
 					}
 					break;
 			case 'm':
 					if ( n0==0 ) n0 = n2; 	//ESC[0;0m	ESC[01;34m
 					switch ( (int)(n0/10) ) {		//ESC[34m
-					case 0: pt->c_attr = (n0%10==7) ? 0x70 : 7; break;
-					case 2: if ( n0%10==7 ) {pt->c_attr = 7; break; }
-					case 3: if ( n0==39 ) n0 = 7;	//39 default foreground
+					case 0: if ( n0==7 ) { pt->c_attr = 0x70; break; }
+					case 1:
+					case 2: pt->c_attr = 7; break;
+					case 3: if ( n0==39 ) n0 = 37;	//39 default foreground
 							pt->c_attr = (pt->c_attr&0xf0) + n0%10; break;
 					case 4: if ( n0==49 ) n0 = 0;	//49 default background
 							pt->c_attr = (pt->c_attr&0x0f) + ((n0%10)<<4); 
