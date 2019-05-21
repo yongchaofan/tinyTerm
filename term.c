@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 29745 2019-05-15 15:05:10 $"
+// "$Id: term.c 30243 2019-05-21 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -64,6 +64,7 @@ void term_Clear( TERM *pt )
 	pt->sel_left = pt->sel_right = 0;
 	pt->bAlterScreen = FALSE;
 	pt->bAppCursor = FALSE;
+	pt->bBracket = FALSE;
 	pt->bGraphic = FALSE;
 	pt->bEscape = FALSE;
 	pt->bInsert = FALSE;
@@ -195,7 +196,7 @@ void term_Parse( TERM *pt, const char *buf, int len )
 						}
 						p++;
 					}
-		default:	if ( pt->bGraphic ) switch ( c ) 
+		default:	if ( pt->bGraphic ) switch ( c )
 					{
 						case 'q': c='_'; break;
 						case 'x':
@@ -291,6 +292,12 @@ void term_Send( TERM *pt, char *buf, int len )
 	if ( host_Status(pt->host)!=HOST_IDLE ) 
 		host_Send( pt->host, buf, len );
 }
+void term_Paste( TERM *pt, char *buf, int len )
+{
+	if ( pt->bBracket ) term_Send( pt, "\033[200~", 6);
+	term_Send( pt, buf, len );
+	if ( pt->bBracket ) term_Send( pt, "\033[201~", 6);
+}
 int term_Recv( TERM *pt, char **pTL1text )
 {
 	if ( pTL1text!=NULL ) *pTL1text = pt->tl1text;
@@ -300,9 +307,12 @@ int term_Recv( TERM *pt, char **pTL1text )
 }
 void term_Learn_Prompt( TERM *pt )
 {//capture prompt for scripting
-	pt->sPrompt[0] = pt->buff[pt->cursor_x-2];
-	pt->sPrompt[1] = pt->buff[pt->cursor_x-1];
-	pt->iPrompt = 2;
+	if ( pt->cursor_x>1 ) {
+		pt->sPrompt[0] = pt->buff[pt->cursor_x-2];
+		pt->sPrompt[1] = pt->buff[pt->cursor_x-1];
+		pt->sPrompt[2] = 0;
+		pt->iPrompt = 2;
+	}
 }
 char *term_Mark_Prompt( TERM *pt )
 {
@@ -783,6 +793,7 @@ const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 						n0 = atoi(pt->escape_code+2);
 						if ( n0==1 ) pt->bAppCursor = TRUE;
 						if ( n0==25 ) pt->bCursor = TRUE;
+						if ( n0==2004 ) pt->bBracket = TRUE;
 						if ( n0==1049 ) { 	//?1049h alternate screen,
 							pt->bAlterScreen = TRUE;
 							pt->save_edit = tiny_Edit(FALSE);
@@ -806,6 +817,7 @@ const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 						n0 = atoi(pt->escape_code+2);
 						if ( n0==1 ) pt->bAppCursor = FALSE;
 						if ( n0==25 ) pt->bCursor = FALSE;
+						if ( n0==2004 ) pt->bBracket = FALSE;
 						if ( n0==1049 ) { 	//?1049l exit alternate screen,
 							pt->bAlterScreen = FALSE;
 							if ( pt->save_edit ) tiny_Edit(TRUE);
@@ -818,11 +830,12 @@ const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 					}
 					break;
 			case 'm':
-					if ( n0==0 ) n0 = n2; 	//ESC[0;0m	ESC[01;34m
+					if ( pt->escape_code[pt->escape_idx-2]=='[' ) n0 = 0;
+					if ( n0==0 && n2!=1 ) n0 = n2;	//ESC[0;0m	ESC[01;34m
 					switch ( (int)(n0/10) ) {		//ESC[34m
-					case 0: if ( n0==7 ) { pt->c_attr = 0x70; break; }
-					case 1:
-					case 2: pt->c_attr = 7; break;
+					case 0:	if ( n0==1 ) { pt->c_attr|= 0x08; break; }//bright
+							if ( n0==7 ) { pt->c_attr = 0x70; break; }//negative
+					case 2: pt->c_attr = 7; break;					  //normal
 					case 3: if ( n0==39 ) n0 = 37;	//39 default foreground
 							pt->c_attr = (pt->c_attr&0xf0) + n0%10; break;
 					case 4: if ( n0==49 ) n0 = 0;	//49 default background

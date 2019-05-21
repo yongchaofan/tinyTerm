@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 40008 2019-05-12 21:35:10 $"
+// "$Id: tiny.c 39989 2019-05-12 21:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -29,7 +29,7 @@
 #define WM_DPICHANGED	0x02E0
 #define SM_CXPADDEDBORDER 92
 
-float dpi = 96;
+int dpi = 96;
 int iTitleHeight;
 int iFontSize = 16;
 WCHAR wsFontFace[32] = L"Consolas";
@@ -46,7 +46,7 @@ const char WELCOME[]="\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\n\n\n\
 \tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\n\n\n\
-\tVerision 1.6.1, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
+\tVerision 1.6.2, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
 const char SCP_TO_FOLDER[]="\
 var xml = new ActiveXObject(\"Microsoft.XMLHTTP\");\n\
 var port = \"8080/?\";\n\
@@ -213,7 +213,7 @@ void tiny_Fontsize(int i)
 {
 	DeleteObject(hTermFont);
 	iFontSize = i;
-	hTermFont = CreateFont(iFontSize*(dpi/96),0,0,0,FW_MEDIUM,FALSE,FALSE,FALSE,
+	hTermFont = CreateFont(iFontSize*dpi/96,0,0,0,FW_MEDIUM,FALSE,FALSE,FALSE,
 						DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
 						DEFAULT_QUALITY, FIXED_PITCH, wsFontFace);
 	tiny_Font(hwndTerm);
@@ -279,13 +279,13 @@ void menu_Size()
 	oldFont = (HFONT)SelectObject(wndDC, GetStockObject(SYSTEM_FONT));
 	menuX[0] = 32;
 	DrawText(wndDC, L"  Term ", 7, &menuRect, DT_CALCRECT);
-	menuX[1] = menuX[0]+(menuRect.right-menuRect.left)*(dpi/96);
+	menuX[1] = menuX[0]+(menuRect.right-menuRect.left)*dpi/96;
 	menuRect.left = menuRect.right = 0;
 	DrawText(wndDC, L"Script", 6, &menuRect, DT_CALCRECT);
-	menuX[2] = menuX[1]+(menuRect.right-menuRect.left)*(dpi/96);
+	menuX[2] = menuX[1]+(menuRect.right-menuRect.left)*dpi/96;
 	menuRect.left = menuRect.right = 0;
 	DrawText(wndDC, L"Options", 7, &menuRect, DT_CALCRECT);
-	menuX[3] = menuX[2]+(menuRect.right-menuRect.left)*(dpi/96);
+	menuX[3] = menuX[2]+(menuRect.right-menuRect.left)*dpi/96;
 
 	if ( oldFont ) SelectObject( wndDC, oldFont );
 	ReleaseDC(hwndTerm, wndDC);
@@ -719,7 +719,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		pt->sel_left = 0;
 		pt->sel_right = pt->cursor_x;
 		tiny_Redraw_Term();
-//fall through to copy
+		break;
 	case ID_COPY:
 		if ( OpenClipboard(hwndTerm) ) {
 			EmptyClipboard( );
@@ -863,7 +863,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		SetLayeredWindowAttributes(hwnd,0,iTransparency,LWA_ALPHA);
 		drop_Init( hwnd, DropScript );
 		DragAcceptFiles( hwnd, TRUE );
-		hTermFont = CreateFont( iFontSize*(dpi/96), 0, 0, 0,
+		hTermFont = CreateFont( iFontSize*dpi/96, 0, 0, 0,
 						FW_MEDIUM, FALSE, FALSE, FALSE,
 						DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
 						DEFAULT_QUALITY, FIXED_PITCH, wsFontFace);
@@ -1179,7 +1179,7 @@ void CopyText( )
 	char *ptr = pt->buff+pt->sel_left;
 	int len = pt->sel_right-pt->sel_left;
 	HANDLE hglbCopy = GlobalAlloc(GMEM_MOVEABLE, (len+1)*2);
-	if ( hglbCopy != NULL ) {
+	if ( hglbCopy!=NULL && len>0) {
 		WCHAR *wbuf = GlobalLock(hglbCopy);
 		len = utf8_to_wchar( ptr, len, wbuf, len );
 		wbuf[len] = 0;
@@ -1196,7 +1196,7 @@ void PasteText( )
 		char *p = (char *)malloc(len);
 		if ( p!=NULL ) {
 			wchar_to_utf8(ptr, -1, p, len);
-			term_Send( pt, p, len);
+			term_Paste( pt, p, len);
 			free(p);
 		}
 		GlobalUnlock(hglb);

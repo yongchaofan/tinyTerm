@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5456 2019-05-12 22:05:10 $"
+// "$Id: tiny.h 5549 2019-05-12 22:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -78,6 +78,7 @@ typedef struct tagTERM {
 	int sel_left, sel_right;
 	BOOL bLogging, bEcho, bCursor, bAlterScreen;
 	BOOL bAppCursor, bGraphic, bEscape, bTitle, bInsert;
+	BOOL bBracket;					//bracketed paste mode
 	int save_x, save_y;
 	int roll_top, roll_bot;
 
@@ -171,6 +172,7 @@ void term_Logg( TERM *pt, char *fn );
 void term_Save( TERM *pt, char *fn );
 void term_Disp( TERM *pt, const char *buf );
 void term_Send( TERM *pt, char *buf, int len );
+void term_Paste(TERM *pt, char *buf, int len );
 int  term_Recv( TERM *pt, char **preply );
 int  term_Srch( TERM *pt, char *sstr );
 
