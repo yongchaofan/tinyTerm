@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40276 2019-05-12 19:05:10 $"
+// "$Id: ssh2.c 40313 2019-05-12 19:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -137,6 +137,7 @@ char *ssh2_Gets( HOST *ph, char *prompt, BOOL bEcho)
 		Sleep(100);
 	}
 	if ( ph->bPassword ) tiny_Edit(save_edit);	//restore local edit mode
+	term_Disp( ph->term, "\n");
 	return ph->bReturn ? ph->keys : NULL;
 }
 void ssh2_Send( HOST *ph, char *buf, int len )
@@ -147,13 +148,14 @@ void ssh2_Send( HOST *ph, char *buf, int len )
 					 ph->bReturn=TRUE; 
 					 break;
 		case '\010':
-		case '\177': if ( --ph->cursor<0 ) ph->cursor=0;
-					  else
+		case '\177': if ( --ph->cursor<0 ) 
+						ph->cursor=0;
+					 else
 						if ( !ph->bPassword ) term_Disp( ph->term, "\010 \010");
-					  break;
-		default: ph->keys[ph->cursor++]=*p;
-				  if ( ph->cursor>255 ) ph->cursor=255;
-				  if ( !ph->bPassword ) term_Parse( ph->term, p, 1);
+					 break;
+		default:	 ph->keys[ph->cursor++]=*p;
+					 if ( ph->cursor>255 ) ph->cursor=255;
+					 if ( !ph->bPassword ) term_Parse( ph->term, p, 1);
 		}
 	}
 	else if ( ph->channel!=NULL ) {
