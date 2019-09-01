@@ -160,6 +160,7 @@ DWORD WINAPI serial(void *pv)
 	}
 
 	ph->host_type = SERIAL;
+	ph->hostname = ph->cmdline;
 	ph->host_status=HOST_CONNECTED;
 	term_Title( ph->term, ph->cmdline );
 	term_Disp( ph->term, "connected\n" );

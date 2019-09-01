@@ -46,7 +46,7 @@ const char WELCOME[]="\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\n\n\n\
 \tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\n\n\n\
-\tVerision 1.6.2, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
+\tVerision 1.7, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
 const char SCP_TO_FOLDER[]="\
 var xml = new ActiveXObject(\"Microsoft.XMLHTTP\");\n\
 var port = \"8080/?\";\n\
@@ -1335,7 +1335,7 @@ DWORD WINAPI scripter( void *cmds )
 		}
 		else if ( strncmp( p0, "!Loop ", 6)==0 ) {
 			if ( iLoopCnt<0 ) iLoopCnt = atoi( p0+6 );
-			if ( --iLoopCnt>0 ) p1 = (char*)cmds-1;
+			if ( --iLoopCnt>0 ) p1 = (char*)cmds;
 		}
 		else if ( *p0=='!' ) {
 			char cmd[256];
