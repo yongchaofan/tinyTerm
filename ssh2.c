@@ -1,10 +1,10 @@
 //
-// "$Id: ssh2.c 40313 2019-05-12 19:05:10 $"
+// "$Id: ssh2.c 40304 2019-09-28 19:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // ssh2.c is the host communication implementation for
-// ssh/sftp/netconf based on libssh2-1.9.0-20190315
+// ssh/sftp/netconf based on libssh2-1.9.0
 //
 // Copyright 2018-2019 by Yongchao Fan.
 //
