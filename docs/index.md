@@ -17,7 +17,7 @@ Windows 10 user should install from Microsoft Store, users on older versions of 
 		<h4>Appx package:<br/><a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a></h4>
 		<h4>Portable version:<br/>
 	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.8/tinyTerm.exe">tinyTerm.exe</a><br/>
-	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.8/tinyTerm64.exe">tinyTerm64.exe</a>
+	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.8/tinyTerm64.exe">tinyTerm64.exe</a><br/>
 	WinXP : <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.8/tinyTerm64.exe">tinyTerm64.exe</a></h4>
 		<h4>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a></h4>
 	    </td>
