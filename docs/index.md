@@ -60,6 +60,9 @@ tinyTerm is written in C with Win32 API, [libssh2](http://libssh2.org) used for 
 > 
 > To copy file from server to a local folder, select the filename in the terminal window, then chose "scp_to_folder.js" from script menu.
 > 
+> ### xmodem support
+> When a SERIAL sission is established, simply drag and drop a file to the terminal window will cause the file been sent using xmodem protocol, only send function of the original xmodem protocol is supported, CRC optional, xmodem-1K is not supported. This is added to 1.1 release for to support bootstraping of MCUs on embeded system like Ardiuno
+> 
 > ### FTPd/TFTPd/HTTPd
 > A built in FTP server can be used for simple file transfer tasks, like software download to network devices. Only one user name "tiny" is allowed to login, with password "term". For security, user session to the FTP server is timed out in 1 minute without action, and FTP server will time out in 15 minutes without active connection.
 > 
