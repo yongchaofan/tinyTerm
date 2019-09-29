@@ -1,3 +1,4 @@
+#MSYS2/MingW64 Makefile
 OBJS = obj/tiny.o obj/term.o obj/host.o obj/ssh2.o obj/auto_drop.o obj/resource.o
 LIBS = ${MINGW_PREFIX}/lib/libssh2.a
 CC = gcc
