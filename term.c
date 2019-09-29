@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 30243 2019-05-21 15:05:10 $"
+// "$Id: term.c 30597 2019-09-28 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -494,6 +494,20 @@ int term_Tun( TERM *pt, char *cmd, char **preply)
 	ssh2_Tun( pt->host, cmd );
 	return term_Waitfor_Prompt( pt );
 }
+int term_xmodem(TERM *pt, char *fn)
+{
+	if ( host_Type(pt->host)==SERIAL ) {
+		FILE *fp = fopen(fn, "rb");
+		if ( fp!=NULL ) {
+			term_Disp(pt, "sending ");
+			term_Disp(pt, fn);
+			term_Disp(pt, "\n");
+			xmodem_init(pt->host, fp);
+			return 1;
+		}
+	}
+	return 0;
+}
 int term_Cmd( TERM *pt, char *cmd, char **preply )
 {
 	if ( *cmd!='!' ) return term_TL1( pt, cmd, preply);
@@ -537,6 +551,7 @@ int term_Cmd( TERM *pt, char *cmd, char **preply )
 	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 	ftp_Svr( cmd+4 );
 	else if ( strncmp(cmd, "tun",  3)==0 ) 	rc = term_Tun( pt, cmd+3, preply);
 	else if ( strncmp(cmd, "scp ", 4)==0 ) 	rc = term_Scp( pt, cmd+4, preply);
+	else if ( strncmp(cmd, "xmodem ", 7)==0 ) rc = term_xmodem( pt, cmd+7 );
 	else if ( strncmp(cmd, "Wait ", 5)==0 ) Sleep(atoi(cmd+5)*1000);
 	else if ( strncmp(cmd, "Waitfor ", 8)==0) 
 	{

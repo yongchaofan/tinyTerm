@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 39989 2019-05-12 21:35:10 $"
+// "$Id: tiny.c 40490 2019-09-25 21:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -46,7 +46,7 @@ const char WELCOME[]="\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\n\n\n\
 \tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\n\n\n\
-\tVerision 1.7, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
+\tVerision 1.8, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
 const char SCP_TO_FOLDER[]="\
 var xml = new ActiveXObject(\"Microsoft.XMLHTTP\");\n\
 var port = \"8080/?\";\n\
@@ -91,6 +91,7 @@ BOOL SaveDict( char *fn );
 void OpenScript( WCHAR *wfn );
 void DropScript( char *tl1s );
 void DropFiles( HDROP hDrop );
+void DropXmodem(HDROP hDrop);
 
 BOOL isUTF8c(char c)
 {
@@ -571,11 +572,11 @@ void get_serial_ports(HWND hwndPort)
 		}
 	}
 }
+static WCHAR last_host[128] = L"192.168.1.1";
 void get_hosts(HWND hwndHost)
 {
-	 ComboBox_AddString(hwndHost, L"192.168.1.1");
-	 for ( int id=ID_CONNECT0; id<ID_CONNECT0+iConnectCount; id++ ) 
-	{
+	 ComboBox_AddString(hwndHost, last_host);
+	 for ( int id=ID_CONNECT0; id<ID_CONNECT0+iConnectCount; id++ ) {
 		WCHAR wcmd[256], *p;
 		GetMenuString(hMainMenu, id, wcmd, 256, MF_BYCOMMAND);
 		p = wcschr(wcmd, L' ');
@@ -666,6 +667,7 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 						ComboBox_GetText(hwndProto, conn, 127);
 						int len = wcslen(conn);
 						ComboBox_GetText(hwndHost, conn+len, 127);
+						ComboBox_GetText(hwndHost, last_host, 127);
 						SendMessage(hwndHost,CB_FINDSTRING,1,
 												(LPARAM)(conn+len));
 						if ( ComboBox_GetCurSel(hwndHost)==CB_ERR )
@@ -843,6 +845,14 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 			return FALSE;
 	}
 	return TRUE;
+}
+void ftpd_quit()
+{
+	menu_Check( ID_FTPD, bFTPd=FALSE );
+}
+void tftpd_quit()
+{
+	menu_Check( ID_TFTPD, bTFTPd=FALSE );
 }
 LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 {
@@ -1063,6 +1073,8 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	case WM_DROPFILES:
 		if ( host_Type(pt->host)==SSH || host_Type(pt->host)==SFTP )
 			DropFiles((HDROP)wParam);
+		if ( host_Type(pt->host)==SERIAL )
+			DropXmodem((HDROP)wParam);
 		break;
 	case WM_CTLCOLOREDIT:
 		SetTextColor( (HDC)wParam, COLORS[3] );
@@ -1301,6 +1313,13 @@ void DropFiles(HDROP hDrop)
 	files[len] = 0;
 	DragFinish( hDrop );
 	CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)uploader,(void *)files,0,NULL);
+}
+void DropXmodem(HDROP hDrop)
+{
+	WCHAR wname[MAX_PATH];
+	DragQueryFile( hDrop, 0, wname, MAX_PATH );
+	FILE *fp = _wfopen(wname, L"rb");
+	if ( fp!=NULL ) xmodem_init(pt->host, fp);
 }
 DWORD WINAPI scripter( void *cmds )
 {

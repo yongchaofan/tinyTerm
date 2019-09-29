@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5549 2019-05-12 22:05:10 $"
+// "$Id: tiny.h 5627 2019-09-28 22:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -139,6 +139,7 @@ void host_Close( HOST *ph );
 int host_Type(HOST *ph);
 int host_Status(HOST *ph);
 int host_tcp( HOST *ph );
+void xmodem_init(HOST *ph, FILE *fp);
 
 void url_decode(char *url);
 int http_Svr( char *intf );
@@ -186,6 +187,8 @@ int term_Cmd( TERM *pt, char *cmd, char **preply );
 
 /****************tiny.c****************/
 void cmd_Disp_utf8(char *buf);
+void ftpd_quit();
+void tftpd_quit();
 void tiny_Beep();
 void tiny_Scroll(int lines);
 void tiny_Redraw_Line();		//redraw cursor line only

@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 29144 2019-05-12 21:05:10 $"
+// "$Id: host.c 31806 2019-09-28 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -120,6 +120,105 @@ void host_Destory()
 }
 
 /***************************Serial*****************************/
+const char SOH = 0x01;
+const char STX = 0x02;
+const char EOT = 0x04;
+const char ACK = 0x06;
+const char NAK = 0x15;
+static unsigned char xmodem_buf[133];
+static unsigned char xmodem_blk;
+static int xmodem_timeout;
+static FILE *xmodem_fp;
+static BOOL bXmodem, xmodem_crc, xmodem_started;
+void block_crc()
+{
+	unsigned short crc = 0;
+	for ( int i=3; i<131; i++ ) {
+		crc = crc ^ xmodem_buf[i] << 8;
+		for ( int j=0; j<8; j++ ) {
+			if (crc & 0x8000)
+				crc = crc << 1 ^ 0x1021;
+			else
+				crc = crc << 1;
+		}
+	}
+	xmodem_buf[131] = (crc>>8) & 0xff;
+	xmodem_buf[132] = crc & 0xff;
+ }
+void xmodem_block(HOST *ph)
+{
+	xmodem_buf[0] = SOH;
+	xmodem_buf[1] = ++xmodem_blk;
+	xmodem_buf[2] = 255-xmodem_blk;
+	int cnt = fread( xmodem_buf+3, 1, 128, xmodem_fp );
+	if ( cnt <= 0 ) {
+		xmodem_buf[0] = EOT;
+		fclose(xmodem_fp);
+	}
+	if ( cnt>0 && cnt<128 ) 
+		for ( int i=cnt+3; i<131; i++ ) xmodem_buf[i] = 0;
+	if ( xmodem_crc ) {
+		block_crc();
+	}
+	else {
+		unsigned char chksum = 0;
+		for ( int i=3; i<131; i++ ) chksum += xmodem_buf[i];
+		xmodem_buf[131] = chksum;
+	}
+}
+void xmodem_send(HOST *ph)
+{
+	xmodem_started = TRUE;
+	if ( xmodem_buf[0]==EOT )
+		host_Send(ph, xmodem_buf, 1);
+	else
+		host_Send(ph, xmodem_buf, xmodem_crc?133:132);
+}
+void xmodem_recv(HOST *ph, char op)
+{
+	switch( op ) {
+	case 0:		//nothing received,resend every 10 seconds
+				if ( ++xmodem_timeout%10000==0 && xmodem_started ) {
+					xmodem_send(ph);
+					term_Disp(ph->term, "R");
+				}
+				if ( xmodem_timeout>60000 ) {	//timeout after 60 seconds
+					bXmodem = FALSE;
+					fclose(xmodem_fp);
+					term_Disp(ph->term, "Aborted\n");
+				}
+				break;
+	case 0x06:	xmodem_timeout = 0;				//ACK
+				if ( xmodem_buf[0] == EOT ) {
+					term_Disp(ph->term, "Completed\n");
+					bXmodem = FALSE;
+					return;
+				}
+				xmodem_block(ph);
+				xmodem_send(ph); 
+				if ( xmodem_blk==0 ) term_Disp(ph->term, ".");
+				break;
+	case 0x15:	term_Disp(ph->term, "N");		//NAK
+				xmodem_send(ph);
+				break;
+	case 'C':	term_Disp(ph->term, "CRC");		//start CRC
+				xmodem_crc = TRUE; 
+				block_crc();
+				xmodem_send(ph);
+				break;
+	}
+}
+void xmodem_init(HOST *ph, FILE *fp)
+{
+	xmodem_fp = fp;
+	bXmodem = TRUE;
+	xmodem_crc = FALSE;
+	xmodem_started = FALSE;
+	xmodem_timeout = 0;
+	xmodem_blk = 0;
+	xmodem_block(ph);
+	term_Disp(ph->term, "xmodem");
+}
 DWORD WINAPI serial(void *pv)
 {
 	HOST *ph = (HOST *)pv;
@@ -137,7 +236,7 @@ DWORD WINAPI serial(void *pv)
 		goto comm_close;
 	}
 	COMMTIMEOUTS timeouts = { 1, 0, 1, 0, 0 };
-							//ReadIntervalTimeout = 10
+							//ReadIntervalTimeout = 1
 							//ReadTotalTimeoutMultiplier = 0
 							//ReadTotalTimeoutConstant = 1
 							//WriteTotalTimeoutMultiplier = 0
@@ -162,6 +261,7 @@ DWORD WINAPI serial(void *pv)
 	ph->host_type = SERIAL;
 	ph->hostname = ph->cmdline;
 	ph->host_status=HOST_CONNECTED;
+	bXmodem = FALSE;
 	term_Title( ph->term, ph->cmdline );
 	term_Disp( ph->term, "connected\n" );
 	ph->hExitEvent = CreateEventA( NULL, TRUE, FALSE, "COM exit" );
@@ -169,12 +269,19 @@ DWORD WINAPI serial(void *pv)
 		char buf[256];
 		DWORD dwCCH;
 		if ( ReadFile( ph->hSerial, buf, 255, &dwCCH, NULL ) ) {
+			if ( bXmodem ) { 
+				char op = 0;
+				if ( dwCCH>0 ) op = buf[dwCCH-1];
+				xmodem_recv(ph, op);
+				continue;
+			}
 			if ( dwCCH > 0 ) {
 				buf[dwCCH] = 0;
 				term_Parse( ph->term, buf, dwCCH );
 			}
-			else
+			else {
 				Sleep(1);//give WriteFile a chance to complete
+			}
 		}
 		else
 			if ( !ClearCommError( ph->hSerial, NULL, NULL ) ) break;
@@ -437,14 +544,14 @@ DWORD WINAPI httpd( void *pv )
 		cmdlen=recv(http_s1, buf, 4095, 0);
 		if ( cmdlen>0 ) {
 			if ( strncmp(buf, "GET /", 5)!=0 ) {//TCP connection
-				FD_SET readset;
-				struct timeval tv = { 0, 100 };	//tv_sec=0, tv_usec=300
 				term_Send( pt, buf, cmdlen);
 				do {
 					if ( host_Status( pt->host )==HOST_CONNECTED ) {
 						replen = term_Recv( pt,  &reply );
 						if ( replen > 0 ) send(http_s1, reply, replen, 0);
 					}
+					struct timeval tv = { 0, 100 }; //tv_sec=0, tv_usec=100
+					FD_SET readset;
 					FD_ZERO(&readset);
 					FD_SET(http_s1, &readset);
 					if ( select(1, &readset, NULL, NULL, &tv)>0 ) {
@@ -833,15 +940,19 @@ DWORD WINAPI ftpd(LPVOID p)
 	term_Disp( pt,  ret0==0? "FTPd timed out\n" : "FTPd stopped\n" );
 	closesocket(ftp_s0);
 	ftp_s0 = INVALID_SOCKET;
+	ftpd_quit();
 	return 0;
 }
 BOOL ftp_Svr(char *root)
 {
-	if ( ftp_s0 != INVALID_SOCKET ) {
-		closesocket( ftp_s0 );
-		ftp_s0 = INVALID_SOCKET;
+	if ( root==NULL ) {
+		if ( ftp_s0 != INVALID_SOCKET ) {
+			closesocket( ftp_s1 );
+			closesocket( ftp_s0 );
+			ftp_s0 = INVALID_SOCKET;
+		}
 	}
-	else if ( root!=NULL ) {
+	else {
 		if ( is_directory( root ) ) {
 			struct sockaddr_in serveraddr;
 			int addrsize=sizeof(serveraddr);
@@ -929,8 +1040,8 @@ DWORD WINAPI tftpd(LPVOID p)
 
 	char rootDir[MAX_PATH], fn[MAX_PATH];
 	strcpy( rootDir, (char *)p );
-	strcat( rootDir, "\\");
 	term_Print( pt,  "TFTPd started at %s\r\n", rootDir );
+	strcat( rootDir, "\\");
 
 	int ret;
 	while ( (ret=sock_select( tftp_s0, 300 )) == 1 ) {
@@ -961,8 +1072,9 @@ DWORD WINAPI tftpd(LPVOID p)
 	}
 	term_Disp( pt,  ret==0 ? "TFTPD timed out\n" : "TFTPd stopped\n" );
 	closesocket( tftp_s1 );
-	closesocket( tftp_s0 );
+	closesocket(tftp_s0);
 	tftp_s0 = INVALID_SOCKET;
+	tftpd_quit();
 	return 0;
 }
 BOOL tftp_Svr( char *root )
@@ -970,12 +1082,14 @@ BOOL tftp_Svr( char *root )
 	struct sockaddr_in svraddr;
 	int addrsize=sizeof(svraddr);
 
-	if ( tftp_s0 != INVALID_SOCKET ) {
-		closesocket(tftp_s1);
-		closesocket( tftp_s0 );
-		tftp_s0 = INVALID_SOCKET;
+	if ( root==NULL ) {
+		if ( tftp_s0 != INVALID_SOCKET ) {
+			closesocket(tftp_s1);
+			closesocket( tftp_s0 );
+			tftp_s0 = INVALID_SOCKET;
+		}
 	}
-	else if ( root!=NULL ) {
+	else {
 		if ( is_directory( root ) ) {
 			tftp_s0 = socket(AF_INET, SOCK_DGRAM, 0);
 			tftp_s1 = socket(AF_INET, SOCK_DGRAM, 0);
