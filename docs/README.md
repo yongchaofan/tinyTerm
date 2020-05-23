@@ -8,7 +8,7 @@
 
 
 ## Project philosophy
-tinyTerm is intended to be small, simple and scriptable, x64 executable is only 240KB, source code is consist of 6 files totaling 160KB, ~5000 sloc, libssh2 is the only external library required to build on Windows 7/10. 
+tinyTerm is intended to be small, simple and scriptable, x64 executable is only 245KB, source code is consist of 6 files totaling 160KB, ~5000 sloc, libssh2 is the only external library required to build on Windows 7/10. 
 
 User interface design is minimal,, main menu shares title bar space, scrollbar hidden until user trys to scroll back, only one dialog for makeing connections, 
 
