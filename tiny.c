@@ -1,11 +1,11 @@
 //
-// "$Id: tiny.c 40490 2019-09-25 21:35:10 $"
+// "$Id: tiny.c 40452 2020-05-23 09:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // tiny.c is the GUI implementation using WIN32 API.
 //
-// Copyright 2018-2019 by Yongchao Fan.
+// Copyright 2018-2020 by Yongchao Fan.
 //
 // This library is free software distributed under GNU GPL 3.0,
 // see the license at:
@@ -46,7 +46,7 @@ const char WELCOME[]="\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\n\n\n\
 \tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\n\n\n\
-\tVerision 1.8, ©2018-2019 Yongchao Fan, All rights reserved\r\n";
+\tVerision 1.8.1, ©2018-2020 Yongchao Fan, All rights reserved\r\n";
 const char SCP_TO_FOLDER[]="\
 var xml = new ActiveXObject(\"Microsoft.XMLHTTP\");\n\
 var port = \"8080/?\";\n\
@@ -364,7 +364,7 @@ void cmd_Enter(WCHAR *wcmd)
 			term_Cmd( pt, cmd, NULL );
 	}
 	else {
-		if ( host_Status( pt->host )!=HOST_IDLE ) {
+		if ( host_Status( pt->host )!=IDLE ) {
 			cmd[cnt-1] = '\r';
 			term_Send( pt, cmd, cnt ); 
 		}
@@ -432,7 +432,7 @@ void tiny_Title( char *buf )
 {
 	utf8_to_wchar(buf, -1, Title+50, 200);
 	SetWindowText(hwndTerm, Title);
-	if ( host_Status(pt->host)==HOST_IDLE )
+	if ( host_Status(pt->host)==IDLE )
 	{
 		if ( bLocalEdit )
 			term_Disp(pt, TINYTERM);
@@ -696,12 +696,12 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		}
 		break;
 	case ID_CONNECT:
-		if ( host_Status( pt->host )==HOST_IDLE )
+		if ( host_Status( pt->host )==IDLE )
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_CONNECT), 
 							hwndTerm, (DLGPROC)ConnectProc);
 		break;
 	case ID_DISCONN:
-		if ( host_Status( pt->host )!=HOST_IDLE ) host_Close( pt->host );
+		if ( host_Status( pt->host )!=IDLE ) host_Close( pt->host );
 		break;
 	case ID_LOGG:
 		if ( !pt->bLogging ) {
@@ -768,7 +768,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		if ( !bLocalEdit ) 
 			MoveWindow( hwndCmd, 0, 0, 1, 1, TRUE );
 		else {
-			if ( host_Status(pt->host)==HOST_IDLE ) 
+			if ( host_Status(pt->host)==IDLE ) 
 				term_Disp(pt, TINYTERM );
 		}
 		menu_Check( ID_EDIT, bLocalEdit);
@@ -913,7 +913,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		//moves the composition window to cursor pos on Win10
 		break;
 	case WM_CHAR:
-		if ( host_Status( pt->host )==HOST_IDLE ) {//press Enter to restart
+		if ( host_Status( pt->host )==IDLE ) {//press Enter to restart
 			if ( (wParam&0xff)==0x0d ) host_Open(pt->host, NULL);
 		}
 		else {
@@ -1081,7 +1081,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		SetBkColor( (HDC)wParam, COLORS[0] );
 		return (LRESULT)dwBkBrush;		//must return brush for update
 	case WM_CLOSE:
-		if ( host_Status( pt->host )!=HOST_IDLE ) {
+		if ( host_Status( pt->host )!=IDLE ) {
 			if ( MessageBox(hwnd, L"Disconnect and quit?",
 							L"tinyTerm", MB_YESNO)==IDNO ) break;
 			host_Close(pt->host);
@@ -1363,7 +1363,7 @@ DWORD WINAPI scripter( void *cmds )
 			term_Cmd(pt, cmd, NULL);
 		}
 		else {
-			if ( host_Status(pt->host)==HOST_IDLE ) {
+			if ( host_Status(pt->host)==IDLE ) {
 				term_Parse(pt, p0, len+1);
 			}
 			else if ( len>0 && *p0!='#' ) {
