@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 35975 2020-06-06 15:05:10 $"
+// "$Id: term.c 35966 2020-06-06 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -832,9 +832,9 @@ const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 					if ( j>i ) buff_clear(pt, i, j-i+1);
 					}
 					break;
-			case 'L':	//insert lines
-					if ( n0 > pt->screen_y+pt->roll_bot-pt->cursor_y+1 ) 
-						n0 = pt->screen_y+pt->roll_bot-pt->cursor_y+1;
+			case 'L'://insert lines
+					if ( n0 > pt->screen_y+pt->roll_bot-pt->cursor_y ) 
+						n0 = pt->screen_y+pt->roll_bot-pt->cursor_y;
 					for ( int i=pt->screen_y+pt->roll_bot; 
 								i>=pt->cursor_y+n0; i--) {
 						memcpy( pt->buff+pt->line[i],
@@ -846,8 +846,8 @@ const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 					buff_clear(pt, pt->cursor_x, pt->size_x*n0);
 					break;
 			case 'M'://delete lines
-					if ( n0 > pt->screen_y+pt->roll_bot-pt->cursor_y+1 ) 
-						n0 = pt->screen_y+pt->roll_bot-pt->cursor_y+1;
+					if ( n0 > pt->screen_y+pt->roll_bot-pt->cursor_y ) 
+						n0 = pt->screen_y+pt->roll_bot-pt->cursor_y;
 					for ( int i=pt->cursor_y; 
 								i<pt->screen_y+pt->roll_bot-n0; i++ ) {
 						memcpy( pt->buff+pt->line[i],
