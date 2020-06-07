@@ -1,11 +1,11 @@
 //
-// "$Id: tiny.h 5627 2019-09-28 22:05:10 $"
+// "$Id: tiny.h 5898 2020-06-06 22:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // tiny.h has function declarations for all .c files.
 //
-// Copyright 2018-2019 by Yongchao Fan.
+// Copyright 2018-2020 by Yongchao Fan.
 //
 // This library is free software distributed under GNU GPL 3.0,
 // see the license at:
@@ -70,7 +70,7 @@ typedef struct tagHOST {
 } HOST;
 
 typedef struct tagTERM {
-	char *buff, *attr, c_attr;
+	char *buff, *attr, c_attr, save_attr;
 	int *line;
 	int size_x, size_y;
 	int cursor_x, cursor_y;
@@ -78,7 +78,7 @@ typedef struct tagTERM {
 	int sel_left, sel_right;
 	BOOL bLogging, bEcho, bCursor, bAlterScreen;
 	BOOL bAppCursor, bGraphic, bEscape, bTitle, bInsert;
-	BOOL bBracket;					//bracketed paste mode
+	BOOL bBracket, bOriginMode, bWraparound;			//bracketed paste mode
 	int save_x, save_y;
 	int roll_top, roll_bot;
 
@@ -93,25 +93,18 @@ typedef struct tagTERM {
 	int tl1len;
 
 	BOOL save_edit;
-	char escape_code[32];
 	int escape_idx;
+	char escape_code[32];
+	char tabstops[256];
 
 	int xmlIndent;
 	BOOL xmlPreviousIsOpen;
 
 	HOST *host;
 } TERM;
-#define HOST_IDLE			0
-#define HOST_CONNECTING 	1
-#define HOST_AUTHENTICATING	2
-#define HOST_CONNECTED		4
-
-#define STDIO	1
-#define SERIAL	2
-#define TELNET	3
-#define SSH		4
-#define SFTP	5
-#define NETCONF 6
+enum hostStatus {IDLE, CONNECTING, AUTHENTICATING, CONNECTED};
+enum hostType {NONE, STDIO, SERIAL, TELNET, SSH, SFTP, NETCONF};
+enum mouseEvents {DOUBLECLK, RIGHTCLK, LEFTDOWN, LEFTDRAG, LEFTUP, MIDDLEUP};
 
 BOOL isUTF8c(char c);	//check if a byte is a UTF8 continuation byte
 int utf8_to_wchar(const char *buf, int cnt, WCHAR *wbuf, int wcnt);
@@ -164,6 +157,8 @@ void term_Desstruct( TERM *pt );
 void term_Clear( TERM *pt );
 void term_Size( TERM *pt, int x, int y );
 void term_Title( TERM *pt, char *title );
+void term_Scroll( TERM* pt, int lines );
+void term_Mouse(TERM *pt, int evt, int x, int y);
 void term_Print( TERM *pt, const char *fmt, ... );
 void term_Parse( TERM *pt, const char *buf, int len );
 void term_Parse_XML( TERM *pt, const char *xml, int len );
@@ -190,9 +185,10 @@ void cmd_Disp_utf8(char *buf);
 void ftpd_quit();
 void tftpd_quit();
 void tiny_Beep();
-void tiny_Scroll(int lines);
-void tiny_Redraw_Line();		//redraw cursor line only
+void wnd_Size();				//resize window when font or term size changes
+void tiny_Redraw_Line(int line);//redraw cursor line only
 void tiny_Redraw_Term();		//redraw whole term window
 void tiny_Title( char *buf );
+BOOL tiny_Scroll(BOOL bShowScroll, int cy, int sy);//return if scrollbar is shown
 BOOL tiny_Edit(BOOL e);			//return BOOL to indicate if status changed
 char *tiny_Gets(char *prompt, BOOL bEcho);

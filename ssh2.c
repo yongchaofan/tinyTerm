@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40304 2019-09-28 19:05:10 $"
+// "$Id: ssh2.c 40296 2020-06-06 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -137,25 +137,25 @@ char *ssh2_Gets( HOST *ph, char *prompt, BOOL bEcho)
 		Sleep(100);
 	}
 	if ( ph->bPassword ) tiny_Edit(save_edit);	//restore local edit mode
-	term_Disp( ph->term, "\n");
 	return ph->bReturn ? ph->keys : NULL;
 }
 void ssh2_Send( HOST *ph, char *buf, int len )
 {
 	if ( !ph->bReturn ) {
 		for ( char *p=buf; p<buf+len; p++ ) switch( *p ) {
-		case '\015': ph->keys[ph->cursor]=0;
-					 ph->bReturn=TRUE; 
-					 break;
+		case '\015':ph->keys[ph->cursor]=0;
+					ph->bReturn=TRUE; 
+					term_Disp( ph->term, "\r\n");
+					break;
 		case '\010':
-		case '\177': if ( --ph->cursor<0 ) 
-						ph->cursor=0;
-					 else
-						if ( !ph->bPassword ) term_Disp( ph->term, "\010 \010");
-					 break;
-		default:	 ph->keys[ph->cursor++]=*p;
-					 if ( ph->cursor>255 ) ph->cursor=255;
-					 if ( !ph->bPassword ) term_Parse( ph->term, p, 1);
+		case '\177':if ( --ph->cursor<0 ) 
+					ph->cursor=0;
+					else
+					if ( !ph->bPassword ) term_Disp( ph->term, "\010 \010");
+					break;
+		default:	ph->keys[ph->cursor++]=*p;
+					if ( ph->cursor>255 ) ph->cursor=255;
+					if ( !ph->bPassword ) term_Parse( ph->term, p, 1);
 		}
 	}
 	else if ( ph->channel!=NULL ) {
@@ -286,7 +286,7 @@ int ssh_knownhost( HOST *ph )
 	case LIBSSH2_KNOWNHOST_CHECK_MISMATCH:
 		if ( type==((knownhost->typemask&LIBSSH2_KNOWNHOST_KEY_MASK)
 								  >>LIBSSH2_KNOWNHOST_KEY_SHIFT) ) {
-			term_Print( ph->term, "%s\n\033[31m!!!hostkey changed!!!\n", keybuf);
+			term_Print( ph->term, "%s\r\n\033[31m!!!hostkey changed!!!\r\n", keybuf);
 			p=ssh2_Gets( ph, "Update hostkey and continue?(Yes/No):", TRUE);
 			if ( p!=NULL ) {
 				if ( *p=='y' || *p=='Y' ) {
@@ -294,20 +294,20 @@ int ssh_knownhost( HOST *ph )
 				}
 				else {
 					rc = -4;
-					term_Print(ph->term, "\n\033[32mdisconnected, stay safe\n");
+					term_Print(ph->term, "\r\n\033[32mdisconnected, stay safe\r\n");
 					break;
 				}
 			}
 			else {
 				rc = -4;
-				term_Print(ph->term, "\n\033[32mdisconnected, stay safe\n");
+				term_Print(ph->term, "\033[32mdisconnected, stay safe\r\n");
 				break;
 			}
 		}
 		//fall through if hostkey type different, or hostkey deleted for update
 	case LIBSSH2_KNOWNHOST_CHECK_NOTFOUND:
 		if ( p == NULL ) {
-			term_Print( ph->term, "%s\n\033[33munknown hostkey!\n", keybuf);
+			term_Print( ph->term, "%s\r\n\033[33munknown hostkey!", keybuf);
 			p = ssh2_Gets( ph, "Add entry to .ssh/known_hosts?(Yes/No):", TRUE);
 		}
 		if ( p!=NULL ) {
@@ -320,15 +320,15 @@ int ssh_knownhost( HOST *ph )
 										&knownhost);
 				if ( libssh2_knownhost_writefile(nh, knownhostfile,
 										LIBSSH2_KNOWNHOST_FILE_OPENSSH)==0 )
-					term_Print( ph->term, "\033[32m\nhostkey added/updated\n");
+					term_Print( ph->term, "\033[32mhostkey added/updated\r\n");
 				else
-					term_Print( ph->term, "\033[33m\ncouldn't update hostkey file\n");
+					term_Print( ph->term, "\033[33mcouldn't update hostkey file\r\n");
 			}
 			else
-				term_Print( ph->term, "\033[33m\nhostkey ignored\n");
+				term_Print( ph->term, "\033[33mhostkey ignored\r\n");
 		}
 		else
-			term_Print( ph->term, "\033[33m\nhostkey ignored\n");
+			term_Print( ph->term, "\033[33mhostkey ignored\r\n");
 	}
 	
 	libssh2_knownhost_free(nh);
@@ -356,7 +356,7 @@ int ssh_authentication( HOST *ph )
 {
 	char user[256], pw[256];
 	if ( ph->username==NULL ) {
-		char *p = ssh2_Gets( ph, "\nusername:", TRUE);
+		char *p = ssh2_Gets( ph, "\r\nusername:", TRUE);
 		if ( p==NULL ) return -5;
 		strcpy(user, p); 
 		ph->username = user;
@@ -383,7 +383,7 @@ int ssh_authentication( HOST *ph )
 	if ( strstr(authlist, "password")!=NULL ) {
 		for ( int rep=0; rep<3; rep++ ) {
 			if ( ph->password==NULL ) {
-				char *p = ssh2_Gets( ph, "\npassword:", FALSE );
+				char *p = ssh2_Gets( ph, "password:", FALSE );
 				if ( p==NULL ) return -5;
 				strcpy(pw, p);
 				ph->password = pw;
@@ -422,7 +422,7 @@ DWORD WINAPI ssh( void *pv )
 	ph->port = 22;
 	if ( strstr(port, "-s netconf")!=NULL ) ph->port = 830;
 	if ( ssh_parameters( ph, port )<0 ) {
-		term_Disp( ph->term, "\033[31minvalid parameters!\n");
+		term_Disp( ph->term, "\033[31minvalid parameters!\r\n");
 		goto TCP_Close;
 	}
 
@@ -435,46 +435,46 @@ DWORD WINAPI ssh( void *pv )
 		rc = libssh2_session_handshake(ph->session, ph->sock);
 	} while ( rc == LIBSSH2_ERROR_EAGAIN) ;
 	if ( rc!=0 ) {
-		term_Disp( ph->term, "\033[31msession failure!\n");
+		term_Disp( ph->term, "\033[31msession failure!\r\n");
 		goto Session_Close;
 	}
 	const char *banner = libssh2_session_banner_get(ph->session);
 	if ( banner!=NULL ) term_Disp( ph->term, banner);
 
-	ph->host_status=HOST_AUTHENTICATING;
+	ph->host_status=AUTHENTICATING;
 	if ( ssh_knownhost( ph )<0 ) {
-		term_Disp( ph->term, "\033[31mverification failure!\n" );
+		term_Disp( ph->term, "\033[31mverification failure!\r\n" );
 		goto Session_Close;
 	}
 	if ( ssh_authentication( ph )<0 ) {
-		term_Disp( ph->term,"\033[31mauthentication failure!\n" );
+		term_Disp( ph->term,"\033[31mauthentication failure!\r\n" );
 		goto Session_Close;
 	}
 	ph->channel = libssh2_channel_open_session(ph->session);
 	if ( !ph->channel ) {
-		term_Disp( ph->term, "\033[31mchannel failure!\n");
+		term_Disp( ph->term, "\033[31mchannel failure!\r\n");
 		goto Session_Close;
 	}
 	if ( ph->subsystem==NULL ) {
 		if (libssh2_channel_request_pty(ph->channel, "xterm")) {
-			term_Disp( ph->term, "\033[31mpty failure! \n");
+			term_Disp( ph->term, "\033[31mpty failure!\r\n");
 			goto Channel_Close;
 		}
 		if (libssh2_channel_shell(ph->channel)) {
-			term_Disp( ph->term, "\033[31mshell failure!\n");
+			term_Disp( ph->term, "\033[31mshell failure!\r\n");
 			goto Channel_Close;
 		}
 	}
 	else {
 		if (libssh2_channel_subsystem(ph->channel, ph->subsystem)) {
-			term_Disp( ph->term, "\033[31msubsystem failure!\n");
+			term_Disp( ph->term, "\033[31msubsystem failure!\r\n");
 			goto Channel_Close;
 		}
 		libssh2_channel_write(ph->channel, IETF_HELLO, strlen(IETF_HELLO));
 	}
 	libssh2_session_set_blocking(ph->session, 0);
 
-	ph->host_status=HOST_CONNECTED;
+	ph->host_status=CONNECTED;
 	term_Title( ph->term, ph->hostname );
 	while ( libssh2_channel_eof(ph->channel) == 0 ) {
 		char buf[32768];
@@ -496,7 +496,7 @@ DWORD WINAPI ssh( void *pv )
 				else {
 					char *errmsg;
 					libssh2_session_last_error(ph->session, &errmsg, NULL, 0);
-					term_Print( ph->term, "\n\033[31m%s error\n", errmsg);
+					term_Print( ph->term, "\n\033[31m%s error\r\n", errmsg);
 				}
 				break;
 			}
@@ -504,7 +504,7 @@ DWORD WINAPI ssh( void *pv )
 	}
 	tun_closeall( ph );
 	ph->host_type = 0;
-	term_Disp( ph->term, "disconnected\n");
+	term_Disp( ph->term, "disconnected\r\n");
 
 Channel_Close:
 	if ( ph->channel!=NULL ) {
@@ -520,7 +520,7 @@ Session_Close:
 
 TCP_Close:
 	ph->sock = 0;
-	ph->host_status=HOST_IDLE;
+	ph->host_status=IDLE;
 	term_Title( ph->term, "");
 	return 1;
 }
@@ -1336,7 +1336,7 @@ DWORD WINAPI sftp( void *pv )
 	const char *banner = libssh2_session_banner_get(ph->session);
 	if ( banner!=NULL ) term_Disp( ph->term, banner);
 
-	ph->host_status=HOST_AUTHENTICATING;
+	ph->host_status=AUTHENTICATING;
 	if ( ssh_knownhost( ph )<0 ) {
 		term_Disp( ph->term, "\033[31mverification failure!\n");
 		goto sftp_Close;
@@ -1356,7 +1356,7 @@ DWORD WINAPI sftp( void *pv )
 	strcpy( ph->homepath, ph->realpath );
 
 	ph->host_type=SFTP;
-	ph->host_status=HOST_CONNECTED;
+	ph->host_status=CONNECTED;
 	char prompt[4096], *cmd;
 	int timeout_cnt = 0;
 	while ( TRUE ) {
@@ -1388,7 +1388,7 @@ sftp_Close:
 
 TCP_Close:
 	ph->sock = 0;
-	ph->host_status=HOST_IDLE;
+	ph->host_status=IDLE;
 	term_Title( ph->term, "" );
 	return 1;
 }

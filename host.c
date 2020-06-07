@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 31806 2019-09-28 21:05:10 $"
+// "$Id: host.c 31773 2020-06-06 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -7,7 +7,7 @@
 // serial communication is based on WIN32 API.
 // telnet communication is based on socket API
 //
-// Copyright 2018-2019 by Yongchao Fan.
+// Copyright 2018-2020 by Yongchao Fan.
 //
 // This library is free software distributed under GNU GPL 3.0,
 // see the license at:
@@ -34,14 +34,14 @@ void stdio_Close( HOST *ph );
 void host_Construct( HOST *ph )
 {
 	ph->sock = 0;
-	ph->host_type = 0;
-	ph->host_status=HOST_IDLE;
+	ph->host_type = NONE;
+	ph->host_status=IDLE;
 	ph->homedir[0]=0;
 	ssh2_Construct( ph );
 }
 void host_Open( HOST *ph, char *port )
 {
-	if ( ph->host_status==HOST_IDLE ) 
+	if ( ph->host_status==IDLE ) 
 	{
 		if ( port!=NULL ) 
 		{
@@ -66,7 +66,7 @@ void host_Open( HOST *ph, char *port )
 			reader = sftp;
 		}
 
-		ph->host_status=HOST_CONNECTING;
+		ph->host_status=CONNECTING;
 		CreateThread(NULL, 0, reader, ph, 0, NULL);
 	}
 	else {
@@ -87,7 +87,7 @@ void host_Send( HOST *ph, char *buf, int len )
 	case SSH:
 	case SFTP:
 	case NETCONF: ssh2_Send( ph, buf, len ); break;
-	default:	if ( ph->host_status!=HOST_IDLE ) ssh2_Send( ph, buf, len);
+	default:	if ( ph->host_status!=IDLE ) ssh2_Send( ph, buf, len);
 	}
 }
 void host_Send_Size( HOST *ph, int w, int h )
@@ -232,7 +232,7 @@ DWORD WINAPI serial(void *pv)
 	ph->hSerial = CreateFileA( port, GENERIC_READ|GENERIC_WRITE, 0, NULL,
 												OPEN_EXISTING, 0, NULL);
 	if ( ph->hSerial==INVALID_HANDLE_VALUE ) {
-		term_Disp( ph->term, "Couldn't open serial port\n" );
+		term_Disp( ph->term, "Couldn't open serial port\r\n" );
 		goto comm_close;
 	}
 	COMMTIMEOUTS timeouts = { 1, 0, 1, 0, 0 };
@@ -242,7 +242,7 @@ DWORD WINAPI serial(void *pv)
 							//WriteTotalTimeoutMultiplier = 0
 							//WriteTotalTimeoutConstant = 0
 	if ( SetCommTimeouts( ph->hSerial, &timeouts)==0 ) {
-		term_Disp( ph->term, "couldn't set serial port timeout\n" );
+		term_Disp( ph->term, "couldn't set serial port timeout\r\n" );
 		CloseHandle( ph->hSerial );
 		goto comm_close;
 	}
@@ -253,17 +253,17 @@ DWORD WINAPI serial(void *pv)
 	dcb.DCBlength = sizeof(dcb);
 	BuildCommDCBA(p, &dcb);
 	if ( SetCommState( ph->hSerial, &dcb )==0 ) {
-		term_Disp( ph->term, "Invalid serial port settings\n" );
+		term_Disp( ph->term, "Invalid serial port settings\r\n" );
 		CloseHandle( ph->hSerial );
 		goto comm_close;
 	}
 
 	ph->host_type = SERIAL;
 	ph->hostname = ph->cmdline;
-	ph->host_status=HOST_CONNECTED;
+	ph->host_status=CONNECTED;
 	bXmodem = FALSE;
 	term_Title( ph->term, ph->cmdline );
-	term_Disp( ph->term, "connected\n" );
+	term_Disp( ph->term, "connected\r\n" );
 	ph->hExitEvent = CreateEventA( NULL, TRUE, FALSE, "COM exit" );
 	while ( WaitForSingleObject( ph->hExitEvent, 0 ) == WAIT_TIMEOUT ) {
 		char buf[256];
@@ -289,10 +289,10 @@ DWORD WINAPI serial(void *pv)
 	CloseHandle( ph->hExitEvent );
 	CloseHandle( ph->hSerial );
 	ph->host_type = 0;
-	term_Disp( ph->term, "disconnected\n" );
+	term_Disp( ph->term, "disconnected\r\n" );
 
 comm_close:
-	ph->host_status=HOST_IDLE;
+	ph->host_status=IDLE;
 	term_Title( ph->term, "" );
 	return 1;
 }
@@ -303,7 +303,7 @@ int host_tcp( HOST *ph )
 	int rc = 0;
 	struct addrinfo *ainfo;
 	if ( getaddrinfo(ph->hostname, NULL, NULL, &ainfo)!=0 ) {
-		term_Disp(ph->term, "invalid ip address or hostname\n");
+		term_Disp(ph->term, "invalid ip address or hostname\r\n");
 		return -1;
 	}
 	((struct sockaddr_in *)(ainfo->ai_addr))->sin_port = htons(ph->port);
@@ -311,15 +311,15 @@ int host_tcp( HOST *ph )
 	ph->sock= socket(ainfo->ai_family, SOCK_STREAM, 0);
 	term_Disp(ph->term, "Trying...");
 	if ( connect(ph->sock, ainfo->ai_addr, ainfo->ai_addrlen)!=SOCKET_ERROR )
-		term_Disp(ph->term, "connected\n");
+		term_Disp(ph->term, "connected\r\n");
 	else {
 		switch ( WSAGetLastError() ) {
 		case WSAEHOSTUNREACH:
-		case WSAENETUNREACH: term_Disp(ph->term,"host unreachable!\n"); break;
-		case WSAECONNRESET:  term_Disp(ph->term,"connection reset!\n"); break;
-		case WSAETIMEDOUT:   term_Disp(ph->term,"connection timeout!\n");break;
-		case WSAECONNREFUSED:term_Disp(ph->term,"connection refused!\n");break;
-		default: term_Disp( ph->term,  "connection failure!\n" );
+		case WSAENETUNREACH: term_Disp(ph->term,"host unreachable!\r\n"); break;
+		case WSAECONNRESET:  term_Disp(ph->term,"connection reset!\r\n"); break;
+		case WSAETIMEDOUT:   term_Disp(ph->term,"connection timeout!\r\n");break;
+		case WSAECONNREFUSED:term_Disp(ph->term,"connection refused!\r\n");break;
+		default: term_Disp( ph->term,  "connection failure!\r\n" );
 		}
 		closesocket(ph->sock);
 		rc = -1;
@@ -346,7 +346,7 @@ DWORD WINAPI telnet( void *pv )
 	if ( host_tcp(ph)!=-1 ) 
 	{
 		ph->host_type=TELNET;
-		ph->host_status=HOST_CONNECTED;
+		ph->host_status=CONNECTED;
 		term_Title( ph->term, ph->hostname );
 
 		char buf[1536];
@@ -357,11 +357,11 @@ DWORD WINAPI telnet( void *pv )
 
 		ph->host_type = 0;
 		closesocket(ph->sock);
-		term_Disp( ph->term, "disconnected\n" );
+		term_Disp( ph->term, "disconnected\r\n" );
 	}
 
 	ph->sock = 0;
-	ph->host_status=HOST_IDLE;
+	ph->host_status=IDLE;
 	term_Title( ph->term, "" );
 	return 1;
 }
@@ -421,7 +421,7 @@ DWORD WINAPI stdio( void *pv)
 		CloseHandle( Stderr_Wr );
 
 		ph->host_type = STDIO;
-		ph->host_status=HOST_CONNECTED;
+		ph->host_status=CONNECTED;
 		term_Title( ph->term, ph->cmdline );
 		while ( TRUE ) {
 			DWORD dwCCH;
@@ -444,7 +444,7 @@ DWORD WINAPI stdio( void *pv)
 
 	CloseHandle( ph->hStdioRead );
 	CloseHandle( ph->hStdioWrite );
-	ph->host_status=HOST_IDLE;
+	ph->host_status=IDLE;
 	term_Title( ph->term, "");
 	return 1;
 }
@@ -546,7 +546,7 @@ DWORD WINAPI httpd( void *pv )
 			if ( strncmp(buf, "GET /", 5)!=0 ) {//TCP connection
 				term_Send( pt, buf, cmdlen);
 				do {
-					if ( host_Status( pt->host )==HOST_CONNECTED ) {
+					if ( host_Status( pt->host )==CONNECTED ) {
 						replen = term_Recv( pt,  &reply );
 						if ( replen > 0 ) send(http_s1, reply, replen, 0);
 					}
@@ -891,7 +891,7 @@ DWORD WINAPI ftpd(LPVOID p)
 				}
 				while ( nLen==32768);
 				fclose(fp);
-				term_Print( pt, "\r%lu bytes sentd\n", lSize);
+				term_Print( pt, "\r%lu bytes sent\n", lSize);
 				sock_send( "226 Transfer complete\n");
 				closesocket(s2);
 			}
