@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 35966 2020-06-06 15:05:10 $"
+// "$Id: term.c 35695 2020-06-08 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -144,100 +144,98 @@ void term_Parse( TERM *pt, const char *buf, int len )
 		case 0x00:
 		case 0x0e:
 		case 0x0f: 	break;
-		case 0x07:	tiny_Beep();
-					break;
-		case 0x08:	if ( pt->cursor_x==pt->line[pt->cursor_y] ) break;
-					if ( isUTF8c(pt->buff[pt->cursor_x--]) )//utf8 continuation
-						while ( isUTF8c(pt->buff[pt->cursor_x]) ) 
-							pt->cursor_x--;
-					if ( pt->cursor_x < pt->line[pt->cursor_y] )
-						pt->cursor_y--;
-					break;
-		case 0x09:	
-					for (int l=pt->cursor_x-pt->line[pt->cursor_y];
-						 	l<pt->size_x && pt->tabstops[l]==0; l++ ) {
-						pt->attr[pt->cursor_x] = pt->c_attr;
-						pt->buff[pt->cursor_x++]=' ';
-					}
-					break;
+		case 0x07:	tiny_Beep();break;
+		case 0x08:
+			if ( pt->cursor_x>pt->line[pt->cursor_y] ) {
+				if ( isUTF8c(pt->buff[pt->cursor_x--]) )//utf8 continuation
+					while ( isUTF8c(pt->buff[pt->cursor_x]) ) 
+						pt->cursor_x--;
+			}
+			break;
+		case 0x09: {
+			int l;
+			do {
+				pt->attr[pt->cursor_x] = pt->c_attr;
+				pt->buff[pt->cursor_x++]=' ';
+				l=pt->cursor_x-pt->line[pt->cursor_y];
+			} while ( l<pt->size_x && pt->tabstops[l]==0 );
+		}
+			break;
 		case 0x0a:
 		case 0x0b:
 		case 0x0c:
-					if ( pt->bAlterScreen || pt->line[pt->cursor_y+2]!=0 ) 
-					{	//IND to next line
-						vt100_Escape(pt, "D", 1);
-					}
-					else {	//LF and new line
-						pt->cursor_x = pt->line[pt->cursor_y+1];
-						pt->attr[pt->cursor_x] = pt->c_attr;
-						pt->buff[pt->cursor_x++] = c;	
-						term_nextLine(pt);
-					}
-					break;
-		case 0x0d:	if ( pt->cursor_x-pt->line[pt->cursor_y]
-						==pt->size_x+1 && *p!=0x0a )
-						term_nextLine(pt);	//soft line feed
-					else
-						pt->cursor_x = pt->line[pt->cursor_y];
-					break;
+			if ( pt->bAlterScreen || pt->line[pt->cursor_y+2]!=0 ) {
+					//IND to next line
+				vt100_Escape(pt, "D", 1);
+			}
+			else {	//LF and new line
+				pt->cursor_x = pt->line[pt->cursor_y+1];
+				pt->attr[pt->cursor_x] = pt->c_attr;
+				pt->buff[pt->cursor_x++] = c;	
+				term_nextLine(pt);
+			}
+			break;
+		case 0x0d:
+			if (pt->cursor_x-pt->line[pt->cursor_y]==pt->size_x+1 && *p!=0x0a)
+				term_nextLine(pt);	//soft line feed
+			else
+				pt->cursor_x = pt->line[pt->cursor_y];
+			break;
 		case 0x1b:	p = vt100_Escape( pt, p, zz-p ); break;
 		case 0xff:	p = telnet_Options( pt, p-1, zz-p+1 ); break;
-		case 0xe2:	if ( pt->bAlterScreen ) 
-					{
-						c = ' ';			//hack utf8 box drawing
-						if ( *p++==0x94 )	//to make alterscreen easier
-						{	
-							switch ( *p ) 
-							{
-							case 0x80:
-							case 0xac:
-							case 0xb4:
-							case 0xbc: c='_'; break;
-							case 0x82:
-							case 0x94:
-							case 0x98:
-							case 0x9c:
-							case 0xa4: c='|'; break;
-							}
-						}
-						p++;
+		case 0xe2:	
+			if ( pt->bAlterScreen ) {
+				c = ' ';			//hack utf8 box drawing
+				if ( *p++==0x94 )	//to make alterscreen easier
+				{	
+					switch ( *p ) {
+					case 0x80:
+					case 0xac:
+					case 0xb4:
+					case 0xbc: c='_'; break;
+					case 0x82:
+					case 0x94:
+					case 0x98:
+					case 0x9c:
+					case 0xa4: c='|'; break;
 					}
-		default:	if ( pt->bGraphic ) switch ( c )
-					{
-						case 'q': c='_'; break;
-						case 'x':
-						case 't':
-						case 'u':
-						case 'm':
-						case 'j': c='|'; break;
-						case 'l':
-						case 'k':
-						default: c = ' ';
-					}
-					if ( pt->bInsert ) 
-						vt100_Escape(pt, "[1@", 3);
-					if ( pt->cursor_x-pt->line[pt->cursor_y]>=pt->size_x ) 
-					{
-						int char_cnt=0;
-						for ( int i=pt->line[pt->cursor_y]; i<pt->cursor_x; i++ )
-							if ( !isUTF8c(pt->buff[i]) ) char_cnt++;
-						if ( char_cnt==pt->size_x ) 
-						{
-							if ( pt->bWraparound )//pt->bAlterScreen
-								term_nextLine(pt);
-							else
-								pt->cursor_x--; //don't overflow in vi
-						}
-					}
-					pt->attr[pt->cursor_x] = pt->c_attr;
-					pt->buff[pt->cursor_x++] = c;
-					if ( pt->line[pt->cursor_y+1]<pt->cursor_x ) 
-						pt->line[pt->cursor_y+1]=pt->cursor_x;
+				}
+				p++;
+			}//fall through
+		default:
+			if ( pt->bGraphic ) 
+				switch ( c ) {
+				case 'q': c='_'; break;
+				case 'x':
+				case 't':
+				case 'u':
+				case 'm':
+				case 'j': c='|'; break;
+				case 'l':
+				case 'k':
+				default: c = ' ';
+			}
+			if ( pt->bInsert ) 
+				vt100_Escape(pt, "[1@", 3);
+			if ( pt->cursor_x-pt->line[pt->cursor_y]>=pt->size_x ) {
+				int char_cnt=0;
+				for ( int i=pt->line[pt->cursor_y]; i<pt->cursor_x; i++ )
+					if ( !isUTF8c(pt->buff[i]) ) char_cnt++;
+				if ( char_cnt==pt->size_x ) {
+					if ( pt->bWraparound )//pt->bAlterScreen
+						term_nextLine(pt);
+					else
+						pt->cursor_x--; //don't overflow in vi
+				}
+			}
+			pt->attr[pt->cursor_x] = pt->c_attr;
+			pt->buff[pt->cursor_x++] = c;
+			if ( pt->line[pt->cursor_y+1]<pt->cursor_x ) 
+				pt->line[pt->cursor_y+1]=pt->cursor_x;
 		}
 	}
 
-	if ( !pt->bPrompt && pt->cursor_x>pt->iPrompt ) 
-	{
+	if ( !pt->bPrompt && pt->cursor_x>pt->iPrompt ) {
 		pt->tl1len = pt->buff+pt->cursor_x - pt->tl1text;
 		if ( strncmp(pt->sPrompt, pt->buff+pt->cursor_x-pt->iPrompt, 
 														pt->iPrompt)==0)
@@ -256,8 +254,7 @@ BOOL term_Echo(TERM *pt)
 }
 void term_Title( TERM *pt, char *title )
 {
-	switch ( host_Status(pt->host) )
-	{
+	switch ( host_Status(pt->host) ) {
 	case IDLE:
 		pt->title[0] = 0;
 		pt->bEcho = FALSE;
@@ -588,8 +585,7 @@ int term_Cmd( TERM *pt, char *cmd, char **preply )
 	int rc = 0;
 	if ( strncmp(++cmd, "Clear",5)==0 )	{
 		term_Clear( pt );
-	//	tiny_Redraw_Term();	
-	}	
+	}
 	else if ( strncmp(cmd, "Log", 3)==0 )	term_Logg( pt, cmd+3 );
 	else if ( strncmp(cmd, "Find ",5)==0 )	term_Srch( pt, cmd+5 );
 	else if ( strncmp(cmd, "Disp ",5)==0 )	term_Disp( pt, cmd+5 );
@@ -739,13 +735,13 @@ const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 			int n1=1; 			//n1;n0 used by ESC[Ps;PtH and ESC[Ps;Ptr
 			if ( isdigit(pt->escape_code[1]) ) {
 				m0 = n0 = atoi(pt->escape_code+1);
-				if ( n0==0 ) n0 = 1;	//ESC[0A == ESC[1A
+				if ( n0==0 ) n0 = 1;//ESC[0A == ESC[1A
 			}
 			char *p = strchr(pt->escape_code, ';');
 			if ( p != NULL ) {
 				n1 = n0 ; 
 				n0 = atoi(p+1);
-				if ( n0==0 ) n0=1;		//ESC[0;0f == ESC[1;1f
+				if ( n0==0 ) n0=1;	//ESC[0;0f == ESC[1;1f
 			}
 			int x;
 			switch ( pt->escape_code[pt->escape_idx-1] ) 
@@ -1121,7 +1117,7 @@ void term_Parse_XML( TERM *pt, const char *msg, int len)
 	if ( p>msg ) term_Parse( pt, msg, p-msg );
 	while ( *p!=0 && p<msg+len ) {
 		while (*p==0x0d || *p==0x0a || *p=='\t' || *p==' ' ) p++;
-		if ( *p=='<' ) { //tag
+		if ( *p=='<' ) {//tag
 			if ( p[1]=='/' ) {
 				if ( !pt->xmlPreviousIsOpen ) {
 					pt->xmlIndent -= 2;
@@ -1152,7 +1148,7 @@ void term_Parse_XML( TERM *pt, const char *msg, int len)
 				if ( q[-1]=='/' ) pt->xmlPreviousIsOpen = FALSE;
 			}
 		}
-		else {									//data
+		else {//data
 			term_Parse( pt, "\033[33m", 5 );
 			int l;
 			q = strchr(p, '<');
@@ -1176,9 +1172,9 @@ void term_Parse_XML( TERM *pt, const char *msg, int len)
 #define TNO_TERMTYPE 0x18
 #define TNO_NEWENV	0x27
 //UCHAR NEGOBEG[]={0xff, 0xfb, 0x03, 0xff, 0xfd, 0x03, 0xff, 0xfd, 0x01};
-unsigned char TERMTYPE[]={  0xff, 0xfa, 0x18, 0x00, 
-							0x76, 0x74, 0x31, 0x30, 0x30, //vt100
-							0xff, 0xf0};
+unsigned char TERMTYPE[]={//vt100
+	0xff, 0xfa, 0x18, 0x00, 0x76, 0x74, 0x31, 0x30, 0x30, 0xff, 0xf0
+};
 const unsigned char *telnet_Options( TERM *pt, const unsigned char *p, int cnt )
 {
 	const unsigned char *q = p+cnt;

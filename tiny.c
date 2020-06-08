@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 39096 2020-05-23 09:35:10 $"
+// "$Id: tiny.c 39116 2020-05-23 09:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -36,16 +36,16 @@ WCHAR fontFace[32] = L"Consolas";
 WCHAR wndTitle[256] = L"    Term    Script    Options                     ";
 
 char TINYTERM[]="\n\033[32mtinyTerm > \033[37m";
-const char WELCOME[]="\n\
-\ttinyTerm is a simple, small and scriptable terminal emulator,\n\n\
-\ta serial/telnet/ssh/sftp/netconf client with unique features:\n\n\n\
-\t    * small portable exe less than 256KB\n\n\
-\t    * command history and autocompletion\n\n\
-\t    * text based batch command automation\n\n\
-\t    * drag and drop to transfer files via scp\n\n\
-\t    * scripting interface at xmlhttp://127.0.0.1:%d\n\n\n\
-\tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\n\n\
-\thomepage: https://yongchaofan.github.io/tinyTerm/\n\n\n\
+const char WELCOME[]="\r\n\
+\ttinyTerm is a simple, small and scriptable terminal emulator,\r\n\n\
+\ta serial/telnet/ssh/sftp/netconf client with unique features:\r\n\n\n\
+\t    * small portable exe less than 256KB\r\n\n\
+\t    * command history and autocompletion\r\n\n\
+\t    * text based batch command automation\r\n\n\
+\t    * drag and drop to transfer files via scp\r\n\n\
+\t    * scripting interface at xmlhttp://127.0.0.1:%d\r\n\n\n\
+\tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\r\n\n\
+\thomepage: https://yongchaofan.github.io/tinyTerm/\r\n\n\n\
 \tVerision 1.9.0, ©2018-2020 Yongchao Fan, All rights reserved\r\n";
 const char SCP_TO_FOLDER[]="\
 var xml = new ActiveXObject(\"Microsoft.XMLHTTP\");\n\
