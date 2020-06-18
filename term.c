@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 35695 2020-06-08 15:05:10 $"
+// "$Id: term.c 35821 2020-06-17 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -437,7 +437,7 @@ int term_Srch( TERM *pt, char *sstr )
 }
 int term_TL1( TERM *pt, char *cmd, char **pTl1Text )
 {
-	if ( host_Status( pt->host )==CONNECTED ) {	//retrieve from NE
+	if ( host_Status( pt->host )!=IDLE ) {	//retrieve from NE
 		term_Mark_Prompt( pt );
 		int cmdlen = strlen(cmd);
 		term_Send( pt, cmd, cmdlen );
@@ -643,6 +643,11 @@ int term_Cmd( TERM *pt, char *cmd, char **preply )
 			term_Print(pt, "\033[33m%s\n", cmd); 
 		term_Mark_Prompt( pt );
 		host_Open( pt->host, cmd );
+		if ( preply!=NULL ) {
+			term_Waitfor_Prompt( pt );	//added for scripting
+			*preply = pt->tl1text;
+			rc =  pt->tl1len;
+		}
 	}
 	return rc;
 }
@@ -824,8 +829,8 @@ const unsigned char *vt100_Escape( TERM *pt, const unsigned char *sz, int cnt )
 					int i = pt->line[pt->cursor_y];		//setup for m0==2
 					int j = pt->line[pt->cursor_y+1];
 					if ( m0==0 ) i = pt->cursor_x;		//change start if m0==0
-					if ( m0==1 ) j = pt->cursor_x;		//change stop if m0==1
-					if ( j>i ) buff_clear(pt, i, j-i+1);
+					if ( m0==1 ) j = pt->cursor_x+1;	//change stop if m0==1
+					if ( j>i ) buff_clear(pt, i, j-i);
 					}
 					break;
 			case 'L'://insert lines
