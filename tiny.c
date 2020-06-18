@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 39116 2020-05-23 09:35:10 $"
+// "$Id: tiny.c 38235 2020-06-17 19:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -34,39 +34,26 @@ int titleHeight;
 int fontSize = 16;
 WCHAR fontFace[32] = L"Consolas";
 WCHAR wndTitle[256] = L"    Term    Script    Options                     ";
-
-char TINYTERM[]="\n\033[32mtinyTerm > \033[37m";
+const char TINYTERM[]="\n\033[32mtinyTerm > \033[37m";
+const char DICTFILE[]="tinyTerm.hist";
 const char WELCOME[]="\r\n\
 \ttinyTerm is a simple, small and scriptable terminal emulator,\r\n\n\
 \ta serial/telnet/ssh/sftp/netconf client with unique features:\r\n\n\n\
-\t    * small portable exe less than 256KB\r\n\n\
+\t    * small portable exe less than 250KB\r\n\n\
 \t    * command history and autocompletion\r\n\n\
 \t    * text based batch command automation\r\n\n\
-\t    * drag and drop to transfer files via scp\r\n\n\
+\t    * drag and drop to send files via scp or xmodem\r\n\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\r\n\n\n\
 \tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\r\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\r\n\n\n\
-\tVerision 1.9.0, ©2018-2020 Yongchao Fan, All rights reserved\r\n";
-const char SCP_TO_FOLDER[]="\
-var xml = new ActiveXObject(\"Microsoft.XMLHTTP\");\n\
-var port = \"8080/?\";\n\
-if ( WScript.Arguments.length>0 ) port = WScript.Arguments(0)+\"/?\";\n\
-var filename = term(\"!Selection\");\n\
-var objShell = new ActiveXObject(\"Shell.Application\");\n\
-var objFolder = objShell.BrowseForFolder(0,\"Destination folder\",0x11,\"\");\n\
-if ( objFolder ) term(\"!scp :\"+filename+\" \"+objFolder.Self.path);\n\
-function term( cmd ) {\n\
-   xml.Open (\"GET\", \"http://127.0.0.1:\"+port+cmd, false);\n\
-   xml.Send();\n\
-   return xml.responseText;\n\
-}";
+\tVerision 1.9.1, ©2018-2020 Yongchao Fan, All rights reserved\r\n\r\n";
 
-const COLORREF COLORS[16] ={RGB(0,0,0), 	RGB(192,0,0), RGB(0,192,0),
-							RGB(192,192,0), RGB(32,96,240), RGB(192,0,192),
-							RGB(0,192,192), RGB(192,192,192),
-							RGB(0,0,0), 	RGB(240,0,0), RGB(0,240,0),
-							RGB(240,240,0), RGB(32,96,240), RGB(240,0,240),
-							RGB(0,240,240), RGB(240,240,240) };
+const COLORREF COLORS[16] = {
+	RGB(0,0,0), 	RGB(192,0,0), RGB(0,192,0), RGB(192,192,0),
+	RGB(32,96,240), RGB(192,0,192), RGB(0,192,192), RGB(192,192,192),
+	RGB(0,0,0), 	RGB(240,0,0), RGB(0,240,0), RGB(240,240,0), 
+	RGB(32,96,240), RGB(240,0,240), RGB(0,240,240), RGB(240,240,240) 
+};
 static HINSTANCE hInst;
 static HBRUSH dwBkBrush;
 static HWND hwndTerm, hwndCmd;
@@ -88,8 +75,8 @@ static BOOL bFTPd=FALSE, bTFTPd=FALSE;
 
 void CopyText( );
 void PasteText( );
-BOOL LoadDict( char *fn );
-BOOL SaveDict( char *fn );
+BOOL LoadDict( );
+BOOL SaveDict( );
 void OpenScript( WCHAR *wfn );
 void DropScript( char *tl1s );
 void DropFiles( HDROP hDrop );
@@ -236,27 +223,6 @@ void menu_Size()
 
 	if ( oldFont ) SelectObject( wndDC, oldFont );
 	ReleaseDC(hwndTerm, wndDC);
-}
-void dict_Load()
-{
-	if ( !LoadDict( "tinyTerm.hist" ) )
-	{
-		_chdir(getenv("USERPROFILE"));
-		_mkdir("Documents\\tinyTerm");
-		_chdir("Documents\\tinyTerm");
-		LoadDict( "tinyTerm.hist" );
-
-		FILE *fp = fopen("scp_to_folder.js", "r");
-		if ( fp==NULL ) {
-			fp = fopen("scp_to_folder.js", "w");
-			if ( fp!=NULL ) {
-				fprintf(fp, "%s", SCP_TO_FOLDER);
-			}
-		}
-		if ( fp!=NULL ) fclose(fp);
-		if ( autocomplete_Add(L"!script scp_to_folder.js") )
-			menu_Add(L"script scp_to_folder.js");
-	}
 }
 void menu_Check( DWORD id, BOOL op)
 {
@@ -532,7 +498,10 @@ void tiny_Paint(HDC hDC, RECT rcPaint)
 
 	int cnt = utf8_to_wchar(term.buff+term.line[term.cursor_y],
 							term.cursor_x-term.line[term.cursor_y], wbuf, 1024);
-	DrawText(hDC, wbuf, cnt, &text_rect, DT_CALCRECT|DT_NOPREFIX);
+	if ( cnt>0 ) 
+		DrawText(hDC, wbuf, cnt, &text_rect, DT_CALCRECT|DT_NOPREFIX);
+	else
+		text_rect.right = 0;//DrawText won't work when wbuf is zero length
 
 	if ( bLocalEdit ) {
 		MoveWindow( hwndCmd, text_rect.right,
@@ -786,7 +755,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		menu_Check( ID_TFTPD, bTFTPd );
 		break;
 	case ID_RUN: {
-		WCHAR *wfn = fileDialog(L"Script\0*.js;*.vbs\0All\0*.*\0\0", 
+		WCHAR *wfn = fileDialog(L"Script\0*.js;*.vbs;*.html\0All\0*.*\0\0", 
 													OFN_FILEMUSTEXIST);
 		if ( wfn!=NULL )
 		{
@@ -804,8 +773,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 						L"Script", MB_OKCANCEL|MB_ICONASTERISK) ){
 			bScriptPause = FALSE;
 			break;
-		}
-//fall through to quit
+		}//fall through to quit
 	case ID_QUIT:
 		bScriptPause = bScriptRun = FALSE;
 		MessageBox(hwndTerm, L"script stopped", L"Script", 
@@ -849,7 +817,6 @@ void tftpd_quit()
 LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 {
 	static WCHAR wm_chars[2]={0,0};	//for unicode character input
-char str[256];
 
 	switch (msg) {
 	case WM_CREATE:
@@ -864,7 +831,7 @@ char str[256];
 		SendMessage( hwndCmd, WM_SETFONT, (WPARAM)hTermFont, TRUE );
 		SendMessage( hwndCmd, EM_SETLIMITTEXT, 255, 0);
 		autocomplete_Init(hwndCmd);
-		dict_Load();
+		LoadDict();
 		menu_Size();
 		font_Size();
 		wnd_Size();
@@ -945,7 +912,8 @@ char str[256];
 		case VK_HOME:  term_Send(pt, term.bAppCursor?"\033OH":"\033[H",3); break;
 		case VK_END:   term_Send(pt, term.bAppCursor?"\033OF":"\033[F",3); break;
 		}
-		if ( bScrollbar ) term_Scroll( pt, term.screen_y-(term.cursor_y-term.size_y+1));
+		if ( bScrollbar ) 
+			term_Scroll( pt, term.screen_y-(term.cursor_y-term.size_y+1));
 		break;
 	case WM_ACTIVATE:
 		SetFocus( bLocalEdit? hwndCmd : hwndTerm );
@@ -1033,7 +1001,7 @@ char str[256];
 	case WM_CTLCOLOREDIT:
 		SetTextColor( (HDC)wParam, COLORS[3] );
 		SetBkColor( (HDC)wParam, COLORS[0] );
-		return (LRESULT)dwBkBrush;		//must return brush for update
+		return (LRESULT)dwBkBrush;	//must return brush for update
 	case WM_CLOSE:
 		if ( host_Status( ph )!=IDLE ) {
 			if ( MessageBox(hwnd, L"Disconnect and quit?",
@@ -1089,10 +1057,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	host.term = pt;
 
 	const char *homedir = getenv("USERPROFILE");
-	if ( homedir!=NULL )
-	{
+	if ( homedir!=NULL ) {
 		strncpy(host.homedir, homedir, MAX_PATH-64);
 		host.homedir[MAX_PATH-64] = 0;
+	}
+	struct _stat buf;
+	if ( _stat(DICTFILE, &buf)==-1 ) {
+		_chdir(homedir);
+		_mkdir("Documents\\tinyTerm");
+		_chdir("Documents\\tinyTerm");
 	}
 
 	HDC sysDC = GetDC(0);
@@ -1134,7 +1107,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	}
 
 	if ( term.bLogging ) term_Logg( pt, NULL );
-	SaveDict( "tinyTerm.hist" );
+	SaveDict( );
 	autocomplete_Destroy( );
 
 	http_Svr("127.0.0.1");
@@ -1173,9 +1146,9 @@ void PasteText( )
 	}
 }
 
-BOOL LoadDict( char *fn )
+BOOL LoadDict( )
 {
-	FILE *fp = fopen(fn, "r");
+	FILE *fp = fopen(DICTFILE, "r");
 	if ( fp!=NULL ) {
 		char cmd[256];
 		while ( fgets( cmd, 256, fp )!=NULL ) {
@@ -1195,9 +1168,9 @@ BOOL LoadDict( char *fn )
 	}
 	return FALSE;
 }
-BOOL SaveDict( char *fn )
+BOOL SaveDict( )
 {
-	FILE *fp = fopen(fn, "w");
+	FILE *fp = fopen(DICTFILE, "w");
 	if ( fp!=NULL ) {
 		if ( fontSize!=16 ) 
 			fprintf(fp, "~FontSize %d\n", fontSize);
@@ -1315,10 +1288,10 @@ DWORD WINAPI scripter( void *cmds )
 			if ( --iLoopCnt>0 ) p1 = (char*)cmds;
 		}
 		else if ( *p0=='!' ) {
-			char cmd[256];
+			char cmd[256], *reply;
 			strncpy(cmd, p0, len);
 			cmd[len] = 0;
-			term_Cmd(pt, cmd, NULL);
+			term_Cmd(pt, cmd, &reply);
 		}
 		else {
 			if ( host_Status(ph)==IDLE ) {
