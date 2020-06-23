@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 31773 2020-06-06 15:05:10 $"
+// "$Id: host.c 31682 2020-06-18 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -289,7 +289,6 @@ DWORD WINAPI serial(void *pv)
 	CloseHandle( ph->hExitEvent );
 	CloseHandle( ph->hSerial );
 	ph->host_type = 0;
-	term_Disp( ph->term, "disconnected\r\n" );
 
 comm_close:
 	ph->host_status=IDLE;
@@ -357,7 +356,6 @@ DWORD WINAPI telnet( void *pv )
 
 		ph->host_type = 0;
 		closesocket(ph->sock);
-		term_Disp( ph->term, "disconnected\r\n" );
 	}
 
 	ph->sock = 0;

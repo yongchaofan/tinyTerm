@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40296 2020-06-06 15:05:10 $"
+// "$Id: ssh2.c 40300 2020-06-18 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -356,7 +356,7 @@ int ssh_authentication( HOST *ph )
 {
 	char user[256], pw[256];
 	if ( ph->username==NULL ) {
-		char *p = ssh2_Gets( ph, "\r\nusername:", TRUE);
+		char *p = ssh2_Gets( ph, "\r\nusername: ", TRUE);
 		if ( p==NULL ) return -5;
 		strcpy(user, p); 
 		ph->username = user;
@@ -383,7 +383,7 @@ int ssh_authentication( HOST *ph )
 	if ( strstr(authlist, "password")!=NULL ) {
 		for ( int rep=0; rep<3; rep++ ) {
 			if ( ph->password==NULL ) {
-				char *p = ssh2_Gets( ph, "password:", FALSE );
+				char *p = ssh2_Gets( ph, "password: ", FALSE );
 				if ( p==NULL ) return -5;
 				strcpy(pw, p);
 				ph->password = pw;
@@ -438,9 +438,13 @@ DWORD WINAPI ssh( void *pv )
 		term_Disp( ph->term, "\033[31msession failure!\r\n");
 		goto Session_Close;
 	}
+	
 	const char *banner = libssh2_session_banner_get(ph->session);
-	if ( banner!=NULL ) term_Disp( ph->term, banner);
-
+	if ( banner!=NULL ) {
+		term_Disp( ph->term, banner);
+		term_Disp( ph->term, "\r\n");
+	}
+	
 	ph->host_status=AUTHENTICATING;
 	if ( ssh_knownhost( ph )<0 ) {
 		term_Disp( ph->term, "\033[31mverification failure!\r\n" );
@@ -504,7 +508,6 @@ DWORD WINAPI ssh( void *pv )
 	}
 	tun_closeall( ph );
 	ph->host_type = 0;
-	term_Disp( ph->term, "disconnected\r\n");
 
 Channel_Close:
 	if ( ph->channel!=NULL ) {

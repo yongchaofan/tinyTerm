@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 38235 2020-06-17 19:35:10 $"
+// "$Id: tiny.c 38328 2020-06-18 19:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -33,8 +33,8 @@ int dpi = 96;
 int titleHeight;
 int fontSize = 16;
 WCHAR fontFace[32] = L"Consolas";
-WCHAR wndTitle[256] = L"    Term    Script    Options                     ";
-const char TINYTERM[]="\n\033[32mtinyTerm > \033[37m";
+WCHAR wndTitle[256] = L"    Term    Script    Options                         ";
+const char TINYTERM[]="\n\033[32mtinyTerm> \033[37m";
 const char DICTFILE[]="tinyTerm.hist";
 const char WELCOME[]="\r\n\
 \ttinyTerm is a simple, small and scriptable terminal emulator,\r\n\n\
@@ -274,9 +274,12 @@ void cmd_Enter(WCHAR *wcmd)
 			term_Send( pt, cmd, cnt ); 
 		}
 		else {
-			term_Print(pt, "\033[33m%s\n", cmd); 
-			host_Open(ph, cmd);
-		}
+			if ( *cmd ) {
+				term_Print(pt, "\033[33m%s\n", cmd); 
+				host_Open(ph, cmd);
+			}
+			else
+ 				host_Open(ph, NULL);		}
 	}
 }
 WNDPROC wpOrigCmdProc;
@@ -339,10 +342,9 @@ void tiny_Title( char *buf )
 	SetWindowText(hwndTerm, wndTitle);
 	if ( host_Status(ph)==IDLE )
 	{
-		if ( bLocalEdit )
-			term_Disp(pt, TINYTERM);
-		else
-			term_Print(pt, "\r\n\033[33mPress Enter to reconnect\r\n");
+		term_Print(pt, "\r\n\033[31mDisconnected! \
+\033[37mPress \033[33mEnter\033[37m to reconnect\r\n");
+		if ( bLocalEdit ) term_Disp(pt, TINYTERM);
 		menu_Enable( ID_CONNECT, TRUE);
 		menu_Enable( ID_DISCONN, FALSE);
 		menu_Check( ID_ECHO, term.bEcho);
@@ -873,7 +875,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		//moves the composition window to cursor pos on Win10
 		break;
 	case WM_CHAR:
-		if ( host_Status( ph )==IDLE ) {//press Enter to restart
+		if ( host_Status( ph )==IDLE ) {//press Enter to reconnect
 			if ( (wParam&0xff)==0x0d ) host_Open(ph, NULL);
 		}
 		else {
