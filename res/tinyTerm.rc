@@ -87,8 +87,8 @@ CAPTION "Connect Dialog"
 }
 
 1 VERSIONINFO
-	FILEVERSION		1,9,0,0
-	PRODUCTVERSION	1,9,0,0
+	FILEVERSION		1,9,1,0
+	PRODUCTVERSION	1,9,1,0
 	FILEOS			VOS__WINDOWS32
 	FILETYPE		VFT_APP
 	FILESUBTYPE		VFT2_UNKNOWN
@@ -102,7 +102,7 @@ CAPTION "Connect Dialog"
 			VALUE "FileDescription", "Tiny Terminal Emulator"
 			VALUE "LegalCopyright", "©2018-2020 Yongchao Fan"
 			VALUE "ProductName", "tinyTerm"
-			VALUE "ProductVersion", "1.9.0.0"
+			VALUE "ProductVersion", "1.9.1.0"
 		}
 	}
 	BLOCK "VarFileInfo"
