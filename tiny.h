@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5898 2020-06-06 22:05:10 $"
+// "$Id: tiny.h 5866 2020-06-27 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -21,8 +21,8 @@
 #include <libssh2.h>
 #include <libssh2_sftp.h>
 
-#define MAXLINES	8192
-#define BUFFERSIZE	8192*64
+#define MAXLINES 8192
+#define BUFFERSIZE 8192*64
 
 struct Tunnel
 {
@@ -37,8 +37,8 @@ struct Tunnel
 };
 
 typedef struct tagHOST {
-	int host_type;
-	int host_status;
+	int type;
+	int status;
 
 	char cmdline[256];
 	char tunline[256];
@@ -78,7 +78,7 @@ typedef struct tagTERM {
 	int sel_left, sel_right;
 	BOOL bLogging, bEcho, bCursor, bAlterScreen;
 	BOOL bAppCursor, bGraphic, bEscape, bTitle, bInsert;
-	BOOL bBracket, bOriginMode, bWraparound;			//bracketed paste mode
+	BOOL bBracket, bOriginMode, bWraparound;//bracketed paste mode
 	int save_x, save_y;
 	int roll_top, roll_bot;
 
@@ -106,81 +106,83 @@ enum hostStatus {IDLE, CONNECTING, AUTHENTICATING, CONNECTED};
 enum hostType {NONE, STDIO, SERIAL, TELNET, SSH, SFTP, NETCONF};
 enum mouseEvents {DOUBLECLK, RIGHTCLK, LEFTDOWN, LEFTDRAG, LEFTUP, MIDDLEUP};
 
+/****************auto_drop.c*************/
+void drop_Init(HWND hwnd, void (*handler)(char *));
+void drop_Destroy(HWND hwnd);
+int autocomplete_Init(HWND hWnd);
+int autocomplete_Destroy();
+int autocomplete_Add(WCHAR *cmd);
+int autocomplete_Del(WCHAR *cmd);
+WCHAR *autocomplete_First();
+WCHAR *autocomplete_Next();
+WCHAR *autocomplete_Prev();
+
+/****************host.c****************/
+void host_Construct(HOST *ph);
+void host_Open(HOST *ph, char *port);
+void host_Send_Size(HOST *ph, int w, int h);
+void host_Send(HOST *ph, char *buf, int len);
+void host_Close(HOST *ph);
+int host_Type(HOST *ph);
+int host_Status(HOST *ph);
+int host_tcp(HOST *ph);
+void xmodem_init(HOST *ph, FILE *fp);
+
+void url_decode(char *url);
+int http_Svr(char *intf);
+BOOL ftp_Svr(char *root);
+BOOL tftp_Svr(char *root);
+
+/****************ssh2.c****************/
+void ssh2_Construct(HOST *ph);
+void ssh2_Size(HOST *ph, int w, int h);
+void ssh2_Send(HOST *ph, char *buf, int len);
+char *ssh2_Gets(HOST *ph, char *prompt, BOOL bEcho);
+void ssh2_Close(HOST *ph);
+void ssh2_Tun(HOST *ph, char *cmd);
+void scp_read(HOST *ph, char *lpath, char *rfiles);
+void scp_write(HOST *ph, char *lpath, char *rpath);
+void sftp_put(HOST *ph, char *src, char *dst);
+
+/****************term.c****************/
+void host_callback( void *term, char *buf, int len);
+BOOL term_Construct(TERM *pt);
+void term_Desstruct(TERM *pt);
+void term_Clear(TERM *pt);
+void term_Size(TERM *pt, int x, int y);
+void term_Title(TERM *pt, char *title);
+void term_Error(TERM *pt, char *error);
+void term_Scroll(TERM* pt, int lines);
+void term_Mouse(TERM *pt, int evt, int x, int y);
+void term_Print(TERM *pt, const char *fmt, ...);
+void term_Parse(TERM *pt, const char *buf, int len);
+void term_Parse_XML(TERM *pt, const char *xml, int len);
+
+BOOL term_Echo(TERM *pt);
+void term_Logg(TERM *pt, char *fn);
+void term_Save(TERM *pt, char *fn);
+void term_Disp(TERM *pt, const char *buf);
+void term_Send(TERM *pt, char *buf, int len);
+void term_Paste(TERM *pt, char *buf, int len);
+int  term_Copy(TERM *pt, char **buf);
+int  term_Recv(TERM *pt, char **preply);
+int  term_Srch(TERM *pt, char *sstr);
+
+void term_Learn_Prompt(TERM *pt);
+char *term_Mark_Prompt(TERM *pt);
+int term_Waitfor_Prompt(TERM *pt);
+int term_Pwd(TERM *pt, char *buf, int len);
+int term_Scp(TERM *pt, char *cmd, char **preply);
+int term_Tun(TERM *pt, char *cmd, char **preply);
+int term_Cmd(TERM *pt, char *cmd, char **preply);
+
+/****************tiny.c****************/
 BOOL isUTF8c(char c);	//check if a byte is a UTF8 continuation byte
 int utf8_to_wchar(const char *buf, int cnt, WCHAR *wbuf, int wcnt);
 int wchar_to_utf8(WCHAR *wbuf, int wcnt, char *buf, int cnt);
 int stat_utf8(const char *fn, struct _stat *buffer);
 FILE *fopen_utf8(const char *fn, const char *mode);
 
-/****************auto_drop.c*************/
-void drop_Init( HWND hwnd, void (*handler)(char *) );
-void drop_Destroy( HWND hwnd );
-int autocomplete_Init( HWND hWnd );
-int autocomplete_Destroy( );
-int autocomplete_Add( WCHAR *cmd );
-int autocomplete_Del( WCHAR *cmd );
-WCHAR *autocomplete_First( );
-WCHAR *autocomplete_Next( );
-WCHAR *autocomplete_Prev( );
-
-/****************host.c****************/
-void host_Construct( HOST *ph );
-void host_Open( HOST *ph, char *port );
-void host_Send_Size( HOST *ph, int w, int h );
-void host_Send( HOST *ph, char *buf, int len );
-void host_Close( HOST *ph );
-int host_Type(HOST *ph);
-int host_Status(HOST *ph);
-int host_tcp( HOST *ph );
-void xmodem_init(HOST *ph, FILE *fp);
-
-void url_decode(char *url);
-int http_Svr( char *intf );
-BOOL ftp_Svr( char *root );
-BOOL tftp_Svr( char *root );
-
-/****************ssh2.c****************/
-void ssh2_Construct( HOST *ph );
-void ssh2_Size( HOST *ph, int w, int h );
-void ssh2_Send( HOST *ph, char *buf, int len );
-char *ssh2_Gets( HOST *ph, char *prompt, BOOL bEcho );
-void ssh2_Close( HOST *ph );
-void ssh2_Tun( HOST *ph, char *cmd );
-void scp_read( HOST *ph, char *lpath, char *rfiles );
-void scp_write( HOST *ph, char *lpath, char *rpath );
-void sftp_put( HOST *ph, char *src, char *dst );
-
-/****************term.c****************/
-void host_callback( void *term, char *buf, int len );
-BOOL term_Construct( TERM *pt );
-void term_Desstruct( TERM *pt );
-void term_Clear( TERM *pt );
-void term_Size( TERM *pt, int x, int y );
-void term_Title( TERM *pt, char *title );
-void term_Scroll( TERM* pt, int lines );
-void term_Mouse(TERM *pt, int evt, int x, int y);
-void term_Print( TERM *pt, const char *fmt, ... );
-void term_Parse( TERM *pt, const char *buf, int len );
-void term_Parse_XML( TERM *pt, const char *xml, int len );
-
-BOOL term_Echo( TERM *pt );
-void term_Logg( TERM *pt, char *fn );
-void term_Save( TERM *pt, char *fn );
-void term_Disp( TERM *pt, const char *buf );
-void term_Send( TERM *pt, char *buf, int len );
-void term_Paste(TERM *pt, char *buf, int len );
-int  term_Recv( TERM *pt, char **preply );
-int  term_Srch( TERM *pt, char *sstr );
-
-void term_Learn_Prompt( TERM *pt );
-char *term_Mark_Prompt( TERM *pt );
-int term_Waitfor_Prompt(TERM *pt );
-int term_Pwd( TERM *pt, char *buf, int len );
-int term_Scp( TERM *pt, char *cmd, char **preply );
-int term_Tun( TERM *pt, char *cmd, char **preply );
-int term_Cmd( TERM *pt, char *cmd, char **preply );
-
-/****************tiny.c****************/
 void cmd_Disp_utf8(char *buf);
 void ftpd_quit();
 void tftpd_quit();
@@ -188,7 +190,7 @@ void tiny_Beep();
 void wnd_Size();				//resize window when font or term size changes
 void tiny_Redraw_Line(int line);//redraw cursor line only
 void tiny_Redraw_Term();		//redraw whole term window
-void tiny_Title( char *buf );
+void tiny_Title(char *buf);
 BOOL tiny_Scroll(BOOL bShowScroll, int cy, int sy);//return if scrollbar is shown
 BOOL tiny_Edit(BOOL e);			//return BOOL to indicate if status changed
 char *tiny_Gets(char *prompt, BOOL bEcho);
