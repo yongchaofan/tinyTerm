@@ -8,9 +8,9 @@
 
 
 ## Project philosophy
-tinyTerm is intended to be small, simple and scriptable, x64 executable is only 244KB, source code is consist of 6 files totaling 150KB, ~6000 sloc, libssh2 is the only external library required to build on Windows 7/10. 
+tinyTerm is intended to be small, simple and scriptable, x64 executable is only 244KB, source code consist of 6 files totaling 150KB, ~6000 sloc, libssh2 is the only external library required to build on Windows 7/10. 
 
-User interface design is minimal,, main menu shares title bar space, scrollbar hidden until user trys to scroll back, only one dialog for makeing connections, 
+User interface design is minimal, main menu shares title bar space, scrollbar hidden until user trys to scroll back, only one dialog for making connections, 
 
 
 ## Building
@@ -20,7 +20,7 @@ Makefiles are provided for building with MSYS2+MingW64/32, also a cmd file for b
     Make.cmd   command for Visual Studio 2019 build tool
     
 ### Librarys
-    libssh2 using any daily snapshot after March, 2018 for full support of WinCNG crypto functions
+    libssh2 using release 1.9.0 with pull request #397 for full support of WinCNG crypto functions
             ./configure --with-crypto=wincng
             make install
             
