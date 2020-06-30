@@ -1,5 +1,5 @@
 //
-// "$Id: auto_drop.c 17982 2019-05-09 23:05:10 $"
+// "$Id: auto_drop.c 17850 2020-06-27 23:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -24,8 +24,6 @@
 #include <shlwapi.h>
 #include <shldisp.h>
 #include <shlguid.h>
-//DEFINE_GUID(CLSID_AutoComplete, 0x00bb2763, 0x6a77, 0x11d0, 0xa5, 0x35,
-//									0x00, 0xc0, 0x4f, 0xd7, 0xd0, 0x62);
 //
 //impletemention of IEnumString interface,
 //provided to IAutoCompelte for command history
@@ -523,8 +521,6 @@ idroptarget_release (WB_IDropTarget* This)
 }
 //
 //	IDropTarget::DragEnter
-//
-//
 //
 static HRESULT STDMETHODCALLTYPE idroptarget_dragenter( WB_IDropTarget *This,
 												WB_IDataObject *pDataObject, 

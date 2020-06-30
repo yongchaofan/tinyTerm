@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 35805 2020-06-27 15:05:10 $"
+// "$Id: term.c 35856 2020-06-30 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -27,6 +27,8 @@ BOOL term_Construct(TERM *pt)
 {
 	pt->size_x=80;
 	pt->size_y=25;
+	pt->roll_top = 0;
+	pt->roll_bot = pt->size_y-1;
 	pt->bLogging=FALSE;
 	pt->bEcho=FALSE;
 	pt->title_idx = 0;

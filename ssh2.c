@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 39940 2020-06-27 15:05:10 $"
+// "$Id: ssh2.c 39884 2020-06-30 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -136,6 +136,7 @@ char *ssh2_Gets(HOST *ph, char *prompt, BOOL bEcho)
 		if ( ph->cursor>old_cursor ) { old_cursor=ph->cursor; i=0; }
 		Sleep(100);
 	}
+	term_Disp(ph->term, "\r\n");
 	if ( ph->bPassword ) tiny_Edit(save_edit);	//restore local edit mode
 	return ph->bReturn ? ph->keys : NULL;
 }
@@ -145,7 +146,6 @@ void ssh2_Send(HOST *ph, char *buf, int len)
 		for ( char *p=buf; p<buf+len; p++ ) switch( *p ) {
 		case '\015':ph->keys[ph->cursor]=0;
 					ph->bReturn=TRUE; 
-					term_Disp(ph->term, "\r\n");
 					break;
 		case '\010':
 		case '\177':if ( --ph->cursor<0 ) 
@@ -361,6 +361,7 @@ int ssh_authentication(HOST *ph)
 	if ( ph->username==NULL ) {
 		char *p = ssh2_Gets( ph, "\r\nusername: ", TRUE);
 		if ( p==NULL ) return -5;
+		if ( *p==0 ) return -5;
 		strcpy(user, p); 
 		ph->username = user;
 	}
@@ -1360,12 +1361,9 @@ DWORD WINAPI sftp(void *pv)
 
 	ph->type = SFTP;
 	ph->status=CONNECTED;
-	char prompt[4096], *cmd;
 	int timeout_cnt = 0;
 	while ( TRUE ) {
-		sprintf(prompt, "sftp %s> ", ph->realpath);
-		cmd = ssh2_Gets( ph, prompt, TRUE);
-		term_Disp(ph->term, "\n");
+		char *cmd = ssh2_Gets( ph, "\033[32msftp> \033[37m", TRUE);
 		if ( cmd!=NULL ) {
 			if ( strncmp(cmd, "bye",3)==0 ) {
 				term_Disp(ph->term, "Logout! "); 
@@ -1375,7 +1373,7 @@ DWORD WINAPI sftp(void *pv)
 			timeout_cnt=0;
 		}
 		else {
-			if ( ++timeout_cnt==5 ) {
+			if ( ++timeout_cnt==10 ) {
 				term_Disp(ph->term, "\r\n\033[31mTime Out! ");
 				break;
 			}
