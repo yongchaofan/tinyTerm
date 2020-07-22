@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 37902 2020-06-27 15:35:10 $"
+// "$Id: tiny.c 37053 2020-07-20 15:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -35,7 +35,6 @@ int fontSize = 16;
 WCHAR fontFace[32] = L"Consolas";
 WCHAR wndTitle[256] = L"    Term    Script    Options                         ";
 const char TINYTERM[]="\n\033[32mtinyTerm> \033[37m";
-const char DICTFILE[]="tinyTerm.hist";
 const char WELCOME[]="\r\n\
 \ttinyTerm is a simple, small and scriptable terminal emulator,\r\n\n\
 \ta serial/telnet/ssh/sftp/netconf client with unique features:\r\n\n\n\
@@ -46,7 +45,7 @@ const char WELCOME[]="\r\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\r\n\n\n\
 \tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\r\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\r\n\n\n\
-\tVerision 1.9.2, ©2018-2020 Yongchao Fan, All rights reserved\r\n\r\n";
+\tVerision 1.9.3, ©2018-2020 Yongchao Fan, All rights reserved\r\n\r\n";
 
 const COLORREF COLORS[16] = {
 	RGB(0,0,0), 	RGB(192,0,0), RGB(0,192,0), RGB(192,192,0),
@@ -134,10 +133,10 @@ char *getFolderName(WCHAR *wtitle)
 {
 	static BROWSEINFO bi;
 	static char szFolder[MAX_PATH];
+	static WCHAR wfolder[MAX_PATH];
 	WCHAR szDispName[MAX_PATH];
 	LPITEMIDLIST pidl;
 
-	WCHAR wfolder[MAX_PATH];
 	memset(&bi, 0, sizeof(BROWSEINFO));
 	bi.hwndOwner = 0;
 	bi.pidlRoot = NULL;
@@ -257,6 +256,7 @@ void cmd_Enter(WCHAR *wcmd)
 	char cmd[256];
 	int cnt = wchar_to_utf8(wcmd, -1, cmd, 256);
 	int added = autocomplete_Add(wcmd);
+	cmd_Disp(L"");
 	if ( *cmd=='!' ) {
 		if ( added ) menu_Add(wcmd+1);
 		if ( strncmp(cmd+1,"scp ",4)==0 && ph->type==SSH )
@@ -301,10 +301,11 @@ LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 		}
 		else 
 		{
-			switch ( wParam ) 
-			{
-			case VK_UP:   cmd_Disp(autocomplete_Prev()); break;
-			case VK_DOWN: cmd_Disp(autocomplete_Next()); break;
+			switch ( wParam ) {
+			case VK_UP:   
+				cmd_Disp(autocomplete_Prev()); break;
+			case VK_DOWN: 
+				cmd_Disp(autocomplete_Next()); break;
 			case VK_BACK: 
 				if ( GetWindowText(hwndCmd, wcmd, 256)==0 ) {
 					term_Send(pt, "\b", 1);
@@ -312,7 +313,8 @@ LRESULT APIENTRY CmdEditProc(HWND hwnd, UINT uMsg,
 				}
 				break;
 			case VK_RETURN:
-				if ( GetWindowText(hwndCmd, wcmd, 256)>=0 ) cmd_Enter(wcmd);
+				if ( GetWindowText(hwndCmd, wcmd, 256)>=0 ) 
+					cmd_Enter(wcmd);
 				break;
 			}
 		}
@@ -747,7 +749,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		menu_Check( ID_TFTPD, bTFTPd );
 		break;
 	case ID_RUN: {
-		WCHAR *wfn = fileDialog(L"Script\0*.js;*.vbs;*.html\0All\0*.*\0\0", 
+		WCHAR *wfn=fileDialog(L"Script\0*.html;*.js;*.vbs;*.txt\0All\0*.*\0\0",
 													OFN_FILEMUSTEXIST);
 		if ( wfn!=NULL )
 		{
@@ -759,17 +761,13 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		break;
 	}
 	case ID_PAUSE: 
-		bScriptPause = TRUE;
-		if ( IDOK==MessageBox(hwndTerm, 
-						L"script paused, OK to continue, Cancel to quit", 
-						L"Script", MB_OKCANCEL|MB_ICONASTERISK) ){
-			bScriptPause = FALSE;
-			break;
-		}//fall through to quit
-	case ID_QUIT:
-		bScriptPause = bScriptRun = FALSE;
-		MessageBox(hwndTerm, L"script stopped", L"Script", 
-								MB_OK|MB_ICONASTERISK);
+		while ( bScriptRun && IDOK==MessageBox(hwndTerm, bScriptPause?
+				L"OK to resume, Cancel to quit":L"OK to pause, Cancel to Quit",
+				bScriptPause?L"Script Paused":L"Script Running",
+				MB_OKCANCEL|MB_TOPMOST) ) {
+			bScriptPause = !bScriptPause;
+		}
+		bScriptRun = bScriptPause = FALSE;
 		break;
 	case ID_TERM:
 		menu_Popup(TTERM);
@@ -1051,18 +1049,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	term.host = ph;
 	host.term = pt;
 
-	const char *homedir = getenv("USERPROFILE");
-	if ( homedir!=NULL ) {
-		strncpy(host.homedir, homedir, MAX_PATH-64);
-		host.homedir[MAX_PATH-64] = 0;
-	}
-	struct _stat buf;
-	if ( _stat(DICTFILE, &buf)==-1 ) {
-		_chdir(homedir);
-		_mkdir("Documents\\tinyTerm");
-		_chdir("Documents\\tinyTerm");
-	}
-
 	HDC sysDC = GetDC(0);
 	dpi = GetDeviceCaps(sysDC, LOGPIXELSX);
 	ReleaseDC(0, sysDC);
@@ -1109,10 +1095,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 	return 0;
 }
-
+const char *DICTFILE="tinyTerm.hist";
 BOOL LoadDict( )
 {
 	FILE *fp = fopen(DICTFILE, "r");
+	if ( fp==NULL ) {
+		if ( _chdir(getenv("USERPROFILE"))==0 ) {
+			_mkdir("Documents\\tinyTerm");
+			_chdir("Documents\\tinyTerm");
+			fp = fopen(DICTFILE, "r");
+		}
+	}
 	if ( fp!=NULL ) {
 		char cmd[256];
 		while ( fgets(cmd, 256, fp)!=NULL ) {
@@ -1187,7 +1180,7 @@ BOOL SaveDict( )
 	return FALSE;
 }
 
-DWORD WINAPI uploader( void *files )	//upload files through scp or sftp
+DWORD WINAPI uploader(void *files)	//upload files through scp or sftp
 {
 	for ( char *q=files; *q; q++ ) if ( *q=='\\' ) *q='/';
 	term_Learn_Prompt( pt );
@@ -1251,9 +1244,6 @@ DWORD WINAPI scripter(void *cmds)
 	char *p0=(char *)cmds, *p1;
 	int iLoopCnt = -1, iWaitCnt = 0;
 	bScriptRun=TRUE; bScriptPause = FALSE;
-	menu_Enable(ID_RUN, FALSE);
-	menu_Enable(ID_PAUSE, TRUE);
-	menu_Enable(ID_QUIT, TRUE);
 	while ( bScriptRun && p0!=NULL )
 	{
 		if ( iWaitCnt>0 ) {
@@ -1278,7 +1268,7 @@ DWORD WINAPI scripter(void *cmds)
 		else if ( *p0=='!' ) {
 			char cmd[256], *reply;
 			strncpy(cmd, p0, len);
-			cmd[len] = 0;
+			if ( cmd[len-1]=='\r' ) cmd[len-1]=0;
 			term_Cmd(pt, cmd, &reply);
 		}
 		else {
@@ -1295,10 +1285,8 @@ DWORD WINAPI scripter(void *cmds)
 	}
 
 	free(cmds);
+	if ( iWaitCnt>0 ) cmd_Disp(L"");
 	bScriptRun = bScriptPause = FALSE;
-	menu_Enable( ID_RUN, TRUE);
-	menu_Enable( ID_PAUSE, FALSE);
-	menu_Enable( ID_QUIT, FALSE);
 	return 0;
 }
 void DropScript(char *cmds)
@@ -1308,7 +1296,7 @@ void DropScript(char *cmds)
 		free(cmds);
 	}
 	else {
-		term_Learn_Prompt( pt );
+		term_Learn_Prompt(pt);
 		CreateThread(NULL, 0, scripter, (void *)cmds, 0, NULL);
 	}
 }
@@ -1318,37 +1306,14 @@ void OpenScript(WCHAR *wfn)
 	wsprintf(wport, L"!script %s", wfn);
 	if ( autocomplete_Add(wport) ) menu_Add(wport+1);
 
+	term_Learn_Prompt(pt);
 	int len = wcslen(wfn);
-	if ( wcscmp(wfn+len-3, L".js")==0 
-		|| wcscmp(wfn+len-4, L".vbs")==0 ) {
-		term_Learn_Prompt(pt);
-		wsprintf(wport, L"%d", httport);
-		ShellExecute(NULL, L"Open", wfn, wport, NULL, SW_SHOW);
-	}
-	else if ( wcscmp(wfn+len-5, L".html")==0) {
+	if ( wcscmp(wfn+len-5, L".html")==0) {
 		wsprintf(wport, L"http://127.0.0.1:%d/%s", httport, wfn);
 		ShellExecute(NULL, L"Open", wport, NULL, NULL, SW_SHOW);
 	}
-	else {	//batch commands in plain text format
-		struct _stat sb;
-		if ( _wstat(wfn, &sb)==0 ) {
-			char *tl1s = (char *)malloc(sb.st_size+1);
-			if ( tl1s!=NULL )
-			{
-				FILE *fpScript = _wfopen(wfn, L"rb");
-				if ( fpScript!=NULL )
-				{
-					int lsize = fread(tl1s, 1, sb.st_size, fpScript);
-					fclose( fpScript );
-					if ( lsize > 0 )
-					{
-						tl1s[lsize]=0;
-						DropScript(tl1s);
-						return;
-					}
-				}
-				free(tl1s);
-			}
-		}
+	else {
+		wsprintf(wport, L"%d", httport);
+		ShellExecute(NULL, L"Open", wfn, wport, NULL, SW_SHOW);
 	}
 }

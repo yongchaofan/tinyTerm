@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 35856 2020-06-30 15:05:10 $"
+// "$Id: term.c 36056 2020-07-20 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -497,19 +497,32 @@ int term_Pwd(TERM *pt, char *pwd, int len)
 		len = 0;
 	return len;
 }
+void escape_space(char *p)
+{
+	do { 
+		p = strchr(p, '\\');
+		if ( p!=NULL ) {
+			if ( p[1]==' ' ) 
+				for ( char *q=p; *q; q++ ) *q=q[1];
+		}
+	} while ( p!=NULL );
+}
 int term_Scp(TERM *pt, char *cmd, char **preply)
 {
 	if ( host_Type(pt->host )!=SSH ) return 0; 
 
-	for ( char *q=cmd; *q; q++ ) if ( *q=='\\' ) *q='/';
+	for ( char *q=cmd; *q; q++ ) if ( *q=='\\'&&q[1]!=' ' ) *q='/';
 	char *p = strchr(cmd, ' ');
-	if ( p==NULL ) return 0;
-	*p++ = 0;
+	while ( p!=NULL ) {
+		if ( p[-1]!='\\' ) { *p++=0; break; }
+		p = strchr(p+1, ' ');
+	}
 
 	char *lpath, *rpath, *reply = term_Mark_Prompt(pt);
 	term_Learn_Prompt(pt);
 	if ( *cmd==':' ) {	//scp_read
 		lpath = p; rpath = cmd+1;
+		escape_space(lpath);
 		char ls_1[1024]="ls -1 ";
 		if ( *rpath!='/' && *rpath!='~' ) {
 			term_Pwd(pt, ls_1+6, 1016);
@@ -560,6 +573,8 @@ int term_Scp(TERM *pt, char *cmd, char **preply)
 			}
 		}
 		reply = term_Mark_Prompt(pt);
+		escape_space(lsld+7);
+		escape_space(lpath);
 		scp_write(pt->host, lpath, lsld+7);
 	}
 	term_Send(pt, "\r", 1);
@@ -592,39 +607,30 @@ int term_xmodem(TERM *pt, char *fn)
 int term_Cmd(TERM *pt, char *cmd, char **preply)
 {
 	if ( *cmd!='!' ) return term_TL1(pt, cmd, preply);
-	cmd[strcspn(cmd, "\r")] = 0;	//remove trailing "\r"
 
 	int rc = 0;
-	if ( strncmp(++cmd, "Clear",5)==0 )	{
-		term_Clear(pt);
-	}
+	if ( strncmp(++cmd, "Clear",5)==0 )		term_Clear(pt);
 	else if ( strncmp(cmd, "Log", 3)==0 )	term_Logg(pt, cmd+3);
 	else if ( strncmp(cmd, "Find ",5)==0 )	term_Srch(pt, cmd+5);
 	else if ( strncmp(cmd, "Disp ",5)==0 )	term_Disp(pt, cmd+5);
-	else if ( strncmp(cmd, "Send ",5)==0 )
-	{
+	else if ( strncmp(cmd, "Send ",5)==0 ) {
 		term_Mark_Prompt(pt);
 		term_Send(pt, cmd+5,strlen(cmd+5));
-		term_Send(pt, "\r", 1);
 	}
-	else if ( strncmp(cmd, "Hostname",8)==0) 
-	{
-		if ( preply!=NULL ) 
-		{
+	else if ( strncmp(cmd, "Hostname",8)==0) {
+		if ( preply!=NULL ) {
 			*preply = host_Status(pt->host)==IDLE ? "":pt->host->hostname;
 			rc = strlen(*preply);
 		}
 	}
-	else if ( strncmp(cmd,"Selection",9)==0) 
-	{
+	else if ( strncmp(cmd,"Selection",9)==0) {
 		if ( preply!=NULL ) *preply = pt->buff+pt->sel_left;
 		rc = pt->sel_right-pt->sel_left;
 	}
 	else if ( strncmp(cmd, "Recv" ,4)==0 )	rc = term_Recv(pt, preply);
 	else if ( strncmp(cmd, "Echo", 4)==0 )	rc = term_Echo(pt ) ? 1 : 0;
 	else if ( strncmp(cmd, "Timeout",7)==0 )pt->iTimeOut = atoi( cmd+8);
-	else if ( strncmp(cmd, "Prompt ",7)==0 ) 
-	{
+	else if ( strncmp(cmd, "Prompt ",7)==0 ) {
 		strncpy(pt->sPrompt, cmd+7, 31);
 		pt->sPrompt[31] = 0;
 		url_decode(pt->sPrompt);
@@ -636,10 +642,8 @@ int term_Cmd(TERM *pt, char *cmd, char **preply)
 	else if ( strncmp(cmd, "scp ", 4)==0 ) 	rc = term_Scp(pt, cmd+4, preply);
 	else if ( strncmp(cmd, "xmodem ", 7)==0 ) rc = term_xmodem(pt, cmd+7);
 	else if ( strncmp(cmd, "Wait ", 5)==0 ) Sleep(atoi(cmd+5)*1000);
-	else if ( strncmp(cmd, "Waitfor ", 8)==0) 
-	{
-		for ( int i=pt->iTimeOut; i>0; i-- ) 
-		{
+	else if ( strncmp(cmd, "Waitfor ", 8)==0) {
+		for ( int i=pt->iTimeOut; i>0; i-- ) {
 			pt->buff[pt->cursor_x] = 0;
 			if ( strstr(pt->tl1text, cmd+8)!=NULL ) {
 				if ( preply!=NULL ) *preply = pt->tl1text;
@@ -649,8 +653,7 @@ int term_Cmd(TERM *pt, char *cmd, char **preply)
 			Sleep(1000);
 		}
 	}
-	else 
-	{
+	else {
 		if ( host_Status(pt->host)==IDLE )
 			term_Print(pt, "\033[33m%s\n", cmd); 
 		term_Mark_Prompt(pt);
