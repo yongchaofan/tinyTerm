@@ -1,5 +1,5 @@
 //
-// "$Id: tinyTerm.rc 3031 2020-06-30 09:05:10 $"
+// "$Id: tinyTerm.rc 2987 2020-07-20 09:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -37,9 +37,8 @@ IDMENU_MAIN MENU
 	}
 	POPUP "&Script"
 	{
-		MENUITEM "&Run...", 		ID_RUN
-		MENUITEM "&Quit",			ID_QUIT, GRAYED
-		MENUITEM "&Pause",			ID_PAUSE, GRAYED
+		MENUITEM "&Open...", 		ID_RUN
+		MENUITEM "&Pause/Quit",		ID_PAUSE
 		MENUITEM SEPARATOR
 	}
 	POPUP "&Options"
@@ -87,8 +86,8 @@ CAPTION "Connect Dialog"
 }
 
 1 VERSIONINFO
-	FILEVERSION		1,9,2,0
-	PRODUCTVERSION	1,9,2,0
+	FILEVERSION		1,9,3,0
+	PRODUCTVERSION	1,9,3,0
 	FILEOS			VOS__WINDOWS32
 	FILETYPE		VFT_APP
 	FILESUBTYPE		VFT2_UNKNOWN
@@ -102,7 +101,7 @@ CAPTION "Connect Dialog"
 			VALUE "FileDescription", "Tiny Terminal Emulator"
 			VALUE "LegalCopyright", "©2018-2020 Yongchao Fan"
 			VALUE "ProductName", "tinyTerm"
-			VALUE "ProductVersion", "1.9.2.0"
+			VALUE "ProductVersion", "1.9.3.0"
 		}
 	}
 	BLOCK "VarFileInfo"
