@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40424 2020-07-20 12:05:10 $"
+// "$Id: ssh2.c 40388 2020-07-20 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -37,7 +37,7 @@ int fnmatch(char *pattern, char *file, int flag)
 
 struct dirent {
 	unsigned char d_type;
-	char d_name[MAX_PATH * 3];
+	char d_name[MAX_PATH*3];
 };
 
 typedef struct tagDIR {
@@ -45,7 +45,7 @@ typedef struct tagDIR {
 	HANDLE dd_handle;     
 	int dd_stat; 
 } DIR;
-static inline void finddata2dirent(struct dirent *ent, WIN32_FIND_DATA *fdata)
+static void finddata2dirent(struct dirent *ent, WIN32_FIND_DATA *fdata)
 {
 	wchar_to_utf8(fdata->cFileName, -1, ent->d_name, sizeof(ent->d_name));
 
@@ -80,9 +80,8 @@ struct dirent *readdir(DIR *dir)
 
 	if (dir->dd_stat) {
 		WIN32_FIND_DATA fdata;
-		if (FindNextFile(dir->dd_handle, &fdata)) {
+		if (FindNextFile(dir->dd_handle, &fdata))
 			finddata2dirent(&dir->dd_dir, &fdata);
-		} 
 		else
 			return NULL;
 	}
@@ -270,7 +269,7 @@ int ssh_knownhost(HOST *ph)
 	char keybuf[256];
 	const char *key = libssh2_session_hostkey(ph->session, &len, &type);
 	if ( key==NULL ) {
-		term_Disp(ph->term, "hostkey failure! ");
+		term_Disp(ph->term, "hostkey ");
 		return -4;
 	}
 	buff_len=sprintf(keybuf, "%s key fingerprint", keytypes[type]);
@@ -284,7 +283,7 @@ int ssh_knownhost(HOST *ph)
 
 	LIBSSH2_KNOWNHOSTS *nh = libssh2_knownhost_init(ph->session);
 	if ( nh==NULL ) {
-		term_Disp(ph->term, "known hosts failure! ");
+		term_Disp(ph->term, "known_hosts ");
 		return -4;
 	}
 	libssh2_knownhost_readfile(nh, knownhostfile,
@@ -641,9 +640,9 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 	size_t nread = 0, total = 0;
 	char mem[1024*32];
 	while ( (nread=fread(mem, 1, sizeof(mem), fp)) >0 ) {
+		char *ptr = mem;
 		int rc;
 		while ( nread>0 ) {
-			char *ptr = mem;
 			WaitForSingleObject(ph->mtx, INFINITE);
 			rc = libssh2_channel_write(scp_channel, ptr, nread);
 			ReleaseMutex(ph->mtx);

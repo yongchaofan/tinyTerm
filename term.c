@@ -630,11 +630,18 @@ int term_Cmd(TERM *pt, char *cmd, char **preply)
 	else if ( strncmp(cmd, "Recv" ,4)==0 )	rc = term_Recv(pt, preply);
 	else if ( strncmp(cmd, "Echo", 4)==0 )	rc = term_Echo(pt ) ? 1 : 0;
 	else if ( strncmp(cmd, "Timeout",7)==0 )pt->iTimeOut = atoi( cmd+8);
-	else if ( strncmp(cmd, "Prompt ",7)==0 ) {
-		strncpy(pt->sPrompt, cmd+7, 31);
-		pt->sPrompt[31] = 0;
-		url_decode(pt->sPrompt);
-		pt->iPrompt = strlen(pt->sPrompt);
+	else if ( strncmp(cmd, "Prompt",6)==0 ) {
+		if ( cmd[6]==' ' ) {
+			strncpy(pt->sPrompt, cmd+7, 31);
+			pt->sPrompt[31] = 0;
+			url_decode(pt->sPrompt);
+			pt->iPrompt = strlen(pt->sPrompt);
+		}
+		else {
+			term_Learn_Prompt(pt);
+		}
+		if ( preply!=NULL ) *preply = pt->sPrompt;
+		rc = pt->iPrompt;
 	}
 	else if ( strncmp(cmd, "Tftpd",5)==0 )	tftp_Svr( cmd+5);
 	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 	ftp_Svr( cmd+4);
