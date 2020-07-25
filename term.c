@@ -890,10 +890,12 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 					buff_clear(pt, pt->line[pt->cursor_y+1]-n0, n0);
 					break;
 			case '@'://insert n0 spaces
-					for (int i=pt->line[pt->cursor_y+1]-n0-1;i>=pt->cursor_x; i--){
+					for (int i=pt->line[pt->cursor_y+1]-n0;i>=pt->cursor_x; i--){
 						pt->buff[i+n0]=pt->buff[i];
 						pt->attr[i+n0]=pt->attr[i];
-					}//fall through;
+					}
+					pt->line[pt->cursor_y+1]+=n0;
+					//fall through;
 			case 'X': //erase n0 characters
 					buff_clear(pt, pt->cursor_x, n0);
 					break;
