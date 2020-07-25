@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 37053 2020-07-20 15:35:10 $"
+// "$Id: tiny.c 36716 2020-07-25 15:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -20,21 +20,16 @@
 #include "tiny.h"
 #include <windows.h>
 #include <windowsx.h>
-#include <direct.h>
 #include <shlobj.h>
-#include <shlwapi.h>
-
-#define ID_SCRIPT0		1000
-#define ID_CONNECT0		2000
-#define WM_DPICHANGED	0x02E0
-#define SM_CXPADDEDBORDER 92
+#define ID_SCRIPT0	1000
+#define ID_CONNECT0	2000
 
 int dpi = 96;
 int titleHeight;
 int fontSize = 16;
 WCHAR fontFace[32] = L"Consolas";
-WCHAR wndTitle[256] = L"    Term    Script    Options                         ";
-const char TINYTERM[]="\n\033[32mtinyTerm> \033[37m";
+WCHAR wndTitle[256] = L"    Term    Script    Options                             ";
+const char TINYTERM[]="\r\033[32mtinyTerm> \033[37m";
 const char WELCOME[]="\r\n\
 \ttinyTerm is a simple, small and scriptable terminal emulator,\r\n\n\
 \ta serial/telnet/ssh/sftp/netconf client with unique features:\r\n\n\n\
@@ -43,7 +38,6 @@ const char WELCOME[]="\r\n\
 \t    * text based batch command automation\r\n\n\
 \t    * drag and drop to send files via scp or xmodem\r\n\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\r\n\n\n\
-\tstore: https://www.microsoft.com/store/apps/9NXGN9LJTL05\r\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\r\n\n\n\
 \tVerision 1.9.3, ©2018-2020 Yongchao Fan, All rights reserved\r\n\r\n";
 
@@ -72,8 +66,8 @@ static BOOL bFocus=TRUE, bLocalEdit=FALSE, bScrollbar=FALSE;
 static BOOL bScriptRun=FALSE, bScriptPause=FALSE;
 static BOOL bFTPd=FALSE, bTFTPd=FALSE;
 
-BOOL LoadDict();
-BOOL SaveDict();
+void LoadDict();
+void SaveDict();
 void OpenScript(WCHAR *wfn);
 void DropScript(char *tl1s);
 void DropFiles(HDROP hDrop);
@@ -724,9 +718,9 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 			MoveWindow(hwndCmd, 0, 0, 1, 1, TRUE);
 		else {
 			if ( ph->status==IDLE ) 
-				term_Disp(pt, TINYTERM );
+				term_Disp(pt, TINYTERM);
 		}
-		menu_Check( ID_EDIT, bLocalEdit);
+		menu_Check(ID_EDIT, bLocalEdit);
 		tiny_Redraw_Term();
 		break;
 	case ID_TRANSP:
@@ -751,12 +745,12 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 	case ID_RUN: {
 		WCHAR *wfn=fileDialog(L"Script\0*.html;*.js;*.vbs;*.txt\0All\0*.*\0\0",
 													OFN_FILEMUSTEXIST);
-		if ( wfn!=NULL )
-		{
-			WCHAR wport[MAX_PATH], wcwd[MAX_PATH];
+		if ( wfn!=NULL ) {
+			WCHAR wcwd[MAX_PATH];
 			_wgetcwd(wcwd, MAX_PATH);
-			PathRelativePathTo(wport, wcwd, FILE_ATTRIBUTE_DIRECTORY, wfn, 0);
-			OpenScript( (wport[0]==L'.'&&wport[1]==L'\\') ? wport+2 : wfn);
+			int len = wcslen(wcwd);
+			if ( wcsncmp(wcwd, wfn, len)==0 ) wfn+=len+1;
+			OpenScript(wfn);
 		}
 		break;
 	}
@@ -827,6 +821,10 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		wnd_Size();
 		SetLayeredWindowAttributes(hwnd,0,iTransparency,LWA_ALPHA);
 		ShowWindow(hwnd, SW_SHOW);
+		if ( bLocalEdit ) 
+			term_Disp(pt, TINYTERM);
+		else
+			PostMessage(hwndTerm, WM_COMMAND, ID_CONNECT, 0);
 		break;
 	case WM_SIZE:
 		if ( IsWindowVisible(hwnd) ) {	//change term size only when visible
@@ -1066,16 +1064,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 						NULL, NULL, hInst, NULL );
 	ShowScrollBar(hwndTerm, SB_VERT, FALSE);
 
-	if ( *lpCmdLine==0 )
-	{
-		if ( bLocalEdit ) 
-			term_Disp(pt,TINYTERM);
-		else
-			PostMessage(hwndTerm, WM_COMMAND, ID_CONNECT, 0);
-	}
-	else 
-		host_Open(ph, lpCmdLine);
-
 	HACCEL haccel = LoadAccelerators(hInst, MAKEINTRESOURCE(IDACCEL_MAIN));
 	MSG msg;
 	while ( GetMessage(&msg, NULL, 0, 0) )
@@ -1096,7 +1084,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	return 0;
 }
 const char *DICTFILE="tinyTerm.hist";
-BOOL LoadDict( )
+void LoadDict( )
 {
 	FILE *fp = fopen(DICTFILE, "r");
 	if ( fp==NULL ) {
@@ -1120,7 +1108,7 @@ BOOL LoadDict( )
 				}		
 				else if ( strncmp(cmd, "~LocalEdit", 10)==0) {
 					bLocalEdit = TRUE;
-					CheckMenuItem(hMainMenu, ID_EDIT, MF_BYCOMMAND|MF_CHECKED);
+					menu_Check(ID_EDIT, TRUE);
 				}
 				else if ( strncmp(cmd, "~FontSize", 9)==0 )	{
 					fontSize = atoi(cmd+9);
@@ -1145,11 +1133,9 @@ BOOL LoadDict( )
 			}
 		}
 		fclose( fp );
-		return TRUE;
 	}
-	return FALSE;
 }
-BOOL SaveDict( )
+void SaveDict( )
 {
 	FILE *fp = fopen(DICTFILE, "w");
 	if ( fp!=NULL ) {
@@ -1175,9 +1161,7 @@ BOOL SaveDict( )
 			wp = autocomplete_Next();
 		}
 		fclose( fp );
-		return TRUE;
 	}
-	return FALSE;
 }
 
 DWORD WINAPI uploader(void *files)	//upload files through scp or sftp
@@ -1244,6 +1228,7 @@ DWORD WINAPI scripter(void *cmds)
 	char *p0=(char *)cmds, *p1;
 	int iLoopCnt = -1, iWaitCnt = 0;
 	bScriptRun=TRUE; bScriptPause = FALSE;
+	menu_Enable(ID_PAUSE, TRUE);
 	while ( bScriptRun && p0!=NULL )
 	{
 		if ( iWaitCnt>0 ) {
@@ -1283,7 +1268,7 @@ DWORD WINAPI scripter(void *cmds)
 		}
 		p0 = p1;
 	}
-
+	menu_Enable(ID_PAUSE, FALSE);
 	free(cmds);
 	if ( iWaitCnt>0 ) cmd_Disp(L"");
 	bScriptRun = bScriptPause = FALSE;
