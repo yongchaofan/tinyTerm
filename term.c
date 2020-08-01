@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 36056 2020-07-20 15:05:10 $"
+// "$Id: term.c 36298 2020-07-27 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -102,22 +102,22 @@ void term_nextLine(TERM *pt)
 	if (pt->screen_y==pt->cursor_y-pt->size_y ) pt->screen_y++;
 
 	if (pt->cursor_x>=BUFFERSIZE-1024 || pt->cursor_y==MAXLINES-2 ) {
-		int i, len = pt->line[1024];
+		int i, len = pt->line[4096];
 		pt->tl1text -= len;
 		if (pt->tl1text<pt->buff ) {
 			pt->tl1len -= pt->buff-pt->tl1text;
 			pt->tl1text = pt->buff;
 		}
 		pt->cursor_x -= len;
-		pt->cursor_y -= 1024;
-		pt->screen_y -= 1024;
+		pt->cursor_y -= 4096;
+		pt->screen_y -= 4096;
 		if (pt->screen_y<0 ) pt->screen_y = 0;
 		memmove(pt->buff, pt->buff+len, BUFFERSIZE-len);
 		memset(pt->buff+pt->cursor_x, 0, BUFFERSIZE-pt->cursor_x);
 		memmove(pt->attr, pt->attr+len, BUFFERSIZE-len);
 		memset(pt->attr+pt->cursor_x, 0, BUFFERSIZE-pt->cursor_x);
 		for ( i=0; i<pt->cursor_y+2; i++ ) 
-			pt->line[i] = pt->line[i+1024]-len;
+			pt->line[i] = pt->line[i+4096]-len;
 		while ( i<MAXLINES ) pt->line[i++] = 0;
 	}
 }
@@ -125,7 +125,6 @@ void term_Parse(TERM *pt, const char *buf, int len)
 {
 	const unsigned char *p=(const unsigned char *)buf;
 	const unsigned char *zz = p+len;
-	int old_cursor_y = pt->cursor_y;
 
 	if (pt->bLogging ) fwrite( buf, 1, len, pt->fpLogFile);
 	if (pt->bEscape ) p = vt100_Escape(pt, p, zz-p);
@@ -168,7 +167,7 @@ void term_Parse(TERM *pt, const char *buf, int len)
 		case 0x0c:
 			if (pt->bAlterScreen || pt->line[pt->cursor_y+2]!=0 ) {
 					//IND to next line
-				vt100_Escape(pt, "D", 1);
+				vt100_Escape(pt, (const unsigned char *)"D", 1);
 			}
 			else {	//LF and new line
 				pt->cursor_x = pt->line[pt->cursor_y+1];
@@ -218,7 +217,7 @@ void term_Parse(TERM *pt, const char *buf, int len)
 				default: c = ' ';
 			}
 			if (pt->bInsert ) 
-				vt100_Escape(pt, "[1@", 3);
+				vt100_Escape(pt, (const unsigned char *)"[1@", 3);
 			if (pt->cursor_x-pt->line[pt->cursor_y]>=pt->size_x ) {
 				int char_cnt=0;
 				for ( int i=pt->line[pt->cursor_y]; i<pt->cursor_x; i++ )
@@ -238,16 +237,11 @@ void term_Parse(TERM *pt, const char *buf, int len)
 	}
 
 	if ( !pt->bPrompt && pt->cursor_x>pt->iPrompt ) {
+		char *p=pt->buff+pt->cursor_x-pt->iPrompt;
+		if ( strncmp(p, pt->sPrompt, pt->iPrompt)==0 ) pt->bPrompt=TRUE;
 		pt->tl1len = pt->buff+pt->cursor_x - pt->tl1text;
-		if ( strncmp(pt->sPrompt, pt->buff+pt->cursor_x-pt->iPrompt, 
-														pt->iPrompt)==0)
-			pt->bPrompt = TRUE;
 	}
-	if ( old_cursor_y!=pt->cursor_y || pt->bAlterScreen 
-									|| pt->line[pt->cursor_y+2]!=0 ) //ESC[2J
-		tiny_Redraw_Term();
-	else
-		tiny_Redraw_Line(pt->cursor_y-pt->screen_y);
+	tiny_Redraw_Term();
 }
 BOOL term_Echo(TERM *pt)
 {
@@ -278,7 +272,9 @@ void term_Title(TERM *pt, char *title)
 	tiny_Title(pt->title);
 }
 void term_Scroll(TERM *pt, int lines)
-{	pt->screen_y -= lines;
+{	
+	if ( pt->bAlterScreen ) return;
+	pt->screen_y -= lines;
 	if (pt->screen_y<0 || pt->screen_y>pt->cursor_y ) {
 		pt->screen_y += lines;
 		return;
@@ -360,11 +356,12 @@ void term_Disp(TERM *pt, const char *msg )
 }
 void term_Send(TERM *pt, char *buf, int len)
 {
-	if (pt->bEcho ) 
+	if (pt->bEcho ) {
 		if ( host_Type(pt->host)==NETCONF ) 
 			term_Parse_XML(pt, buf, len);
 		else
 			term_Parse(pt, buf, len);
+	}
 	if ( host_Status(pt->host)!=IDLE ) 
 		host_Send(pt->host, buf, len);
 }
@@ -404,7 +401,7 @@ char *term_Mark_Prompt(TERM *pt)
 }
 int term_Waitfor_Prompt(TERM *pt)
 {
-	int oldlen = pt->tl1len;
+	int oldlen = 0;
 	for ( int i=0; i<pt->iTimeOut*10 && !pt->bPrompt; i++ ) {
 		if (pt->tl1len>oldlen ) { i=0; oldlen=pt->tl1len; }
 		Sleep(100);
@@ -634,8 +631,7 @@ int term_Cmd(TERM *pt, char *cmd, char **preply)
 		if ( cmd[6]==' ' ) {
 			strncpy(pt->sPrompt, cmd+7, 31);
 			pt->sPrompt[31] = 0;
-			url_decode(pt->sPrompt);
-			pt->iPrompt = strlen(pt->sPrompt);
+			pt->iPrompt = url_decode(pt->sPrompt);
 		}
 		else {
 			term_Learn_Prompt(pt);
@@ -733,7 +729,7 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 		if ( *sz>31 ) {
 			pt->escape_code[pt->escape_idx++] = *sz++;
 		}
-		else {
+		else {	//handle control character in escape sequence
 			switch ( *sz++ ) {
 				case 0x08:	//BS
 					if ( isUTF8c(pt->buff[pt->cursor_x--]) )
@@ -774,156 +770,153 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 			switch (pt->escape_code[pt->escape_idx-1] ) 
 			{
 			case 'A'://cursor up n0 lines
-					x = pt->cursor_x - pt->line[pt->cursor_y];
-					pt->cursor_y -= n0;
-					check_cursor_y(pt);
-					pt->cursor_x = pt->line[pt->cursor_y]+x;
-					break;
+				x = pt->cursor_x - pt->line[pt->cursor_y];
+				pt->cursor_y -= n0;
+				check_cursor_y(pt);
+				pt->cursor_x = pt->line[pt->cursor_y]+x;
+				break;
 			case 'd'://line position absolute
-					x = pt->cursor_x-pt->line[pt->cursor_y];
-					pt->cursor_y = pt->screen_y+n0-1;
-					check_cursor_y(pt);
-					pt->cursor_x = pt->line[pt->cursor_y]+x;
-					break;
+				x = pt->cursor_x-pt->line[pt->cursor_y];
+				pt->cursor_y = pt->screen_y+n0-1;
+				check_cursor_y(pt);
+				pt->cursor_x = pt->line[pt->cursor_y]+x;
+				break;
 			case 'e'://line position relative
 			case 'B'://cursor down n0 lines
-					x = pt->cursor_x - pt->line[pt->cursor_y];
-					pt->cursor_y += n0;
-					check_cursor_y(pt);
-					pt->cursor_x = pt->line[pt->cursor_y]+x;
-					break;
+				x = pt->cursor_x - pt->line[pt->cursor_y];
+				pt->cursor_y += n0;
+				check_cursor_y(pt);
+				pt->cursor_x = pt->line[pt->cursor_y]+x;
+				break;
 			case '`': //character position absolute
 			case 'G': //cursor to n0th position from left
-					pt->cursor_x = pt->line[pt->cursor_y];
-					//fall through
+				pt->cursor_x = pt->line[pt->cursor_y];
+				//fall through
 			case 'a'://character position relative
 			case 'C'://cursor right n0 characters
-					while ( n0-->0 && 
-						pt->cursor_x<pt->line[pt->cursor_y]+pt->size_x-1 )
-					{
-						if ( isUTF8c(pt->buff[++pt->cursor_x]) )
-							while ( isUTF8c(pt->buff[++pt->cursor_x]));
-					}
-					break;
+				while ( n0-->0 && 
+					pt->cursor_x<pt->line[pt->cursor_y]+pt->size_x-1 )
+				{
+					if ( isUTF8c(pt->buff[++pt->cursor_x]) )
+						while ( isUTF8c(pt->buff[++pt->cursor_x]));
+				}
+				break;
 			case 'D'://cursor left n0 characters
-					while ( n0-->0 && pt->cursor_x>pt->line[pt->cursor_y]) {
-						if ( isUTF8c(pt->buff[--pt->cursor_x]) )
-							while ( isUTF8c(pt->buff[--pt->cursor_x]));
-					}
-					break;
+				while ( n0-->0 && pt->cursor_x>pt->line[pt->cursor_y]) {
+					if ( isUTF8c(pt->buff[--pt->cursor_x]) )
+						while ( isUTF8c(pt->buff[--pt->cursor_x]));
+				}
+				break;
 			case 'E': //cursor to begining of next line n0 times
-					pt->cursor_y += n0;
-					check_cursor_y(pt);
-					pt->cursor_x = pt->line[pt->cursor_y];
-					break;
+				pt->cursor_y += n0;
+				check_cursor_y(pt);
+				pt->cursor_x = pt->line[pt->cursor_y];
+				break;
 			case 'F': //cursor to begining of previous line n0 times
-					pt->cursor_y -= n0;
-					check_cursor_y(pt);
-					pt->cursor_x = pt->line[pt->cursor_y];
-					break;
+				pt->cursor_y -= n0;
+				check_cursor_y(pt);
+				pt->cursor_x = pt->line[pt->cursor_y];
+				break;
 			case 'f': //horizontal and vertical position forced
-			case 'H':
-					if ( !pt->bAlterScreen && n1==pt->size_y )
-					{ //exit of ESC[2J without alter screen
-						pt->cursor_y = pt->screen_y+pt->size_y;
-						pt->screen_y++;
-					}
-					else {
-						pt->cursor_y = pt->screen_y+n1-1;
-						if (pt->bOriginMode ) pt->cursor_y+=pt->roll_top;
-						check_cursor_y(pt);
-					}
-					pt->cursor_x = pt->line[pt->cursor_y];
-					while ( --n0>0 &&
-						pt->cursor_x<pt->line[pt->cursor_y]+pt->size_x-1 ) 
-					{
-						pt->cursor_x++;
-						while ( isUTF8c(pt->buff[pt->cursor_x]) ) pt->cursor_x++;
-					}
-					break;
+			case 'H': //cursor to line n1, postion n0
+				if ( !pt->bAlterScreen && n1>pt->size_y ) {
+					pt->cursor_y = (pt->screen_y++) + pt->size_y;
+				}
+				else {
+					pt->cursor_y = pt->screen_y+n1-1;
+					if (pt->bOriginMode ) pt->cursor_y+=pt->roll_top;
+					check_cursor_y(pt);
+				}
+				pt->cursor_x = pt->line[pt->cursor_y];
+				while ( --n0>0 ) {
+					pt->cursor_x++;
+					while ( isUTF8c(pt->buff[pt->cursor_x]) ) pt->cursor_x++;
+				}
+				break;
 			case 'J': 	//[J kill till end, 1J begining, 2J entire screen
-					if ( isdigit(pt->escape_code[1])) {
-						screen_clear(pt, m0);
-						break;
-					}//fall through to treat [J as [0K
-					// as a hack for tinyCore command line editing
+				if ( isdigit(pt->escape_code[1])) {
+					screen_clear(pt, m0);
+					break;
+				}//fall through to treat [J as [0K
+				// as a hack for tinyCore command line editing
 			case 'K': {	//[K kill till end, 1K begining, 2K entire line
-					int i = pt->line[pt->cursor_y];		//setup for m0==2
-					int j = pt->line[pt->cursor_y+1];
-					if ( m0==0 ) i = pt->cursor_x;		//change start if m0==0
-					if ( m0==1 ) j = pt->cursor_x+1;	//change stop if m0==1
-					if ( j>i ) buff_clear(pt, i, j-i);
-					}
-					break;
+				int i = pt->line[pt->cursor_y];		//setup for m0==2
+				int j = pt->line[pt->cursor_y+1];
+				if ( m0==0 ) i = pt->cursor_x;		//change start if m0==0
+				if ( m0==1 ) j = pt->cursor_x+1;	//change stop if m0==1
+				if ( j>i ) buff_clear(pt, i, j-i);
+				}
+				break;
 			case 'L'://insert lines
-					if ( n0 > pt->screen_y+pt->roll_bot-pt->cursor_y ) 
-						n0 = pt->screen_y+pt->roll_bot-pt->cursor_y;
-					for ( int i=pt->screen_y+pt->roll_bot; 
-								i>=pt->cursor_y+n0; i--) {
-						memcpy(pt->buff+pt->line[i],
-								pt->buff+pt->line[i-n0], pt->size_x);
-						memcpy(pt->attr+pt->line[i],
-								pt->attr+pt->line[i-n0], pt->size_x);
-					}
-					pt->cursor_x = pt->line[pt->cursor_y];
-					buff_clear(pt, pt->cursor_x, pt->size_x*n0);
-					break;
+				if ( n0 > pt->screen_y+pt->roll_bot-pt->cursor_y ) 
+					n0 = pt->screen_y+pt->roll_bot-pt->cursor_y;
+				for ( int i=pt->screen_y+pt->roll_bot; 
+							i>=pt->cursor_y+n0; i--) {
+					memcpy(pt->buff+pt->line[i],
+							pt->buff+pt->line[i-n0], pt->size_x);
+					memcpy(pt->attr+pt->line[i],
+							pt->attr+pt->line[i-n0], pt->size_x);
+				}
+				pt->cursor_x = pt->line[pt->cursor_y];
+				buff_clear(pt, pt->cursor_x, pt->size_x*n0);
+				break;
 			case 'M'://delete lines
-					if ( n0 > pt->screen_y+pt->roll_bot-pt->cursor_y ) 
-						n0 = pt->screen_y+pt->roll_bot-pt->cursor_y;
-					for ( int i=pt->cursor_y; 
-								i<pt->screen_y+pt->roll_bot-n0; i++ ) {
-						memcpy(pt->buff+pt->line[i],
-								pt->buff+pt->line[i+n0], pt->size_x);
-						memcpy(pt->attr+pt->line[i],
-								pt->attr+pt->line[i+n0], pt->size_x);
-					}
-					pt->cursor_x = pt->line[pt->cursor_y];
-					buff_clear(pt, pt->line[pt->screen_y+pt->roll_bot-n0], 
+				if ( n0 > pt->screen_y+pt->roll_bot-pt->cursor_y ) 
+					n0 = pt->screen_y+pt->roll_bot-pt->cursor_y;
+				for ( int i=pt->cursor_y; 
+							i<=pt->screen_y+pt->roll_bot-n0; i++ ) {
+					memcpy(pt->buff+pt->line[i],
+							pt->buff+pt->line[i+n0], pt->size_x);
+					memcpy(pt->attr+pt->line[i],
+							pt->attr+pt->line[i+n0], pt->size_x);
+				}
+				pt->cursor_x = pt->line[pt->cursor_y];
+				buff_clear(pt, pt->line[pt->screen_y+pt->roll_bot-n0+1],
 														pt->size_x*n0);
-					break;
+				break;
 			case 'P'://delete n0 characters, fill with space to the right margin
-					for (int i=pt->cursor_x;i<pt->line[pt->cursor_y+1]-n0;i++){
-						pt->buff[i]=pt->buff[i+n0];
-						pt->attr[i]=pt->attr[i+n0];
-					}
-					buff_clear(pt, pt->line[pt->cursor_y+1]-n0, n0);
-					break;
+				for (int i=pt->cursor_x;i<pt->line[pt->cursor_y+1]-n0;i++){
+					pt->buff[i]=pt->buff[i+n0];
+					pt->attr[i]=pt->attr[i+n0];
+				}
+				buff_clear(pt, pt->line[pt->cursor_y+1]-n0, n0);
+				break;
 			case '@'://insert n0 spaces
-					for (int i=pt->line[pt->cursor_y+1]-n0;i>=pt->cursor_x; i--){
-						pt->buff[i+n0]=pt->buff[i];
-						pt->attr[i+n0]=pt->attr[i];
-					}
-					pt->line[pt->cursor_y+1]+=n0;
-					//fall through;
+				for (int i=pt->line[pt->cursor_y+1]-n0-1;i>=pt->cursor_x; i--){
+					pt->buff[i+n0]=pt->buff[i];
+					pt->attr[i+n0]=pt->attr[i];
+				}
+				pt->line[pt->cursor_y+1]+=n0;
+				if ( pt->line[pt->cursor_y+1]-pt->line[pt->cursor_y]>pt->size_x )
+					pt->line[pt->cursor_y+1] = pt->line[pt->cursor_y]+pt->size_x;
+				//fall through;
 			case 'X': //erase n0 characters
-					buff_clear(pt, pt->cursor_x, n0);
-					break;
+				buff_clear(pt, pt->cursor_x, n0);
+				break;
 			case 'S': // scroll up n0 lines
-					for ( int i=pt->roll_top; i<=pt->roll_bot-n0; i++ )
-					{
-						memcpy(pt->buff+pt->line[pt->screen_y+i],
-								pt->buff+pt->line[pt->screen_y+i+n0], 
-								pt->size_x);
-						memcpy(pt->attr+pt->line[pt->screen_y+i],
-								pt->attr+pt->line[pt->screen_y+i+n0], 
-								pt->size_x);
-					}
-					buff_clear(pt, pt->line[pt->screen_y+pt->roll_bot-n0+1], 
-																n0*pt->size_x);
-					break;
-			case 'T': // scroll down n0 lines
-					for ( int i=pt->roll_bot; i>=pt->roll_top+n0; i-- ) {
-						memcpy(pt->buff+pt->line[pt->screen_y+i],
-								pt->buff+pt->line[pt->screen_y+i-n0], 
-								pt->size_x);
-						memcpy(pt->attr+pt->line[pt->screen_y+i],
-								pt->attr+pt->line[pt->screen_y+i-n0], 
-								pt->size_x);
-					}
-					buff_clear(pt, pt->line[pt->screen_y+pt->roll_top], 
+				for ( int i=pt->roll_top; i<=pt->roll_bot-n0; i++ ) {
+					memcpy(pt->buff+pt->line[pt->screen_y+i],
+							pt->buff+pt->line[pt->screen_y+i+n0], 
+							pt->size_x);
+					memcpy(pt->attr+pt->line[pt->screen_y+i],
+							pt->attr+pt->line[pt->screen_y+i+n0], 
+							pt->size_x);
+				}
+				buff_clear(pt, pt->line[pt->screen_y+pt->roll_bot-n0+1], 
 															n0*pt->size_x);
-					break;
+				break;
+			case 'T': // scroll down n0 lines
+				for ( int i=pt->roll_bot; i>=pt->roll_top+n0; i-- ) {
+					memcpy(pt->buff+pt->line[pt->screen_y+i],
+							pt->buff+pt->line[pt->screen_y+i-n0], 
+							pt->size_x);
+					memcpy(pt->attr+pt->line[pt->screen_y+i],
+							pt->attr+pt->line[pt->screen_y+i-n0], 
+							pt->size_x);
+				}
+				buff_clear(pt, pt->line[pt->screen_y+pt->roll_top], 
+														n0*pt->size_x);
+				break;
 			case 'I': //cursor forward n0 tab stops
 				break;
 			case 'Z': //cursor backward n0 tab stops
@@ -932,196 +925,201 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 				host_Send(pt->host, "\033[?1;0c", 7);	//vt100 without options
 				break;
 			case 'g': //clear tabstop
-					if ( m0==0 ) {	//clear current tabstop
-						int l = pt->cursor_x - pt->line[pt->cursor_y];
-						pt->tabstops[l] = 0;
-					}
-					if ( m0==3 ) {	//clear all tabstops
-						memset(pt->tabstops, 0, 256);
-					}
-					break;
+				if ( m0==0 ) {	//clear current tabstop
+					int l = pt->cursor_x - pt->line[pt->cursor_y];
+					pt->tabstops[l] = 0;
+				}
+				if ( m0==3 ) {	//clear all tabstops
+					memset(pt->tabstops, 0, 256);
+				}
+				break;
 			case 'h':
-					if (pt->escape_code[1]=='4' )  pt->bInsert = TRUE;
-					if (pt->escape_code[1]=='?' ) {
-						n0 = atoi(pt->escape_code+2);
-						if ( n0==1 ) pt->bAppCursor = TRUE;
-						if ( n0==3 ) { 
-							if (pt->size_x!=132 || pt->size_y!=25 ) {
-								pt->size_x = 132;   pt->size_y = 25;
-								wnd_Size();
-							}
-							screen_clear(pt, 2);
+				if (pt->escape_code[1]=='4' )  pt->bInsert = TRUE;
+				if (pt->escape_code[1]=='?' ) {
+					n0 = atoi(pt->escape_code+2);
+					if ( n0==1 ) pt->bAppCursor = TRUE;
+					if ( n0==3 ) { 
+						if (pt->size_x!=132 || pt->size_y!=25 ) {
+							pt->size_x = 132;   pt->size_y = 25;
+							wnd_Size();
 						}
-						if ( n0==6 ) pt->bOriginMode = TRUE;
-						if ( n0==7 ) pt->bWraparound = TRUE;
-						if ( n0==25 ) pt->bCursor = TRUE;
-						if ( n0==2004 ) pt->bBracket = TRUE;
-						if ( n0==1049 ) { 	//?1049h alternate screen,
-							pt->bAlterScreen = TRUE;
-							pt->save_edit = tiny_Edit(FALSE);
-							screen_clear(pt, 2);
-						}
+						screen_clear(pt, 2);
 					}
-					break;
+					if ( n0==6 ) pt->bOriginMode = TRUE;
+					if ( n0==7 ) pt->bWraparound = TRUE;
+					if ( n0==25 ) pt->bCursor = TRUE;
+					if ( n0==2004 ) pt->bBracket = TRUE;
+					if ( n0==1049 ) { 	//?1049h alternate screen,
+						pt->bAlterScreen = TRUE;
+						pt->save_edit = tiny_Edit(FALSE);
+						screen_clear(pt, 2);
+					}
+				}
+				break;
 			case 'l':
-					if (pt->escape_code[1]=='4' ) pt->bInsert = FALSE;
-					if (pt->escape_code[1]=='?' ) {
-						n0 = atoi(pt->escape_code+2);
-						if ( n0==1 ) pt->bAppCursor = FALSE;
-						if ( n0==3 ) {
-							if (pt->size_x!=80 || pt->size_y!=25 ) {
-								pt->size_x = 80;   pt->size_y = 25;
-								wnd_Size();
-							}
-							screen_clear(pt, 2);
+				if (pt->escape_code[1]=='4' ) pt->bInsert = FALSE;
+				if (pt->escape_code[1]=='?' ) {
+					n0 = atoi(pt->escape_code+2);
+					if ( n0==1 ) pt->bAppCursor = FALSE;
+					if ( n0==3 ) {
+						if (pt->size_x!=80 || pt->size_y!=25 ) {
+							pt->size_x = 80;   pt->size_y = 25;
+							wnd_Size();
 						}
-						if ( n0==6 ) pt->bOriginMode = FALSE;
-						if ( n0==7 ) pt->bWraparound = FALSE;
-						if ( n0==25 ) pt->bCursor = FALSE;
-						if ( n0==2004 ) pt->bBracket = FALSE;
-						if ( n0==1049 ) { 	//?1049l exit alternate screen,
-							pt->bAlterScreen = FALSE;
-							if (pt->save_edit ) tiny_Edit(TRUE);
-							pt->cursor_y = pt->screen_y;
-							pt->cursor_x = pt->line[pt->cursor_y];
-							for ( int i=1; i<=pt->size_y+1; i++ )
-								pt->line[pt->cursor_y+i] = 0;
-							pt->screen_y = pt->cursor_y-pt->size_y+1;
-							if (pt->screen_y<0 ) pt->screen_y = 0;
-						}
+						screen_clear(pt, 2);
 					}
-					break;
+					if ( n0==6 ) pt->bOriginMode = FALSE;
+					if ( n0==7 ) pt->bWraparound = FALSE;
+					if ( n0==25 ) pt->bCursor = FALSE;
+					if ( n0==2004 ) pt->bBracket = FALSE;
+					if ( n0==1049 ) { 	//?1049l exit alternate screen,
+						pt->bAlterScreen = FALSE;
+						if (pt->save_edit ) tiny_Edit(TRUE);
+						pt->cursor_y = pt->screen_y;
+						pt->cursor_x = pt->line[pt->cursor_y];
+						for ( int i=1; i<=pt->size_y+1; i++ )
+							pt->line[pt->cursor_y+i] = 0;
+						pt->screen_y = pt->cursor_y-pt->size_y+1;
+						if (pt->screen_y<0 ) pt->screen_y = 0;
+					}
+				}
+				break;
 			case 'm': {
-						char *p = pt->escape_code;
-						while ( p!=NULL ) {
-							m0 = atoi(++p);
-							switch ( m0/10 ) {
-							case 0:	if ( m0==0 ) pt->c_attr = 7;	//normal
-									if ( m0==1 ) pt->c_attr|= 0x08; //bright
-									if ( m0==7 ) pt->c_attr = 0x70; //negative
-									break;
-							case 2: pt->c_attr = 7;					//normal
-									break;
-							case 3: if ( m0==39 ) m0 = 37;	//default foreground
-									pt->c_attr = (pt->c_attr&0xf8)+m0%10; 
-									break;
-							case 4: if ( m0==49 ) m0 = 0;	//default background
-									pt->c_attr = (pt->c_attr&0x0f)+((m0%10)<<4); 
-									break;
-							case 9: pt->c_attr = (pt->c_attr&0xf0)+m0%10+8; 
-									break;
-							case 10:pt->c_attr = (pt->c_attr&0x0f)+((m0%10+8)<<4); 
-									break;
-							}
-							p = strchr(p, ';');
+					char *p = pt->escape_code;
+					while ( p!=NULL ) {
+						m0 = atoi(++p);
+						switch ( m0/10 ) {
+						case 0:	if ( m0==0 ) pt->c_attr = 7;	//normal
+								if ( m0==1 ) pt->c_attr|= 0x08; //bright
+								if ( m0==7 ) pt->c_attr = 0x70; //negative
+								break;
+						case 2: pt->c_attr = 7;					//normal
+								break;
+						case 3: if ( m0==39 ) m0 = 37;	//default foreground
+								pt->c_attr = (pt->c_attr&0xf8)+m0%10; 
+								break;
+						case 4: if ( m0==49 ) m0 = 0;	//default background
+								pt->c_attr = (pt->c_attr&0x0f)+((m0%10)<<4); 
+								break;
+						case 9: pt->c_attr = (pt->c_attr&0xf0)+m0%10+8; 
+								break;
+						case 10:pt->c_attr = (pt->c_attr&0x0f)+((m0%10+8)<<4); 
+								break;
 						}
+						p = strchr(p, ';');
 					}
-					break;
+				}
+				break;
 			case 'r':
-					if ( n1==1 && n0==1 ) n0 = pt->size_y;	//ESC[r
-					pt->roll_top=n1-1; pt->roll_bot=n0-1;
-					pt->cursor_y = pt->screen_y;
-					if (pt->bOriginMode ) pt->cursor_y+=pt->roll_top;
-					pt->cursor_x = pt->line[pt->cursor_y];
-					break;
+				if ( n1==1 && n0==1 ) n0 = pt->size_y;	//ESC[r
+				pt->roll_top=n1-1; pt->roll_bot=n0-1;
+				pt->cursor_y = pt->screen_y;
+				if (pt->bOriginMode ) pt->cursor_y+=pt->roll_top;
+				pt->cursor_x = pt->line[pt->cursor_y];
+				break;
 			case 's': //save cursor
-					pt->save_x = pt->cursor_x-pt->line[pt->cursor_y];
-					pt->save_y = pt->cursor_y-pt->screen_y;
-					break;
+				pt->save_x = pt->cursor_x-pt->line[pt->cursor_y];
+				pt->save_y = pt->cursor_y-pt->screen_y;
+				break;
 			case 'u': //restore cursor
-					pt->cursor_y = pt->save_y+pt->screen_y;
-					pt->cursor_x = pt->line[pt->cursor_y]+pt->save_x;
-					break;
+				pt->cursor_y = pt->save_y+pt->screen_y;
+				pt->cursor_x = pt->line[pt->cursor_y]+pt->save_x;
+				break;
 				}
 			}
 			break;
 		case '7'://save cursor
-				pt->save_x = pt->cursor_x-pt->line[pt->cursor_y];
-				pt->save_y = pt->cursor_y-pt->screen_y;
-				pt->save_attr = pt->c_attr;
-				pt->bEscape = FALSE;
-				break;
+			pt->save_x = pt->cursor_x-pt->line[pt->cursor_y];
+			pt->save_y = pt->cursor_y-pt->screen_y;
+			pt->save_attr = pt->c_attr;
+			pt->bEscape = FALSE;
+			break;
 		case '8': //restore cursor
-				pt->cursor_y = pt->save_y+pt->screen_y;
-				pt->cursor_x = pt->line[pt->cursor_y]+pt->save_x;
-				pt->c_attr = pt->save_attr;
-				pt->bEscape = FALSE;
-				break; 
+			pt->cursor_y = pt->save_y+pt->screen_y;
+			pt->cursor_x = pt->line[pt->cursor_y]+pt->save_x;
+			pt->c_attr = pt->save_attr;
+			pt->bEscape = FALSE;
+			break; 
 		case 'F'://cursor to lower left corner
-				pt->cursor_y = pt->screen_y+pt->size_y-1;
-				pt->cursor_x = pt->line[pt->cursor_y];
-				pt->bEscape = FALSE;
-				break;
+			pt->cursor_y = pt->screen_y+pt->size_y-1;
+			pt->cursor_x = pt->line[pt->cursor_y];
+			pt->bEscape = FALSE;
+			break;
 		case 'E'://NEL, move to next line
-				pt->cursor_x = pt->line[++pt->cursor_y];
-				pt->bEscape = FALSE;
-				break;
+			pt->cursor_x = pt->line[++pt->cursor_y];
+			pt->bEscape = FALSE;
+			break;
 		case 'D'://IND, move/scroll up one line 
-				if (pt->cursor_y < pt->roll_bot+pt->screen_y ) {
-					int x = pt->cursor_x - pt->line[pt->cursor_y];
-					pt->cursor_x = pt->line[++pt->cursor_y] + x;
-				}
-				else {
-					for ( int i=pt->roll_top; i<pt->roll_bot; i++ ) {
-						memcpy(pt->buff+pt->line[pt->screen_y+i],
-								pt->buff+pt->line[pt->screen_y+i+1], 
-								pt->size_x);
-						memcpy(pt->attr+pt->line[pt->screen_y+i],
-								pt->attr+pt->line[pt->screen_y+i+1],
-								pt->size_x);
-					}
-					buff_clear(pt, pt->line[pt->screen_y+pt->roll_bot],
-								pt->size_x);
-				}
-				pt->bEscape = FALSE;
-				break;
+			if (pt->cursor_y < pt->roll_bot+pt->screen_y ) {
+				int x = pt->cursor_x - pt->line[pt->cursor_y];
+				pt->cursor_x = pt->line[++pt->cursor_y] + x;
+			}
+			else {
+				int len = pt->line[pt->screen_y+pt->roll_bot+1]
+						 -pt->line[pt->screen_y+pt->roll_top+1];
+				int x = pt->cursor_x-pt->line[pt->cursor_y];
+				memcpy( pt->buff+pt->line[pt->screen_y+pt->roll_top],
+						pt->buff+pt->line[pt->screen_y+pt->roll_top+1], len);
+				memcpy( pt->attr+pt->line[pt->screen_y+pt->roll_top],
+						pt->attr+pt->line[pt->screen_y+pt->roll_top+1], len);
+				len = pt->line[pt->screen_y+pt->roll_top+1]
+					 -pt->line[pt->screen_y+pt->roll_top];
+				for ( int i=pt->roll_top+1; i<=pt->roll_bot; i++ ) 
+					pt->line[pt->screen_y+i] = pt->line[pt->screen_y+i+1]-len;
+				buff_clear( pt, pt->line[pt->screen_y+pt->roll_bot],
+							pt->line[pt->screen_y+pt->roll_bot+1]-
+							pt->line[pt->screen_y+pt->roll_bot]);
+				pt->cursor_x = pt->line[pt->cursor_y]+x;
+			}
+			pt->bEscape = FALSE;
+			break;
 		case 'M'://RI, move/scroll down one line
-				if (pt->cursor_y > pt->roll_top+pt->screen_y ) {
-					int x = pt->cursor_x - pt->line[pt->cursor_y];
-					pt->cursor_x = pt->line[--pt->cursor_y] + x;
+			if (pt->cursor_y > pt->roll_top+pt->screen_y ) {
+				int x = pt->cursor_x - pt->line[pt->cursor_y];
+				pt->cursor_x = pt->line[--pt->cursor_y] + x;
+			}
+			else {
+				for ( int i=pt->roll_bot; i>pt->roll_top; i-- ) {
+					memcpy(pt->buff+pt->line[pt->screen_y+i],
+							pt->buff+pt->line[pt->screen_y+i-1],
+							pt->size_x);
+					memcpy(pt->attr+pt->line[pt->screen_y+i],
+							pt->attr+pt->line[pt->screen_y+i-1],
+							pt->size_x);
 				}
-				else {
-					for ( int i=pt->roll_bot; i>pt->roll_top; i-- ) {
-						memcpy(pt->buff+pt->line[pt->screen_y+i],
-								pt->buff+pt->line[pt->screen_y+i-1],
-								pt->size_x);
-						memcpy(pt->attr+pt->line[pt->screen_y+i],
-								pt->attr+pt->line[pt->screen_y+i-1],
-								pt->size_x);
-					}
-					buff_clear(pt, pt->line[pt->screen_y+pt->roll_top],
-								pt->size_x);
-				}
-				pt->bEscape = FALSE;
-				break;
+				buff_clear(pt, pt->line[pt->screen_y+pt->roll_top],
+							pt->size_x);
+			}
+			pt->bEscape = FALSE;
+			break;
 		case 'H':
-				pt->tabstops[pt->cursor_x-pt->line[pt->cursor_y]]=1;
-				pt->bEscape = FALSE;
-				break;
+			pt->tabstops[pt->cursor_x-pt->line[pt->cursor_y]]=1;
+			pt->bEscape = FALSE;
+			break;
 		case ']':
-				if (pt->escape_code[pt->escape_idx-1]==';' ) {
-					if (pt->escape_code[1]=='0' ) {
-						pt->bTitle = TRUE;
-						pt->title_idx = 0;
-					}
-					pt->bEscape = FALSE;
+			if (pt->escape_code[pt->escape_idx-1]==';' ) {
+				if (pt->escape_code[1]=='0' ) {
+					pt->bTitle = TRUE;
+					pt->title_idx = 0;
 				}
-				break;
+				pt->bEscape = FALSE;
+			}
+			break;
 		case '(':
 		case ')':
-				if (pt->escape_code[1]=='B'||pt->escape_code[1]=='0' ) {
-					pt->bGraphic = (pt->escape_code[1]=='0');
-					pt->bEscape = FALSE;
-				}
-				break;
+			if (pt->escape_code[1]=='B'||pt->escape_code[1]=='0' ) {
+				pt->bGraphic = (pt->escape_code[1]=='0');
+				pt->bEscape = FALSE;
+			}
+			break;
 		case '#':	//#8 alignment test, fill screen with 'E'
-				if (pt->escape_idx==2 ) {
-					if (pt->escape_code[1]=='8' ) 
-						memset(pt->buff+pt->line[pt->screen_y], 'E', 
-												pt->size_x*pt->size_y);
-					pt->bEscape = FALSE;
-				}
-				break;
+			if (pt->escape_idx==2 ) {
+				if (pt->escape_code[1]=='8' ) 
+					memset(pt->buff+pt->line[pt->screen_y], 'E', 
+											pt->size_x*pt->size_y);
+				pt->bEscape = FALSE;
+			}
+			break;
 		default: pt->bEscape = FALSE;
 		}
 		if (pt->escape_idx==31 ) pt->bEscape = FALSE;
@@ -1179,7 +1177,6 @@ void term_Parse_XML(TERM *pt, const char *msg, int len)
 		}
 		else {//data
 			term_Parse(pt, "\033[33m", 5);
-			int l;
 			q = strchr(p, '<');
 			if ( q==NULL ) q = p+strlen(p);
 			term_Parse(pt, p, q-p);
@@ -1241,7 +1238,7 @@ const unsigned char *telnet_Options(TERM *pt, const unsigned char *p, int cnt)
 			if ( p[2]==TNO_NEWENV ) {
 				term_Send(pt, (char*)negoreq, 6);
 			}
-			do { p++; } while ( *p!=0xff && p<q);
+			while ( *p!=0xff && p<q ) p++;
 			break;
 		case TNO_SUBEND:
 			p+=2;
