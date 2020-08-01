@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 31341 2020-06-27 15:05:10 $"
+// "$Id: host.c 31376 2020-06-27 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -169,9 +169,9 @@ void xmodem_send(HOST *ph)
 {
 	xmodem_started = TRUE;
 	if ( xmodem_buf[0]==EOT )
-		host_Send(ph, xmodem_buf, 1);
+		host_Send(ph, (char *)xmodem_buf, 1);
 	else
-		host_Send(ph, xmodem_buf, xmodem_crc?133:132);
+		host_Send(ph, (char *)xmodem_buf, xmodem_crc?133:132);
 }
 void xmodem_recv(HOST *ph, char op)
 {
@@ -184,12 +184,12 @@ void xmodem_recv(HOST *ph, char op)
 				if ( xmodem_timeout>60000 ) {	//timeout after 60 seconds
 					bXmodem = FALSE;
 					fclose(xmodem_fp);
-					term_Disp(ph->term, "Aborted\n");
+					term_Disp(ph->term, "Aborted\r\n");
 				}
 				break;
 	case 0x06:	xmodem_timeout = 0;				//ACK
 				if ( xmodem_buf[0] == EOT ) {
-					term_Disp(ph->term, "Completed\n");
+					term_Disp(ph->term, "Completed\r\n");
 					bXmodem = FALSE;
 					return;
 				}
@@ -520,7 +520,7 @@ void httpFile( int s1, char *file)
 		fclose(fp);
 	}
 }
-void url_decode(char *url)
+int url_decode(char *url)
 {
 	char *p = url, *q = url;
 	while ( *p ) {
@@ -532,6 +532,7 @@ void url_decode(char *url)
 		*q++ = *p++;
 	}
 	*q = 0;
+	return q-url;
 }
 
 DWORD WINAPI httpd( void *pv )

@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 36716 2020-07-25 15:35:10 $"
+// "$Id: tiny.c 37018 2020-07-25 15:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -21,8 +21,11 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <shlobj.h>
+#include <direct.h>
 #define ID_SCRIPT0	1000
 #define ID_CONNECT0	2000
+//#define WM_DPICHANGED	0x02E0
+//#define SM_CXPADDEDBORDER 92
 
 int dpi = 96;
 int titleHeight;
@@ -39,7 +42,7 @@ const char WELCOME[]="\r\n\
 \t    * drag and drop to send files via scp or xmodem\r\n\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\r\n\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\r\n\n\n\
-\tVerision 1.9.3, ©2018-2020 Yongchao Fan, All rights reserved\r\n\r\n";
+\tVerision 1.9.4, ©2018-2020 Yongchao Fan, All rights reserved\r\n\n";
 
 const COLORREF COLORS[16] = {
 	RGB(0,0,0), 	RGB(192,0,0), RGB(0,192,0), RGB(192,192,0),
@@ -267,7 +270,7 @@ void cmd_Enter(WCHAR *wcmd)
 		}
 		else {
 			if ( *cmd ) {
-				term_Print(pt, "\033[33m%s\n", cmd); 
+				term_Print(pt, "\033[33m%s\r\n", cmd); 
 				host_Open(ph, cmd);
 			}
 			else
@@ -320,16 +323,17 @@ char *tiny_Gets(char *prompt, BOOL bEcho)
 {
 	return ssh2_Gets( ph, prompt, bEcho );
 }
-void tiny_Redraw_Line(int line)
+/*void tiny_Redraw_Line(int line)
 {
 	RECT lineRect = termRect;
 	lineRect.top = line*iFontHeight;
 	lineRect.bottom = lineRect.top + iFontHeight;
 	InvalidateRect( hwndTerm, &lineRect, TRUE );
-}
+}*/
+static BOOL redraw_pending=FALSE;
 void tiny_Redraw_Term()
 {
-	InvalidateRect(hwndTerm, &termRect, TRUE);
+	if ( !redraw_pending ) redraw_pending = TRUE;
 }
 void tiny_Title(char *buf)
 {
@@ -413,13 +417,13 @@ void tiny_Paint(HDC hDC, RECT rcPaint)
 {
 	WCHAR wbuf[1024];
 	RECT text_rect = {0, 0, 0, 0};
+	redraw_pending = FALSE;
 	SelectObject(hDC, hTermFont);
 	int y = term.screen_y;
 	int sel_min = min(term.sel_left, term.sel_right);
 	int sel_max = max(term.sel_left, term.sel_right);
 	int dx, dy=rcPaint.top;
-	for ( int l=dy/iFontHeight; l<term.size_y; l++ ) 
-	{
+	for ( int l=dy/iFontHeight; l<term.size_y; l++ ) {
 		dx = 0;
 		int i = term.line[y+l];
 		while ( i<term.line[y+l+1] ) {
@@ -452,8 +456,7 @@ void tiny_Paint(HDC hDC, RECT rcPaint)
 			}
 			i=j;
 		}
-		if ( dx < termRect.right )
-		{
+		if ( dx < termRect.right ) {
 			RECT fillRect;
 			fillRect.top = dy;
 			fillRect.bottom = dy+iFontHeight;
@@ -821,6 +824,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		wnd_Size();
 		SetLayeredWindowAttributes(hwnd,0,iTransparency,LWA_ALPHA);
 		ShowWindow(hwnd, SW_SHOW);
+		SetTimer(hwnd, 1, 25, (TIMERPROC)NULL);	//redraw at 40Hz
 		if ( bLocalEdit ) 
 			term_Disp(pt, TINYTERM);
 		else
@@ -848,6 +852,9 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				tiny_Paint(ps.hdc, ps.rcPaint);
 			EndPaint(hwnd, &ps);
 		}
+		break;
+	case WM_TIMER:
+		if ( redraw_pending ) InvalidateRect(hwndTerm, &termRect, TRUE);
 		break;
 	case WM_SETFOCUS:
 		CreateCaret(hwnd, NULL, iFontWidth, iFontHeight/4);

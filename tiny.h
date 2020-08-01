@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5866 2020-06-27 12:05:10 $"
+// "$Id: tiny.h 5866 2020-07-27 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -21,8 +21,8 @@
 #include <libssh2.h>
 #include <libssh2_sftp.h>
 
-#define MAXLINES 8192
-#define BUFFERSIZE 8192*64
+#define MAXLINES 16384
+#define BUFFERSIZE 16384*64
 
 struct Tunnel
 {
@@ -128,7 +128,7 @@ int host_Status(HOST *ph);
 int host_tcp(HOST *ph);
 void xmodem_init(HOST *ph, FILE *fp);
 
-void url_decode(char *url);
+int url_decode(char *url);
 int http_Svr(char *intf);
 BOOL ftp_Svr(char *root);
 BOOL tftp_Svr(char *root);
@@ -147,7 +147,7 @@ void sftp_put(HOST *ph, char *src, char *dst);
 /****************term.c****************/
 void host_callback( void *term, char *buf, int len);
 BOOL term_Construct(TERM *pt);
-void term_Desstruct(TERM *pt);
+void term_Destruct(TERM *pt);
 void term_Clear(TERM *pt);
 void term_Size(TERM *pt, int x, int y);
 void term_Title(TERM *pt, char *title);

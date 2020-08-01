@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40388 2020-07-20 12:05:10 $"
+// "$Id: ssh2.c 40466 2020-07-20 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -382,7 +382,7 @@ int ssh_authentication(HOST *ph)
 		if ( stat(pubkeyfile, &buf)==0 && stat(privkeyfile, &buf)==0 ) {
 			if ( !libssh2_userauth_publickey_fromfile(ph->session,
 					ph->username, pubkeyfile, privkeyfile, ph->passphrase) ) {
-				term_Print(ph->term,"\033[32m\npublic key(RSA) authenticated\n");
+				term_Print(ph->term,"\033[32mpublic key(RSA) authenticated\r\n");
 				return 0;
 			}
 		}
@@ -503,7 +503,7 @@ DWORD WINAPI ssh(void *pv)
 				else {
 					char *errmsg;
 					libssh2_session_last_error(ph->session, &errmsg, NULL, 0);
-					term_Print(ph->term, "\n\033[31m%s error\r\n", errmsg);
+					term_Print(ph->term, "\r\n\033[31m%s error\r\n", errmsg);
 				}
 				break;
 			}
@@ -763,7 +763,7 @@ void scp_write(HOST *ph, char *lpath, char *rpath)
 			closedir(dir);
 		}
 		if ( cnt==0 ) 
-			term_Print(ph->term, "\n\033[31mscp: %s/%s no mathcing file",
+			term_Print(ph->term, "\r\n\033[31mscp: %s/%s no mathcing file",
 												ldir, lpattern);
 	}
 }
@@ -787,7 +787,7 @@ struct Tunnel *tun_add(HOST *ph, int tun_sock,
 			ph->tunnel_list = tun;
 			ReleaseMutex(ph->mtx_tun);
 		}
-		term_Print(ph->term, "\n\033[32mtunnel %d %s:%d %s:%d\n", tun_sock,
+		term_Print(ph->term, "\r\n\033[32mtunnel %d %s:%d %s:%d\r\n", tun_sock,
 							localip, localport, remoteip, remoteport);
 	}
 	return tun;
@@ -806,7 +806,7 @@ void tun_del(HOST *ph, int tun_sock)
 				else
 					ph->tunnel_list = tun->next;
 				free(tun);
-				term_Print(ph->term, "\n\033[32mtunnel %d closed\n", tun_sock);
+				term_Print(ph->term, "\r\n\033[32mtunnel %d closed\r\n", tun_sock);
 				break;
 			}
 			tun_pre = tun;
@@ -901,7 +901,7 @@ DWORD WINAPI tun_local(void *pv)
 	int sinlen=sizeof(sin);
 	struct addrinfo *ainfo;
 	if ( getaddrinfo(shost, NULL, NULL, &ainfo)!=0 ) {
-		term_Print(ph->term, "\n\033[31minvalid address: %s\n", shost);
+		term_Print(ph->term, "\r\n\033[31minvalid address: %s\r\n", shost);
 		return -1;
 	}
 	int listensock = socket(ainfo->ai_family, SOCK_STREAM, 0);
@@ -909,12 +909,12 @@ DWORD WINAPI tun_local(void *pv)
 	int rc = bind(listensock, ainfo->ai_addr, ainfo->ai_addrlen);
 	freeaddrinfo(ainfo);
 	if ( rc==-1 ) {
-		term_Print(ph->term, "\n\033[31mport %d invalid or in use\n", sport);
+		term_Print(ph->term, "\r\n\033[31mport %d invalid or in use\r\n", sport);
 		closesocket(listensock);
 		return -1;
 	}
 	if ( listen(listensock, 2)==-1 ) {
-		term_Print(ph->term, "\n\033[31mlisten error\n");
+		term_Print(ph->term, "\r\n\033[31mlisten error\r\n");
 		closesocket(listensock);
 		return -1;
 	}
@@ -935,7 +935,7 @@ DWORD WINAPI tun_local(void *pv)
 			if ( !tun_channel ) {
 				if ( rc==LIBSSH2_ERROR_EAGAIN )
 					if ( ssh_wait_socket( ph )>0 ) continue;
-				term_Print(ph->term, "\033[31mCouldn't tunnel, is it supported?\n");
+				term_Print(ph->term, "\033[31mCouldn't tunnel, is it supported?\r\n");
 				closesocket(tun_sock);
 				goto shutdown;
 			}
@@ -972,10 +972,10 @@ void ssh2_Tun(HOST *ph, char *cmd)
 	else {								//list existing tunnels
 		struct Tunnel *tun = ph->tunnel_list;
 		int listen_cnt = 0, active_cnt = 0;
-		term_Print(ph->term, "\nTunnels:\n");
+		term_Print(ph->term, "\r\nTunnels:\r\n");
 		while ( tun!=NULL ) {
 			term_Print(ph->term, tun->channel==NULL?"listen":"active");
-			term_Print(ph->term, " socket %d\t%s:%d\t%s:%d\n",
+			term_Print(ph->term, " socket %d\t%s:%d\t%s:%d\r\n",
 								tun->socket, tun->localip, tun->localport,
 								tun->remoteip, tun->remoteport);
 			if ( tun->channel!=NULL )
@@ -984,7 +984,7 @@ void ssh2_Tun(HOST *ph, char *cmd)
 				listen_cnt++;
 			tun = tun->next;
 		}
-		term_Print(ph->term, "\t%d listenning, %d active\n", 
+		term_Print(ph->term, "\t%d listenning, %d active\r\n", 
 							listen_cnt, active_cnt);
 	}
 	ssh2_Send( ph, "\r", 1);
@@ -996,13 +996,13 @@ int sftp_lcd(HOST *ph, char *cmd)
 		char buf[4096];
 		if ( _getcwd(buf, 4096) != NULL ) 
 			term_Print(ph->term, "\033[32m%s ", buf);
-		term_Print(ph->term, "is local directory\n");
+		term_Print(ph->term, "is local directory\r\n");
 	}
 	else {
 		while ( *cmd==' ' ) cmd++;
 		term_Print(ph->term, "\033[32m%s ", cmd);
-		term_Print(ph->term,  chdir(cmd)==0 ?	"is now local directory!\n"
-								  : "\033[31m is not accessible!\n");
+		term_Print(ph->term,  chdir(cmd)==0 ?	"is now local directory!\r\n"
+								  : "\033[31m is not accessible!\r\n");
 	}
 	return 0;
 }
@@ -1013,14 +1013,14 @@ int sftp_cd(HOST *ph, char *path)
 		LIBSSH2_SFTP_HANDLE *sftp_handle;
 		sftp_handle = libssh2_sftp_opendir(ph->sftp, path);
 		if (!sftp_handle) {
-			term_Print(ph->term, "\033[31mCouldn't change dir to %s\n", path);
+			term_Print(ph->term, "\033[31mCouldn't change dir to %s\r\n", path);
 			return 0;
 		}
 		libssh2_sftp_closedir(sftp_handle);
 		int rc = libssh2_sftp_realpath(ph->sftp, path, newpath, 1024);
 		if ( rc>0 ) strcpy(ph->realpath, newpath);
 	}
-	term_Print(ph->term, "\033[32m%s\033[37m\n", ph->realpath);
+	term_Print(ph->term, "\033[32m%s\033[37m\r\n", ph->realpath);
 	return 0;
 }
 int sftp_ls(HOST *ph, char *path, int ll)
@@ -1030,7 +1030,7 @@ int sftp_ls(HOST *ph, char *path, int ll)
 	LIBSSH2_SFTP_HANDLE *sftp_handle = libssh2_sftp_opendir(ph->sftp, path);
 	if (!sftp_handle) {
 		if ( strchr(path, '*')==NULL && strchr(path, '?')==NULL ) {
-			term_Print(ph->term, "\033[31mCouldn't open dir %s\n", path);
+			term_Print(ph->term, "\033[31mCouldn't open dir %s\r\n", path);
 			return 0;
 		}
 		pattern = strrchr(path, '/');
@@ -1043,7 +1043,7 @@ int sftp_ls(HOST *ph, char *path, int ll)
 			sftp_handle = libssh2_sftp_opendir(ph->sftp, "/");
 		}
 		if ( !sftp_handle ) {
-			term_Print(ph->term, "\033[31mCouldn't open dir %s\n", path);
+			term_Print(ph->term, "\033[31mCouldn't open dir %s\r\n", path);
 			return 0;
 		}
 	}
@@ -1052,7 +1052,7 @@ int sftp_ls(HOST *ph, char *path, int ll)
 	while ( libssh2_sftp_readdir_ex(sftp_handle, mem, sizeof(mem),
 							longentry, sizeof(longentry), &attrs)>0 ) {
 		if ( pattern==NULL || fnmatch(pattern, mem, 0)==0 )
-			term_Print(ph->term, "%s\n", ll ? longentry : mem);
+			term_Print(ph->term, "%s\r\n", ll ? longentry : mem);
 	}
 	libssh2_sftp_closedir(sftp_handle);
 	return 0;
@@ -1061,7 +1061,7 @@ int sftp_rm(HOST *ph, char *path)
 {
 	if ( strchr(path, '*')==NULL && strchr(path, '?')==NULL ) {
 		if ( libssh2_sftp_unlink(ph->sftp, path) )
-			term_Print(ph->term, "\033[31mcouldn't delete %s\n", path);
+			term_Print(ph->term, "\033[31mcouldn't delete %s\r\n", path);
 		return 0;
 	}
 	char mem[512], rfile[1024];
@@ -1071,7 +1071,7 @@ int sftp_rm(HOST *ph, char *path)
 	if ( pattern!=path ) *pattern++ = 0;
 	sftp_handle = libssh2_sftp_opendir(ph->sftp, path);
 	if ( !sftp_handle ) {
-		term_Print(ph->term, "\033[31munable to open %s\n", path);
+		term_Print(ph->term, "\033[31munable to open %s\r\n", path);
 		return 0;
 	}
 
@@ -1081,7 +1081,7 @@ int sftp_rm(HOST *ph, char *path)
 			strcat(rfile, "/");
 			strcat(rfile, mem);
 			if ( libssh2_sftp_unlink(ph->sftp, rfile) )
-				term_Print(ph->term, "\033[31mcouldn't delete %s\n", rfile);
+				term_Print(ph->term, "\033[31mcouldn't delete %s\r\n", rfile);
 		}
 	}
 	libssh2_sftp_closedir(sftp_handle);
@@ -1094,7 +1094,7 @@ int sftp_md(HOST *ph, char *path)
 							LIBSSH2_SFTP_S_IRGRP|LIBSSH2_SFTP_S_IXGRP|
 							LIBSSH2_SFTP_S_IROTH|LIBSSH2_SFTP_S_IXOTH);
 	if ( rc ) {
-		term_Print(ph->term, "\033[31mcouldn't create directory\033[32m%s\n", path);
+		term_Print(ph->term, "\033[31mcouldn't create directory\033[32m%s\r\n", path);
 	}
 	return 0;
 }
@@ -1102,7 +1102,7 @@ int sftp_rd(HOST *ph, char *path)
 {
 	int rc = libssh2_sftp_rmdir(ph->sftp, path);
 	if ( rc ) {
-		term_Print(ph->term, "\033[31mcouldn't remove directory\033[32m%s\n", path);
+		term_Print(ph->term, "\033[31mcouldn't remove directory\033[32m%s\r\n", path);
 	}
 	return 0;
 }
@@ -1110,7 +1110,7 @@ int sftp_ren(HOST *ph, char *src, char *dst)
 {
 	int rc = libssh2_sftp_rename(ph->sftp, src, dst);
 	if ( rc )
-		term_Print(ph->term, "\033[31mcouldn't rename file\033[32m%s\n", src);
+		term_Print(ph->term, "\033[31mcouldn't rename file\033[32m%s\r\n", src);
 	return 0;
 }
 int sftp_get_one(HOST *ph, char *src, char *dst)
@@ -1120,12 +1120,12 @@ int sftp_get_one(HOST *ph, char *src, char *dst)
 											src, LIBSSH2_FXF_READ, 0);
 
 	if (!sftp_handle) {
-		term_Print(ph->term, "\033[31mUnable to read remote file\n");
+		term_Print(ph->term, "\033[31mUnable to read remote file\r\n");
 		return 0;
 	}
 	FILE *fp = fopen_utf8(dst, "wb");
 	if ( fp==NULL ) {
-		term_Print(ph->term, "\033[31munable to create local file\n");
+		term_Print(ph->term, "\033[31munable to create local file\r\n");
 		libssh2_sftp_close(sftp_handle);
 		return 0;
 	}
@@ -1162,12 +1162,12 @@ int sftp_put_one(HOST *ph, char *src, char *dst)
 					  LIBSSH2_SFTP_S_IRUSR|LIBSSH2_SFTP_S_IWUSR|
 					  LIBSSH2_SFTP_S_IRGRP|LIBSSH2_SFTP_S_IROTH);
 	if (!sftp_handle) {
-		term_Print(ph->term, "\033[31mcouldn't create remote file\n");
+		term_Print(ph->term, "\033[31mcouldn't create remote file\r\n");
 		return 0;
 	}
 	FILE *fp = fopen_utf8(src, "rb");
 	if ( fp==NULL ) {
-		term_Print(ph->term, "\033[31mcouldn't read local file\n");
+		term_Print(ph->term, "\033[31mcouldn't read local file\r\n");
 		return 0;
 	}
 
@@ -1224,7 +1224,7 @@ int sftp_get(HOST *ph, char *src, char *dst)
 		*pattern++ = 0;
 		sftp_handle = libssh2_sftp_opendir(ph->sftp, src);
 		if ( !sftp_handle ) {
-			term_Print(ph->term, "\033[31mcould't open remote dir %s\n", src);
+			term_Print(ph->term, "\033[31mcould't open remote dir %s\r\n", src);
 			return 0;
 		}
 
@@ -1289,7 +1289,7 @@ void sftp_put(HOST *ph, char *src, char *dst)
 			}
 		}
 		else
-			term_Print(ph->term, "\033[31mcouldn't open \033[32m%s\n",lfile);
+			term_Print(ph->term, "\033[31mcouldn't open \033[32m%s\r\n",lfile);
 	}
 }
 int sftp_cmd(HOST *ph, char *cmd)
@@ -1349,7 +1349,7 @@ int sftp_cmd(HOST *ph, char *cmd)
 		return -1;
 	}
 	else if ( *cmd )
-		term_Print(ph->term, "\033[31m%s is not valid command, try %s\n\t%s\n",
+		term_Print(ph->term, "\033[31m%s is not valid command, try %s\r\n\t%s\r\n",
 					cmd, "\033[37mlcd, lpwd, cd, pwd,",
 					"ls, dir, get, put, ren, rm, del, mkdir, rmdir, bye");
 	return 0;
