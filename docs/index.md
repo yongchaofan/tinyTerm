@@ -12,13 +12,12 @@ Windows 10 user should install from Microsoft Store, users on older versions of 
 		</video>
 	    </td>
 	    <td>
-		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.9.3</a><br/>
+		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.9.4</a><br/>
 		<a href="https://github.com/yongchaofan/tinyTerm/releases">Release history</a></h4>
 		<h4>Appx package:<br/><a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a></h4>
 		<h4>Portable version:<br/>
-	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.3/tinyTerm.exe">tinyTerm.exe</a><br/>
-	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.3/tinyTerm64.exe">tinyTerm64.exe</a><br/>
-	WinXP: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.2/tinyTermXP.exe">tinyTermXP.exe</a></h4>
+	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.4/tinyTerm.exe">tinyTerm.exe</a><br/>
+	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.4/tinyTerm64.exe">tinyTerm64.exe</a><br/>
 		<h4>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a></h4>
 	    </td>
 	</tr>
