@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 36298 2020-07-27 15:05:10 $"
+// "$Id: term.c 36533 2020-07-27 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -101,7 +101,7 @@ void term_nextLine(TERM *pt)
 		pt->line[pt->cursor_y+1]=pt->cursor_x;
 	if (pt->screen_y==pt->cursor_y-pt->size_y ) pt->screen_y++;
 
-	if (pt->cursor_x>=BUFFERSIZE-1024 || pt->cursor_y==MAXLINES-2 ) {
+	if (pt->cursor_x>=BUFFERSIZE-1024 || pt->cursor_y>=MAXLINES-4 ) {
 		int i, len = pt->line[4096];
 		pt->tl1text -= len;
 		if (pt->tl1text<pt->buff ) {
@@ -818,6 +818,9 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 				pt->cursor_x = pt->line[pt->cursor_y];
 				break;
 			case 'f': //horizontal and vertical position forced
+				for ( int i=pt->cursor_y+1; i<pt->screen_y+n1; i++ )
+					if ( i<MAXLINES && pt->line[i]<pt->cursor_x ) 
+						pt->line[i]=pt->cursor_x;
 			case 'H': //cursor to line n1, postion n0
 				if ( !pt->bAlterScreen && n1>pt->size_y ) {
 					pt->cursor_y = (pt->screen_y++) + pt->size_y;
@@ -836,9 +839,13 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 			case 'J': 	//[J kill till end, 1J begining, 2J entire screen
 				if ( isdigit(pt->escape_code[1])) {
 					screen_clear(pt, m0);
-					break;
-				}//fall through to treat [J as [0K
-				// as a hack for tinyCore command line editing
+				}
+				else {
+					pt->line[pt->cursor_y+1] = pt->cursor_x;
+					for ( int i=pt->cursor_y+2; 
+							  i<=pt->screen_y+pt->size_y+1; i++ )
+						if ( i<MAXLINES ) pt->line[i] = 0;
+				}
 			case 'K': {	//[K kill till end, 1K begining, 2K entire line
 				int i = pt->line[pt->cursor_y];		//setup for m0==2
 				int j = pt->line[pt->cursor_y+1];
