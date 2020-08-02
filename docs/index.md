@@ -3,7 +3,7 @@
 tinyTerm started as a simple telnet client used to work with telecom transport equipment through command line interface(TL1). Over time  it has grown to a full function terminal emulator supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation,  plus unique features like: **command autocompletion**, **scp integration**, **batch automation**, and **scripting**. 
 
 Windows 10 user should install from Microsoft Store, users on older versions of Windows, or prefer portable apps download exe files.
-<h4>Stable release:</h4> 1.9.4  <a href="https://github.com/yongchaofan/tinyTerm/releases">Release history</a>
+<h4>Stable release: <a href="https://github.com/yongchaofan/tinyTerm/releases">1.9.4</a></h4>
 <h4>Download:</h4> <a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a>
 32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.4/tinyTerm.exe">tinyTerm.exe</a>
 64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.4/tinyTerm64.exe">tinyTerm64.exe</a><br/>
