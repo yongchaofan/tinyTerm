@@ -3,25 +3,17 @@
 tinyTerm started as a simple telnet client used to work with telecom transport equipment through command line interface(TL1). Over time  it has grown to a full function terminal emulator supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation,  plus unique features like: **command autocompletion**, **scp integration**, **batch automation**, and **scripting**. 
 
 Windows 10 user should install from Microsoft Store, users on older versions of Windows, or prefer portable apps download exe files.
-<table>
-	<tr>
-	    <td width="568">
-		<video width="560" height="412" controls>
-			<source src="tinyTerm.mp4" type="video/mp4">
-			Your browser does not support the video tag.
-		</video>
-	    </td>
-	    <td>
-		<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.9.4</a><br/>
-		<a href="https://github.com/yongchaofan/tinyTerm/releases">Release history</a></h4>
-		<h4>Appx package:<br/><a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a></h4>
-		<h4>Portable version:<br/>
-	32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.4/tinyTerm.exe">tinyTerm.exe</a><br/>
-	64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.4/tinyTerm64.exe">tinyTerm64.exe</a><br/>
-		<h4>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a></h4>
-	    </td>
-	</tr>
-</table>
+<h4>Stable release: <a href="https://github.com/yongchaofan/tinyterm">1.9.4</a><br/>
+<a href="https://github.com/yongchaofan/tinyTerm/releases">Release history</a></h4>
+<h4>Appx package:<br/><a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a></h4>
+<h4>Portable version:<br/>
+32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.4/tinyTerm.exe">tinyTerm.exe</a><br/>
+64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.4/tinyTerm64.exe">tinyTerm64.exe</a><br/>
+<h4>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a></h4>
+<video width="560" height="412" controls>
+	<source src="tinyTerm.mp4" type="video/mp4">
+	Your browser does not support the video tag.
+</video>
 
 tinyTerm is written in C with Win32 API, [libssh2](http://libssh2.org) used for SSH2 functions.
 
