@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 36533 2020-07-27 15:05:10 $"
+// "$Id: term.c 36800 2020-08-04 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -887,15 +887,24 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 					pt->attr[i]=pt->attr[i+n0];
 				}
 				buff_clear(pt, pt->line[pt->cursor_y+1]-n0, n0);
+				if ( !pt->bAlterScreen ) {
+					pt->line[pt->cursor_y+1]-=n0;
+					if ( pt->line[pt->cursor_y+1]<pt->line[pt->cursor_y] )
+						pt->line[pt->cursor_y+1] =pt->line[pt->cursor_y];
+				}
 				break;
 			case '@'://insert n0 spaces
 				for (int i=pt->line[pt->cursor_y+1]-n0-1;i>=pt->cursor_x; i--){
 					pt->buff[i+n0]=pt->buff[i];
 					pt->attr[i+n0]=pt->attr[i];
 				}
-				pt->line[pt->cursor_y+1]+=n0;
-				if ( pt->line[pt->cursor_y+1]-pt->line[pt->cursor_y]>pt->size_x )
-					pt->line[pt->cursor_y+1] = pt->line[pt->cursor_y]+pt->size_x;
+				if ( !pt->bAlterScreen ){
+					pt->line[pt->cursor_y+1]+=n0;
+					if ( pt->line[pt->cursor_y+1]>pt->line[pt->cursor_y]
+															+pt->size_x )
+						pt->line[pt->cursor_y+1] =pt->line[pt->cursor_y]
+															+pt->size_x;
+				}
 				//fall through;
 			case 'X': //erase n0 characters
 				buff_clear(pt, pt->cursor_x, n0);
