@@ -837,7 +837,7 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 				}
 				break;
 			case 'J': 	//[J kill till end, 1J begining, 2J entire screen
-				if ( isdigit(pt->escape_code[1])) {
+				if ( isdigit(pt->escape_code[1]) ) {
 					screen_clear(pt, m0);
 				}
 				else {
@@ -846,6 +846,7 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 							  i<=pt->screen_y+pt->size_y+1; i++ )
 						if ( i<MAXLINES ) pt->line[i] = 0;
 				}
+				break;
 			case 'K': {	//[K kill till end, 1K begining, 2K entire line
 				int i = pt->line[pt->cursor_y];		//setup for m0==2
 				int j = pt->line[pt->cursor_y+1];
@@ -856,26 +857,30 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 				break;
 			case 'L'://insert lines
 				if ( n0 > pt->screen_y+pt->roll_bot-pt->cursor_y ) 
-					n0 = pt->screen_y+pt->roll_bot-pt->cursor_y;
-				for ( int i=pt->screen_y+pt->roll_bot; 
-							i>=pt->cursor_y+n0; i--) {
-					memcpy(pt->buff+pt->line[i],
-							pt->buff+pt->line[i-n0], pt->size_x);
-					memcpy(pt->attr+pt->line[i],
-							pt->attr+pt->line[i-n0], pt->size_x);
+					n0 = pt->screen_y+pt->roll_bot-pt->cursor_y+1;
+				else {
+					for ( int i=pt->screen_y+pt->roll_bot;
+								i>=pt->cursor_y+n0; i--) {
+						memcpy(pt->buff+pt->line[i],
+								pt->buff+pt->line[i-n0], pt->size_x);
+						memcpy(pt->attr+pt->line[i],
+								pt->attr+pt->line[i-n0], pt->size_x);
+					}
 				}
 				pt->cursor_x = pt->line[pt->cursor_y];
 				buff_clear(pt, pt->cursor_x, pt->size_x*n0);
 				break;
 			case 'M'://delete lines
 				if ( n0 > pt->screen_y+pt->roll_bot-pt->cursor_y ) 
-					n0 = pt->screen_y+pt->roll_bot-pt->cursor_y;
-				for ( int i=pt->cursor_y; 
-							i<=pt->screen_y+pt->roll_bot-n0; i++ ) {
-					memcpy(pt->buff+pt->line[i],
-							pt->buff+pt->line[i+n0], pt->size_x);
-					memcpy(pt->attr+pt->line[i],
-							pt->attr+pt->line[i+n0], pt->size_x);
+					n0 = pt->screen_y+pt->roll_bot-pt->cursor_y+1;
+				else {
+					for ( int i=pt->cursor_y; 
+								i<=pt->screen_y+pt->roll_bot-n0; i++ ) {
+						memcpy(pt->buff+pt->line[i],
+								pt->buff+pt->line[i+n0], pt->size_x);
+						memcpy(pt->attr+pt->line[i],
+								pt->attr+pt->line[i+n0], pt->size_x);
+					}
 				}
 				pt->cursor_x = pt->line[pt->cursor_y];
 				buff_clear(pt, pt->line[pt->screen_y+pt->roll_bot-n0+1],
@@ -1036,10 +1041,12 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 			case 's': //save cursor
 				pt->save_x = pt->cursor_x-pt->line[pt->cursor_y];
 				pt->save_y = pt->cursor_y-pt->screen_y;
+				pt->save_attr = pt->c_attr;
 				break;
 			case 'u': //restore cursor
 				pt->cursor_y = pt->save_y+pt->screen_y;
 				pt->cursor_x = pt->line[pt->cursor_y]+pt->save_x;
+				pt->c_attr = pt->save_attr;
 				break;
 				}
 			}
