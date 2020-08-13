@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 31376 2020-06-27 15:05:10 $"
+// "$Id: host.c 31308 2020-06-27 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -267,20 +267,17 @@ DWORD WINAPI serial(void *pv)
 	while ( WaitForSingleObject(ph->hExitEvent, 0) == WAIT_TIMEOUT ) {
 		char buf[256];
 		DWORD dwCCH;
-		if ( ReadFile(ph->hSerial, buf, 255, &dwCCH, NULL ) ) {
+		if ( ReadFile(ph->hSerial, buf, 256, &dwCCH, NULL ) ) {
 			if ( bXmodem ) { 
 				char op = 0;
 				if ( dwCCH>0 ) op = buf[dwCCH-1];
 				xmodem_recv(ph, op);
 				continue;
 			}
-			if ( dwCCH > 0 ) {
-				buf[dwCCH] = 0;
+			if ( dwCCH > 0 )
 				term_Parse(ph->term, buf, dwCCH);
-			}
-			else {
+			else
 				Sleep(1);//give WriteFile a chance to complete
-			}
 		}
 		else
 			if ( !ClearCommError(ph->hSerial, NULL, NULL) ) break;
@@ -353,9 +350,9 @@ DWORD WINAPI telnet(void *pv)
 		ph->status=CONNECTED;
 		term_Disp(ph->term, "connected\r\n");
 
-		char buf[1536];
+		char buf[4096];
 		int cnt;
-		while ( (cnt=recv(ph->sock, buf, 1500, 0)) > 0 ) {
+		while ( (cnt=recv(ph->sock, buf, 4096, 0)) > 0 ) {
 			term_Parse(ph->term, buf, cnt);
 		}
 		closesocket(ph->sock);
@@ -428,12 +425,10 @@ DWORD WINAPI stdio( void *pv)
 		ph->status=CONNECTED;
 		while ( TRUE ) {
 			DWORD dwCCH;
-			char buf[1536];
-			if ( ReadFile(ph->hStdioRead, buf, 1500, &dwCCH, NULL) > 0 ) {
-				if ( dwCCH > 0 ) {
-					buf[dwCCH] = 0;
+			char buf[4096];
+			if ( ReadFile(ph->hStdioRead, buf, 4096, &dwCCH, NULL) > 0 ) {
+				if ( dwCCH > 0 )
 					term_Parse(ph->term, buf, dwCCH);
-				}
 				else
 					Sleep(1);
 			}
