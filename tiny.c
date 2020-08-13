@@ -824,7 +824,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		wnd_Size();
 		SetLayeredWindowAttributes(hwnd,0,iTransparency,LWA_ALPHA);
 		ShowWindow(hwnd, SW_SHOW);
-		SetTimer(hwnd, 1, 25, (TIMERPROC)NULL);	//redraw at 40Hz
+		SetTimer(hwnd, 1, 20, (TIMERPROC)NULL);	//redraw at 50Hz
 		if ( bLocalEdit ) 
 			term_Disp(pt, TINYTERM);
 		else
