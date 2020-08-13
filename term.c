@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 36800 2020-08-04 15:05:10 $"
+// "$Id: term.c 36900 2020-08-04 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -42,8 +42,7 @@ BOOL term_Construct(TERM *pt)
 	pt->attr = (char *)malloc(BUFFERSIZE);
 	pt->line = (int * )malloc(MAXLINES*sizeof(int));
 
-	if (pt->buff!=NULL && pt->attr!=NULL && pt->line!=NULL )
-	{
+	if ( pt->buff!=NULL && pt->attr!=NULL && pt->line!=NULL ) {
 		term_Clear(pt);
 		return TRUE;
 	}
@@ -356,12 +355,7 @@ void term_Disp(TERM *pt, const char *msg )
 }
 void term_Send(TERM *pt, char *buf, int len)
 {
-	if (pt->bEcho ) {
-		if ( host_Type(pt->host)==NETCONF ) 
-			term_Parse_XML(pt, buf, len);
-		else
-			term_Parse(pt, buf, len);
-	}
+	if (pt->bEcho )	term_Parse(pt, buf, len);
 	if ( host_Status(pt->host)!=IDLE ) 
 		host_Send(pt->host, buf, len);
 }
@@ -458,12 +452,12 @@ int term_TL1(TERM *pt, char *cmd, char **pTl1Text)
 		pt->tl1len = 0;
 		pt->buff[pt->cursor_x]=0;
 		char *p = strstr( pcursor, cmd);
-		if ( p==NULL ) { pcursor = pt->buff; p = strstr( pcursor, cmd); }
+		if ( p==NULL ) { pcursor = pt->buff; p = strstr(pcursor, cmd); }
 		if ( p!=NULL ) { p = strstr( p, "\r\n");
 			if ( p!=NULL ) {
 				pt->tl1text = p+2;
-				p = strstr( p, "\nM ");
-				p = strstr( p, pt->sPrompt);
+				p = strstr(p, "\nM ");
+				p = strstr(p, pt->sPrompt);
 				if ( p!=NULL ) {
 					pcursor = ++p;
 					pt->tl1len = pcursor - pt->tl1text;
@@ -580,8 +574,7 @@ int term_Scp(TERM *pt, char *cmd, char **preply)
 }
 int term_Tun(TERM *pt, char *cmd, char **preply)
 {
-	if ( host_Type(pt->host )!=SSH ) return 0; 
-	
+	if ( host_Type(pt->host)!=SSH ) return 0; 
 	char *reply = term_Mark_Prompt(pt);
 	if ( preply!=NULL ) *preply = reply;
 	ssh2_Tun(pt->host, cmd);
@@ -639,8 +632,8 @@ int term_Cmd(TERM *pt, char *cmd, char **preply)
 		if ( preply!=NULL ) *preply = pt->sPrompt;
 		rc = pt->iPrompt;
 	}
-	else if ( strncmp(cmd, "Tftpd",5)==0 )	tftp_Svr( cmd+5);
-	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 	ftp_Svr( cmd+4);
+	else if ( strncmp(cmd, "Tftpd",5)==0 )	tftp_Svr(cmd+5);
+	else if ( strncmp(cmd, "Ftpd", 4)==0 ) 	ftp_Svr(cmd+4);
 	else if ( strncmp(cmd, "tun",  3)==0 ) 	rc = term_Tun(pt, cmd+3, preply);
 	else if ( strncmp(cmd, "scp ", 4)==0 ) 	rc = term_Scp(pt, cmd+4, preply);
 	else if ( strncmp(cmd, "xmodem ", 7)==0 ) rc = term_xmodem(pt, cmd+7);
@@ -657,8 +650,6 @@ int term_Cmd(TERM *pt, char *cmd, char **preply)
 		}
 	}
 	else {
-		if ( host_Status(pt->host)==IDLE )
-			term_Print(pt, "\033[33m%s\n", cmd); 
 		term_Mark_Prompt(pt);
 		host_Open(pt->host, cmd);
 		if ( preply!=NULL ) {
@@ -1167,7 +1158,13 @@ void term_Parse_XML(TERM *pt, const char *msg, int len)
 	if ( p>msg ) term_Parse(pt, msg, p-msg);
 	while ( *p!=0 && p<msg+len ) {
 		while (*p==0x0d || *p==0x0a || *p=='\t' || *p==' ' ) p++;
-		if ( *p=='<' ) {//tag
+		if ( *p==']' && p+6<=msg+len ) {
+			if ( strncmp(p, "]]>]]>", 6)==0 ) {
+				term_Parse(pt, "]]>]]>\n\033[37m", 12);
+				p+=6;
+			}
+		}
+		else if ( *p=='<' ) {//tag
 			if ( p[1]=='/' ) {
 				if ( !pt->xmlPreviousIsOpen ) {
 					pt->xmlIndent -= 2;
