@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 37018 2020-07-25 15:35:10 $"
+// "$Id: tiny.c 37028 2020-07-25 15:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -625,7 +625,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 	case ID_ABOUT:{
 			char welcome[1024];
 			sprintf(welcome, WELCOME, httport);
-			term_Disp( pt, welcome );
+			term_Disp(pt, welcome);
 		}
 		break;
 	case ID_CONNECT:
@@ -634,7 +634,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 							hwndTerm, (DLGPROC)ConnectProc);
 		break;
 	case ID_DISCONN:
-		if ( ph->status!=IDLE ) host_Close( ph );
+		if ( ph->status!=IDLE ) host_Close(ph);
 		break;
 	case ID_LOGG:
 		if ( !term.bLogging ) {
@@ -643,7 +643,7 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 			if ( wfn!=NULL ) {
 				char fn[MAX_PATH];
 				wchar_to_utf8(wfn, wcslen(wfn)+1, fn, MAX_PATH);
-				term_Logg( pt, fn );
+				term_Logg(pt, fn);
 			}
 		}
 		else
@@ -657,18 +657,18 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		break;
 	case ID_COPY:
 		if ( OpenClipboard(hwndTerm) ) {
-			EmptyClipboard( );
+			EmptyClipboard();
 			char *ptr;
 			int len = term_Copy(pt, &ptr);
 			HANDLE hglbCopy = GlobalAlloc(GMEM_MOVEABLE, (len+1)*2);
 			if ( hglbCopy!=NULL && len>0) {
 				WCHAR *wbuf = GlobalLock(hglbCopy);
-				len = utf8_to_wchar( ptr, len, wbuf, len );
+				len = utf8_to_wchar(ptr, len, wbuf, len);
 				wbuf[len] = 0;
 				GlobalUnlock(hglbCopy);
 				SetClipboardData(CF_UNICODETEXT, hglbCopy);
 			}
-			CloseClipboard( );
+			CloseClipboard();
 		}
 		break;
 	case ID_PASTE:
@@ -795,11 +795,11 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 }
 void ftpd_quit()
 {
-	menu_Check( ID_FTPD, bFTPd=FALSE );
+	menu_Check(ID_FTPD, bFTPd=FALSE);
 }
 void tftpd_quit()
 {
-	menu_Check( ID_TFTPD, bTFTPd=FALSE );
+	menu_Check(ID_TFTPD, bTFTPd=FALSE);
 }
 LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 {
@@ -808,15 +808,15 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	switch (msg) {
 	case WM_CREATE:
 		hwndTerm = hwnd;
-		drop_Init( hwnd, DropScript );
-		DragAcceptFiles( hwnd, TRUE );
+		drop_Init(hwnd, DropScript);
+		DragAcceptFiles(hwnd, TRUE);
 		hwndCmd = CreateWindow(L"EDIT", NULL, WS_CHILD|WS_VISIBLE 
 							|ES_AUTOHSCROLL|ES_NOHIDESEL, 0, 0, 1, 1, 
 							hwnd, (HMENU)0, hInst, NULL);
 		wpOrigCmdProc = (WNDPROC)SetWindowLongPtr(hwndCmd,
 							GWLP_WNDPROC, (LONG_PTR)CmdEditProc);
-		SendMessage( hwndCmd, WM_SETFONT, (WPARAM)hTermFont, TRUE );
-		SendMessage( hwndCmd, EM_SETLIMITTEXT, 255, 0);
+		SendMessage(hwndCmd, WM_SETFONT, (WPARAM)hTermFont, TRUE);
+		SendMessage(hwndCmd, EM_SETLIMITTEXT, 255, 0);
 		autocomplete_Init(hwndCmd);
 		LoadDict();
 		menu_Size();
@@ -919,8 +919,8 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		{
 		case SB_LINEUP:   term_Scroll(pt,  1); break;
 		case SB_LINEDOWN: term_Scroll(pt, -1); break;
-		case SB_PAGEUP:   term_Scroll(pt,  term.size_y-1); break;
-		case SB_PAGEDOWN: term_Scroll(pt,  1-term.size_y); break;
+		case SB_PAGEUP:   term_Scroll(pt, term.size_y-1); break;
+		case SB_PAGEDOWN: term_Scroll(pt, 1-term.size_y); break;
 		case SB_THUMBTRACK: {
 				SCROLLINFO si; 
 				si.cbSize = sizeof (si);
@@ -1002,14 +1002,15 @@ LRESULT CALLBACK MainWndProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			if ( MessageBox(hwnd, L"Disconnect and quit?",
 							L"tinyTerm", MB_YESNO)==IDNO ) break;
 			host_Close(ph);
+			while ( ph->status!=IDLE ) Sleep(100);
 		}
-		if ( term.bLogging ) term_Logg( pt, NULL );
-		SaveDict( );
-		autocomplete_Destroy( );
+		if ( term.bLogging ) term_Logg(pt, NULL);
+		SaveDict();
+		autocomplete_Destroy();
 		DestroyMenu(hMainMenu);
 		DeleteObject(dwBkBrush);
 		DragAcceptFiles(hwnd, FALSE);
-		drop_Destroy( hwnd );
+		drop_Destroy(hwnd);
 		DestroyWindow(hwnd);
 		break;
 	case WM_DESTROY:
@@ -1178,12 +1179,12 @@ DWORD WINAPI uploader(void *files)	//upload files through scp or sftp
 	
 	char rdir[1024];
 	if ( ph->type==SSH ) {
-		term_Pwd( pt, rdir, 1022 );
+		term_Pwd(pt, rdir, 1022);
 		rdir[1023] = 0;
 		strcat(rdir, "/");
 	}
 	else 
-		term_Disp( pt, "\n" );
+		term_Disp(pt, "\n");
 
 	char *p1=(char *)files, *p;
 	while ( (p=p1)!=NULL ) {

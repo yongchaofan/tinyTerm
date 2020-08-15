@@ -65,6 +65,7 @@ typedef struct tagHOST {
 	LIBSSH2_SFTP *sftp;				//sftp host
 	char homepath[MAX_PATH];
 	char realpath[MAX_PATH];
+	int sftp_running;
 
 	struct tagTERM *term;
 } HOST;

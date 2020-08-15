@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40092 2020-08-12 12:05:10 $"
+// "$Id: ssh2.c 40314 2020-08-12 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -520,10 +520,10 @@ TCP_Close:
 	term_Title(ph->term, "");
 	return 1;
 }
-void print_total(TERM *pt, time_t start, long long total)
+void print_total(TERM *pt, time_t start, long total)
 {
 	double duration = difftime(time(NULL), start);
-	term_Print(pt, "\033[12D%lld bytes", total);
+	term_Print(pt, "\033[12D%ld bytes", total);
 	if ( duration>0 ) 
 		term_Print(pt, ", %dMB/s", (int)((total>>20)/duration));
 }
@@ -625,9 +625,11 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 		}
 	} while ( !scp_channel);
 
-	time_t start = time(NULL);
-	size_t nread = 0, total = 0;
 	char mem[1024*32];
+	time_t start=time(NULL);
+	size_t nread=0;
+	long total=0;
+	int blocks=0;
 	while ( (nread=fread(mem, 1, sizeof(mem), fp)) >0 ) {
 		char *ptr = mem;
 		int rc;
@@ -645,8 +647,10 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 			}
 		}
 		if ( rc>0 ) {
-			if ( (total&0xfffff)==0 )
-				term_Print(ph->term, "\033[12D% 10lldKB", total>>10);
+			if ( ++blocks==32 ) {
+				blocks = 0;
+				term_Print(ph->term, "\033[12D% 10ldKB", total>>10);
+			}
 		}
 		else {
 			term_Print(ph->term, ", \033[31merror writing to host");
@@ -1147,7 +1151,7 @@ void sftp_put_one(HOST *ph, char *src, char *dst)
 	}
 
 	char mem[1024*64];
-	int nread;
+	int nread, blocks = 0;
 	long total=0;
 	time_t start = time(NULL);
 	while ( (nread=fread(mem, 1, sizeof(mem), fp))>0 ) {
@@ -1160,8 +1164,10 @@ void sftp_put_one(HOST *ph, char *src, char *dst)
 			}
 		}
 		if ( rc>0 ) {
-			if ( (total&0xfffff)==0 )
+			if ( ++blocks==32 ) {
+				blocks = 0;
 				term_Print(ph->term, "\033[12D% 10ldKB", total>>10);
+			}
 		}
 		else {
 			term_Print(ph->term, "\033[31merror writing to host");
@@ -1354,7 +1360,7 @@ DWORD WINAPI sftp(void *pv)
 		goto sftp_Close;
 	}
 	const char *banner = libssh2_session_banner_get(ph->session);
-	if ( banner!=NULL ) term_Disp(ph->term, banner);
+	if ( banner!=NULL ) term_Print(ph->term, "\n%s", banner);
 
 	ph->status=AUTHENTICATING;
 	if ( ssh_knownhost( ph )<0 ) {
@@ -1375,21 +1381,25 @@ DWORD WINAPI sftp(void *pv)
 		*ph->realpath=0;
 	strcpy(ph->homepath, ph->realpath);
 
+	char cwd[4096];
+	_getcwd(cwd, 4096);
 	ph->type = SFTP;
-	ph->status=CONNECTED;
-	for (int i=0; i<10; i++ ) {
-		char *cmd = ssh2_Gets( ph, "\r\033[32msftp> \033[37m", TRUE);
-		if ( cmd!=NULL ) {
-			if ( sftp_cmd( ph, cmd)==-1 ) break;
-			i=0;
+	ph->status = CONNECTED;
+	ph->sftp_running = TRUE;
+	while ( ph->sftp_running ) {
+		char *cmd = ssh2_Gets(ph, "\033[32msftp> \033[37m", TRUE);
+		for ( int i=0; i<10 && cmd==NULL && ph->sftp_running; i++ )
+			cmd = ssh2_Gets(ph, "", TRUE);
+		if ( cmd==NULL ) {
+			term_Disp(ph->term, "Time Out!");
+			break;
 		}
-		else {
-			if ( i==9 ) term_Disp(ph->term, "Time Out!");
-		}
+		if ( sftp_cmd( ph, cmd)==-1 ) break;
 	}
 	libssh2_sftp_shutdown(ph->sftp);
 	term_Error(ph->term, "Disconnected");
 	ph->type = NONE;
+	chdir(cwd);
 
 sftp_Close:
 	libssh2_session_disconnect(ph->session, "Normal Shutdown");
