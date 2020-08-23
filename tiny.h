@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5866 2020-07-27 12:05:10 $"
+// "$Id: tiny.h 5914 2020-08-23 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -144,6 +144,7 @@ void ssh2_Tun(HOST *ph, char *cmd);
 void scp_read(HOST *ph, char *lpath, char *rfiles);
 void scp_write(HOST *ph, char *lpath, char *rpath);
 void sftp_put(HOST *ph, char *src, char *dst);
+void sftp_Close(HOST *ph);
 
 /****************term.c****************/
 void host_callback( void *term, char *buf, int len);

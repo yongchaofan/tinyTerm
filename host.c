@@ -1,5 +1,5 @@
 //
-// "$Id: host.c 31288 2020-06-27 15:05:10 $"
+// "$Id: host.c 31224 2020-08-23 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -104,13 +104,12 @@ int host_Type(HOST *ph)
 void host_Close(HOST *ph)
 {
 	switch (ph->type ) {
-	case STDIO:	stdio_Close(ph); break;
-	case SERIAL:SetEvent(ph->hExitEvent); break;
-	case SFTP:	ph->bGets=ph->sftp_running=FALSE; break;
-	case SSH:
-	case NETCONF:ssh2_Close(ph); break;
-	case TELNET: closesocket(ph->sock); break;
-	default: if (ph->sock!=0) closesocket(ph->sock);
+		case STDIO:	stdio_Close(ph); break;
+		case SERIAL:SetEvent(ph->hExitEvent); break;
+		case TELNET:closesocket(ph->sock); break;
+		case SFTP:	sftp_Close(ph); break;
+		case SSH:
+		case NETCONF:ssh2_Close(ph); break;
 	}
 }
 void host_Destory()
