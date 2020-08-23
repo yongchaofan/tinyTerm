@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40314 2020-08-12 12:05:10 $"
+// "$Id: ssh2.c 40780 2020-08-12 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -117,13 +117,14 @@ void ssh2_Construct(HOST *ph)
 }
 int ssh_wait_socket(HOST *ph)
 {
+	TIMEVAL tv = {0, 100000};
 	fd_set fds, *rfd=NULL, *wfd=NULL;
 	FD_ZERO(&fds); FD_SET(ph->sock, &fds);
 	int dir = libssh2_session_block_directions(ph->session);
 	if ( dir==0 ) return 1;
 	if ( dir & LIBSSH2_SESSION_BLOCK_INBOUND ) rfd = &fds;
 	if ( dir & LIBSSH2_SESSION_BLOCK_OUTBOUND ) wfd = &fds;
-	return select(ph->sock+1, rfd, wfd, NULL, NULL);
+	return select(ph->sock+1, rfd, wfd, NULL, &tv);
 }
 char *ssh2_Gets(HOST *ph, char *prompt, BOOL bEcho)
 {
@@ -178,7 +179,7 @@ void ssh2_Send(HOST *ph, char *buf, int len)
 			if ( cch>=0 )
 				total += cch;
 			else
-				if ( cch=!LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<=0 ) break;
+				if ( cch!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<0 ) break;
 		}
 	}
 }
@@ -489,7 +490,7 @@ DWORD WINAPI ssh(void *pv)
 					term_Parse_XML(ph->term, buf, cch);
 			}
 			else {
-				if ( cch!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket( ph )<=0 ) {
+				if ( cch!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket( ph )<0 ) {
 					char *errmsg;
 					libssh2_session_last_error(ph->session, &errmsg, NULL, 0);
 					term_Print(ph->term, "\r\n\033[31m%s error\r\n", errmsg);
@@ -539,7 +540,7 @@ int scp_read_one(HOST *ph, const char *rpath, const char *lpath)
 		if ( !scp_channel ) err_no = libssh2_session_last_errno(ph->session);
 		ReleaseMutex(ph->mtx);
 		if (!scp_channel) {
-			if ( err_no!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<=0 ) {
+			if ( err_no!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<0 ) {
 				term_Print(ph->term,"\033[31mcouldn't open remote file");
 				return -1;
 			}
@@ -581,7 +582,7 @@ int scp_read_one(HOST *ph, const char *rpath, const char *lpath)
 			}
 		}
 		else {
-			if ( rc!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<=0 ) {
+			if ( rc!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<0 ) {
 				term_Print(ph->term, ", \033[31merror reading from host");
 				break;
 			}
@@ -617,7 +618,7 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 		if ( !scp_channel ) err_no = libssh2_session_last_errno(ph->session);
 		ReleaseMutex(ph->mtx);
 		if ( !scp_channel ) {
-			if ( err_no!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<=0 ) {
+			if ( err_no!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<0 ) {
 				term_Print(ph->term, "\033[31mcouldn't create remote file");
 				fclose(fp);
 				return -2;
@@ -643,7 +644,7 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 				total += rc;
 			}
 			else {
-				if ( rc!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<=0 ) break;
+				if ( rc!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<0 ) break;
 			}
 		}
 		if ( rc>0 ) {
@@ -924,7 +925,7 @@ DWORD WINAPI tun_local(void *pv)
 			if (!tun_channel) rc = libssh2_session_last_errno(ph->session);
 			ReleaseMutex(ph->mtx);
 			if ( !tun_channel ) {
-				if ( rc!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<=0 ) {
+				if ( rc!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<0 ) {
 					term_Print(ph->term, "\033[31mCouldn't tunnel, is it supported?\r\n");
 					closesocket(tun_sock);
 					goto shutdown;
@@ -987,61 +988,77 @@ void sftp_lcd(HOST *ph, char *cmd)
 	char buf[4096];
 	if ( cmd!=NULL && *cmd!=0 ) {
 		if ( chdir(cmd)!=0 )
-			term_Print(ph->term, "\033[31mcouldn't change working directory!\r\n");
+			term_Print(ph->term, "\033[31mcouldn't change working dir!\r\n");
 	}
-	if ( _getcwd(buf, 4096) != NULL ) 
-		term_Print(ph->term, "\033[32m%s is local working directory\r\n", buf);
+	if ( _getcwd(buf, 4096)!=NULL ) 
+		term_Print(ph->term, "\033[32m%s is local working dir\r\n", buf);
 }
 void sftp_cd(HOST *ph, char *path)
 {
 	char newpath[1024];
 	if ( path!=NULL ) {
 		LIBSSH2_SFTP_HANDLE *sftp_handle;
-		sftp_handle = libssh2_sftp_opendir(ph->sftp, path);
-		if (!sftp_handle) {
-			term_Print(ph->term, "\033[31mCouldn't change dir to %s\r\n", path);
-			return;
+		if ( (sftp_handle=libssh2_sftp_opendir(ph->sftp, path))!=NULL ) {
+			libssh2_sftp_closedir(sftp_handle);
+			if ( libssh2_sftp_realpath(ph->sftp, path, newpath, 1024)>0 ) 
+				strcpy(ph->realpath, newpath);
 		}
-		libssh2_sftp_closedir(sftp_handle);
-		int rc = libssh2_sftp_realpath(ph->sftp, path, newpath, 1024);
-		if ( rc>0 ) strcpy(ph->realpath, newpath);
+		else {
+			term_Print(ph->term, "\033[31mCouldn't change dir to %s\r\n",path);
+		}
 	}
 	term_Print(ph->term, "\033[32m%s\033[37m\r\n", ph->realpath);
 }
 void sftp_ls(HOST *ph, char *path, int ll)
 {
-	char *pattern = NULL;
-
 	WaitForSingleObject(ph->mtx, INFINITE);
-	LIBSSH2_SFTP_ATTRIBUTES attrs;
 	LIBSSH2_SFTP_HANDLE *sftp_handle = libssh2_sftp_opendir(ph->sftp, path);
-	if (!sftp_handle) {
-		if ( strchr(path, '*')==NULL && strchr(path, '?')==NULL ) {
-			term_Print(ph->term, "\033[31mCouldn't open dir %s\r\n", path);
-			return;
-		}
+	char *pattern = NULL;
+	if ( sftp_handle==NULL ) {
 		pattern = strrchr(path, '/');
-		if ( pattern!=path ) {
-			*pattern++ = 0;
-			sftp_handle = libssh2_sftp_opendir(ph->sftp, path);
-		}
-		else {
-			pattern++;
-			sftp_handle = libssh2_sftp_opendir(ph->sftp, "/");
-		}
-		if ( !sftp_handle ) {
-			term_Print(ph->term, "\033[31mCouldn't open dir %s\r\n", path);
-			return;
-		}
+		if ( pattern!=path )
+			*pattern = 0;
+		else
+			path = "/";
+		pattern++;
+		sftp_handle = libssh2_sftp_opendir(ph->sftp, path);
 	}
-
-	char mem[256], longentry[256];
-	while ( libssh2_sftp_readdir_ex(sftp_handle, mem, sizeof(mem),
-							longentry, sizeof(longentry), &attrs)>0 ) {
-		if ( pattern==NULL || fnmatch(pattern, mem, 0)==0 )
-			term_Print(ph->term, "%s\r\n", ll ? longentry : mem);
+	if ( sftp_handle!=NULL ) {
+		LIBSSH2_SFTP_ATTRIBUTES attrs;
+		int count = 0;
+		char mem[256], longentry[256];
+		char *shortlist[256], *longlist[256];
+		while ( libssh2_sftp_readdir_ex(sftp_handle, mem, sizeof(mem),
+								longentry, sizeof(longentry), &attrs)>0 ) {
+			if ( pattern==NULL || fnmatch(pattern, mem, 0)==0 ) {
+				int i;
+				for ( i=0; i<count; i++ ) {
+					if ( strcmp(mem, shortlist[i])<0 ) {
+						for ( int j=254; j>i; j-- ) {
+							shortlist[j] = shortlist[j-1];
+							longlist[j] = longlist[j-1];
+						}
+						shortlist[i] = strdup(mem);
+						longlist[i] = strdup(longentry);
+						break;
+					}
+				}
+				if ( i==count ) {
+					shortlist[i] = strdup(mem);
+					longlist[i] = strdup(longentry);
+				}
+				if ( ++count==256 ) break;
+			}
+		}
+		for (int i=0; i<count; i++ ) {
+			term_Print(ph->term, "%s\r\n", ll ? longlist[i] : shortlist[i]);
+			free(longlist[i]); free(shortlist[i]);
+		}	
+		libssh2_sftp_closedir(sftp_handle);
 	}
-	libssh2_sftp_closedir(sftp_handle);
+	else {
+		term_Print(ph->term, "\033[31mCouldn't open dir %s\r\n", path);
+	}
 	ReleaseMutex(ph->mtx);
 }
 void sftp_rm(HOST *ph, char *path)
@@ -1055,23 +1072,23 @@ void sftp_rm(HOST *ph, char *path)
 	LIBSSH2_SFTP_ATTRIBUTES attrs;
 	LIBSSH2_SFTP_HANDLE *sftp_handle;
 	char *pattern = strrchr(path, '/');
-	if ( pattern!=path ) *pattern++ = 0;
-	sftp_handle = libssh2_sftp_opendir(ph->sftp, path);
-	if ( !sftp_handle ) {
+	if ( pattern!=NULL && pattern!=path ) *pattern++ = 0;
+	if ( (sftp_handle=libssh2_sftp_opendir(ph->sftp, path))!=NULL ) {
+		while ( libssh2_sftp_readdir(sftp_handle, mem, sizeof(mem), &attrs)>0 ) {
+			if ( fnmatch(pattern, mem, 0)==0 ) {
+				strcpy(rfile, path);
+				strcat(rfile, "/");
+				strcat(rfile, mem);
+				if ( libssh2_sftp_unlink(ph->sftp, rfile) )
+					term_Print(ph->term, "\033[31mcouldn't delete %s\r\n", rfile);
+			}
+		}
+		libssh2_sftp_closedir(sftp_handle);
+	}
+	else {
 		term_Print(ph->term, "\033[31munable to open %s\r\n", path);
-		return;
 	}
 
-	while ( libssh2_sftp_readdir(sftp_handle, mem, sizeof(mem), &attrs)>0 ) {
-		if ( fnmatch(pattern, mem, 0)==0 ) {
-			strcpy(rfile, path);
-			strcat(rfile, "/");
-			strcat(rfile, mem);
-			if ( libssh2_sftp_unlink(ph->sftp, rfile) )
-				term_Print(ph->term, "\033[31mcouldn't delete %s\r\n", rfile);
-		}
-	}
-	libssh2_sftp_closedir(sftp_handle);
 }
 void sftp_md(HOST *ph, char *path)
 {
@@ -1080,13 +1097,13 @@ void sftp_md(HOST *ph, char *path)
 							LIBSSH2_SFTP_S_IRGRP|LIBSSH2_SFTP_S_IXGRP|
 							LIBSSH2_SFTP_S_IROTH|LIBSSH2_SFTP_S_IXOTH);
 	if ( rc ) {
-		term_Print(ph->term, "\033[31mcouldn't create directory\033[32m%s\r\n", path);
+		term_Print(ph->term, "\033[31mcouldn't create dir \033[32m%s\r\n", path);
 	}
 }
 void sftp_rd(HOST *ph, char *path)
 {
 	if ( libssh2_sftp_rmdir(ph->sftp, path) )
-		term_Print(ph->term, "\033[31mcouldn't remove directory\033[32m%s\r\n", path);
+		term_Print(ph->term, "\033[31mcouldn't remove dir \033[32m%s\r\n", path);
 }
 void sftp_ren(HOST *ph, char *src, char *dst)
 {
@@ -1202,25 +1219,25 @@ void sftp_get(HOST *ph, char *src, char *dst)
 	}
 	else {
 		char *pattern = strrchr(src, '/');
-		*pattern++ = 0;
-		sftp_handle = libssh2_sftp_opendir(ph->sftp, src);
-		if ( !sftp_handle ) {
-			term_Print(ph->term, "\033[31mcould't open remote dir %s\r\n", src);
-			return;
-		}
-
-		char rfile[1024], lfile[1024];
-		strcpy(rfile, src); strcat(rfile, "/");
-		int rlen = strlen(rfile);
-		strcpy(lfile, dst); if ( *lfile ) strcat(lfile, "/");
-		int llen = strlen(lfile);
-		while ( libssh2_sftp_readdir(sftp_handle, mem,
-								sizeof(mem), &attrs)>0 ) {
-			if ( fnmatch(pattern, mem, 0)==0 ) {
-				strcpy(rfile+rlen, mem);
-				strcpy(lfile+llen, mem);
-				sftp_get_one( ph, rfile, lfile);
+		if ( pattern!=NULL ) *pattern++ = 0;
+		if ( (sftp_handle=libssh2_sftp_opendir(ph->sftp, src))!=NULL ) {
+			char rfile[1024], lfile[1024];
+			strcpy(rfile, src); strcat(rfile, "/");
+			int rlen = strlen(rfile);
+			strcpy(lfile, dst); if ( *lfile ) strcat(lfile, "/");
+			int llen = strlen(lfile);
+			while ( libssh2_sftp_readdir(sftp_handle, mem,
+									sizeof(mem), &attrs)>0 ) {
+				if ( fnmatch(pattern, mem, 0)==0 ) {
+					strcpy(rfile+rlen, mem);
+					strcpy(lfile+llen, mem);
+					sftp_get_one( ph, rfile, lfile);
+				}
 			}
+			libssh2_sftp_closedir(sftp_handle);
+		}
+		else {
+			term_Print(ph->term, "\033[31mcould't open remote dir %s\r\n", src);
 		}
 	}
 	ReleaseMutex(ph->mtx);
