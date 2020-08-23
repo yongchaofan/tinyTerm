@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40780 2020-08-12 12:05:10 $"
+// "$Id: ssh2.c 40708 2020-08-23 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -490,12 +490,8 @@ DWORD WINAPI ssh(void *pv)
 					term_Parse_XML(ph->term, buf, cch);
 			}
 			else {
-				if ( cch!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket( ph )<0 ) {
-					char *errmsg;
-					libssh2_session_last_error(ph->session, &errmsg, NULL, 0);
-					term_Print(ph->term, "\r\n\033[31m%s error\r\n", errmsg);
+				if ( cch!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket( ph )<0 ) 
 					break;
-				}
 			}
 		}
 	}
@@ -1428,4 +1424,8 @@ TCP_Close:
 	ph->status=IDLE;
 	term_Title(ph->term, "");
 	return 1;
+}
+void sftp_Close(HOST *ph)
+{
+	ph->bGets=ph->sftp_running=FALSE;
 }
