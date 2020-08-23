@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 37028 2020-07-25 15:35:10 $"
+// "$Id: tiny.c 37006 2020-08-22 15:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -42,7 +42,7 @@ const char WELCOME[]="\r\n\
 \t    * drag and drop to send files via scp or xmodem\r\n\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\r\n\n\n\
 \thomepage: https://yongchaofan.github.io/tinyTerm/\r\n\n\n\
-\tVerision 1.9.5, ©2018-2020 Yongchao Fan, All rights reserved\r\n\n";
+\tVerision 1.9.6 ©2018-2020 Yongchao Fan\r\n\n";
 
 const COLORREF COLORS[16] = {
 	RGB(0,0,0), 	RGB(192,0,0), RGB(0,192,0), RGB(192,192,0),
