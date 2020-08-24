@@ -3,10 +3,10 @@
 tinyTerm started as a simple telnet client used to work with telecom transport equipment through command line interface(TL1). Over time  it has grown to a full function terminal emulator supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation,  plus unique features like: **command autocompletion**, **scp integration**, **batch automation**, and **scripting**. 
 
 Windows 10 user should install from Microsoft Store, users on older versions of Windows, or prefer portable apps download exe files.
-<h4>Stable release: <a href="https://github.com/yongchaofan/tinyTerm/releases">1.9.5</a></h4>
+<h4>Stable release: <a href="https://github.com/yongchaofan/tinyTerm/releases">1.9.6</a></h4>
 <h4>Download: <a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a>
-32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.5/tinyTerm.exe">tinyTerm.exe</a>
-64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.5/tinyTerm64.exe">tinyTerm64.exe</a></h4>
+32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.6/tinyTerm.exe">tinyTerm.exe</a>
+64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.6/tinyTerm64.exe">tinyTerm64.exe</a></h4>
 <h4>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a></h4> written in C with Win32 API and [libssh2](http://libssh2.org)
 <video width="560" height="412" controls>
 	<source src="tinyTerm.mp4" type="video/mp4">
@@ -28,7 +28,7 @@ Windows 10 user should install from Microsoft Store, users on older versions of 
 > 
 > Press and drag left mouse button to select text, left double click to select a word, middle click to paste selected text without copying to clipboard, right click to get context menu for copy, paste, copy all and paste selection(i.e. middle click). 
 >
-> Scroll buffer holds 8192 lines of text, use pageup key or mouse wheel to scroll back, scrollbar will appear when scrolled back, and will hide when scrolled all the way down. 
+> Scroll buffer holds 16k lines of text, use pageup key or mouse wheel to scroll back, scrollbar will appear when scrolled back, and will hide when scrolled all the way down. 
 >
 > ### Command Autocompletion
 > When local edit mode is enabled, key presses are not sent to remote host until "Enter" or "Tab" key is pressed, and the input is auto completed using command history, every command typed in local edit mode is added to command history to complete future inputs. Command history is saved to tinyTerm.hist at exit, then loaded into memory at the next start of tinyTerm. 
@@ -118,8 +118,7 @@ These commands can be used programatically for scripting or interactively in loc
 ### Scripting
     !Disp test case #1  display “test case #1” in terminal window
     !Send exit          send “exit” to host
-    !Recv               get all text received since last Send/Recv
-    !Echo               toggle local echo on/off
+    !Recv               get all text received since last Send/RecV
     !Selection          get current selected text
 
 ### Options
