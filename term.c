@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 36900 2020-08-04 15:05:10 $"
+// "$Id: term.c 37055 2020-08-04 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -37,6 +37,7 @@ BOOL term_Construct(TERM *pt)
 	pt->iTimeOut=30;
 	pt->tl1len=0;
 	pt->tl1text=NULL;
+	pt->mtx = CreateMutex(NULL, FALSE, L"term parse mutex");
 
 	pt->buff = (char *)malloc(BUFFERSIZE);
 	pt->attr = (char *)malloc(BUFFERSIZE);
@@ -125,6 +126,7 @@ void term_Parse(TERM *pt, const char *buf, int len)
 	const unsigned char *p=(const unsigned char *)buf;
 	const unsigned char *zz = p+len;
 
+	if ( WaitForSingleObject(pt->mtx, INFINITE)!=WAIT_OBJECT_0 ) return;
 	if (pt->bLogging ) fwrite( buf, 1, len, pt->fpLogFile);
 	if (pt->bEscape ) p = vt100_Escape(pt, p, zz-p);
 	while ( p < zz ) {
@@ -241,6 +243,7 @@ void term_Parse(TERM *pt, const char *buf, int len)
 		pt->tl1len = pt->buff+pt->cursor_x - pt->tl1text;
 	}
 	tiny_Redraw_Term();
+	ReleaseMutex(pt->mtx);
 }
 BOOL term_Echo(TERM *pt)
 {
