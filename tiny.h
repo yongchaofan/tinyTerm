@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5914 2020-08-23 12:05:10 $"
+// "$Id: tiny.h 5996 2020-08-23 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -54,7 +54,9 @@ typedef struct tagHOST {
 	char *hostname;
 	char homedir[MAX_PATH];
 	char keys[256];
-	int cursor, bReturn, bPassword, bGets;
+	int cursor;
+	BOOL bReturn, bPassword, bGets;
+	BOOL bSCP;						//scp in progress
 
 	HANDLE mtx;						//ssh2 reading/writing mutex
 	LIBSSH2_SESSION *session;
@@ -82,6 +84,7 @@ typedef struct tagTERM {
 	BOOL bBracket, bOriginMode, bWraparound;//bracketed paste mode
 	int save_x, save_y;
 	int roll_top, roll_bot;
+	HANDLE mtx;						//term parse mutex
 
 	char title[64];
 	int title_idx;

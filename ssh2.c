@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40708 2020-08-23 12:05:10 $"
+// "$Id: ssh2.c 40952 2020-08-23 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -105,6 +105,7 @@ void ssh2_Construct(HOST *ph)
 	ph->channel  =NULL;
 	ph->sftp = NULL;
 	ph->bReturn = TRUE;
+	ph->bSCP = FALSE;
 	ph->mtx = CreateMutex(NULL, FALSE, L"channel mutex");
 	ph->tunnel_list = NULL;
 	ph->mtx_tun = CreateMutex(NULL, FALSE, L"tunnel mutex");
@@ -686,6 +687,8 @@ void scp_read(HOST *ph, char *lpath, char *rfiles)
 	strncpy(lfile, lpath, 1024);
 	lfile[1024] = 0;
 
+	if ( ph->bSCP ) return;		//prevent two scp operations at the same time
+	ph->bSCP = TRUE;
 	struct _stat statbuf;
 	if ( stat_utf8(lpath, &statbuf)!=-1 ) {
 		if ( (statbuf.st_mode & S_IFMT) == S_IFDIR ) 
@@ -705,6 +708,7 @@ void scp_read(HOST *ph, char *lpath, char *rfiles)
 		p = p1;
 		*ldir = 0;
 	}
+	ph->bSCP = FALSE;
 }
 void scp_write(HOST *ph, char *lpath, char *rpath)
 {
@@ -712,6 +716,8 @@ void scp_write(HOST *ph, char *lpath, char *rpath)
 	struct dirent *dp;
 	struct _stat statbuf;
 
+	if ( ph->bSCP ) return;		//prevent two scp operations at the same time
+	ph->bSCP = TRUE;
 	if ( stat_utf8(lpath, &statbuf)!=-1 ) {	//lpath exist
 		char rfile[4096];
 		strncpy(rfile, rpath, 1024);
@@ -754,6 +760,7 @@ void scp_write(HOST *ph, char *lpath, char *rpath)
 			term_Print(ph->term, "\r\n\033[31mscp: %s/%s no mathcing file",
 												ldir, lpattern);
 	}
+	ph->bSCP = FALSE;
 }
 
 struct Tunnel *tun_add(HOST *ph, int tun_sock,
