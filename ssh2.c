@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 40952 2020-08-23 12:05:10 $"
+// "$Id: ssh2.c 41206 2020-08-23 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -105,7 +105,6 @@ void ssh2_Construct(HOST *ph)
 	ph->channel  =NULL;
 	ph->sftp = NULL;
 	ph->bReturn = TRUE;
-	ph->bSCP = FALSE;
 	ph->mtx = CreateMutex(NULL, FALSE, L"channel mutex");
 	ph->tunnel_list = NULL;
 	ph->mtx_tun = CreateMutex(NULL, FALSE, L"tunnel mutex");
@@ -129,12 +128,10 @@ int ssh_wait_socket(HOST *ph)
 }
 char *ssh2_Gets(HOST *ph, char *prompt, BOOL bEcho)
 {
-	BOOL save_edit = FALSE;		//save local edit mode, disable it for password
-	if ( (ph->bPassword=!bEcho) ) save_edit = tiny_Edit(FALSE);
-
 	term_Disp(ph->term, prompt);
+	ph->bPassword=!bEcho;
 	ph->bReturn=FALSE;
-	ph->bGets = TRUE;
+	ph->bGets=TRUE;
 	ph->keys[0]=0;
 	ph->cursor=0;
 	int old_cursor=0;
@@ -145,7 +142,6 @@ char *ssh2_Gets(HOST *ph, char *prompt, BOOL bEcho)
 		}
 		Sleep(100);
 	}
-	if ( ph->bPassword ) tiny_Edit(save_edit);	//restore local edit mode
 	if ( ph->bReturn ) {
 		term_Disp(ph->term, "\r\n");
 		return ph->keys;
@@ -187,9 +183,8 @@ void ssh2_Send(HOST *ph, char *buf, int len)
 void ssh2_Size(HOST *ph, int w, int h)
 {
 	if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
-		if ( ph->channel!=NULL ) {
+		if ( ph->channel!=NULL )
 			libssh2_channel_request_pty_size(ph->channel, w, h);
-		}
 		ReleaseMutex(ph->mtx);
 	}
 }
@@ -253,6 +248,7 @@ int ssh_parameters(  HOST *ph, char *p )
 }
 int ssh_knownhost(HOST *ph)
 {
+	int rc = -4;
 	int type, check, buff_len;
 	size_t len;
 	char knownhostfile[MAX_PATH];
@@ -266,29 +262,31 @@ int ssh_knownhost(HOST *ph)
 	const char *key = libssh2_session_hostkey(ph->session, &len, &type);
 	if ( key==NULL ) {
 		term_Disp(ph->term, "hostkey ");
-		return -4;
+		return rc;
 	}
 	buff_len=sprintf(keybuf, "%s key fingerprint", keytypes[type]);
 	if ( type>0 ) type++;
 
 	const char *fingerprint;
 	fingerprint = libssh2_hostkey_hash(ph->session, LIBSSH2_HOSTKEY_HASH_SHA1);
-	for(int i = 0; i < 20; i++) {
+	if ( fingerprint!=NULL ) for(int i = 0; i < 20; i++) {
 		sprintf(keybuf+buff_len+i*3, ":%02x", (unsigned char)fingerprint[i]);
 	}
 
 	LIBSSH2_KNOWNHOSTS *nh = libssh2_knownhost_init(ph->session);
 	if ( nh==NULL ) {
-		term_Disp(ph->term, "known_hosts ");
-		return -4;
+		term_Disp(ph->term, "known_hosts init");
+		return rc;
 	}
-	libssh2_knownhost_readfile(nh, knownhostfile,
-							   LIBSSH2_KNOWNHOST_FILE_OPENSSH);
+	if ( libssh2_knownhost_readfile(nh, knownhostfile,
+							   LIBSSH2_KNOWNHOST_FILE_OPENSSH)<0 ) {
+		term_Disp(ph->term, "known_hosts read");
+		return rc;
+	};
 	struct libssh2_knownhost *knownhost;
 	check = libssh2_knownhost_check(nh, ph->hostname, key, len,
 								LIBSSH2_KNOWNHOST_TYPE_PLAIN|
 								LIBSSH2_KNOWNHOST_KEYENC_RAW, &knownhost);
-	int rc = -4;
 	char *p = NULL;
 	const char *msg = "Disconnected!";
 	switch ( check ) {
@@ -346,7 +344,7 @@ static void kbd_callback(const char *name, int name_len,
   for ( int i=0; i<num_prompts; i++) {
 		char *prompt = strdup(prompts[i].text);
 		prompt[prompts[i].length] = 0;
-		const char *p = tiny_Gets( prompt, prompts[i].echo);
+		const char *p = tiny_Gets(prompt, prompts[i].echo);
 		free(prompt);
 		if ( p!=NULL ) {
 			responses[i].text = strdup(p);
@@ -378,7 +376,8 @@ int ssh_authentication(HOST *ph)
 		if ( stat(pubkeyfile, &buf)==0 && stat(privkeyfile, &buf)==0 ) {
 			if ( !libssh2_userauth_publickey_fromfile(ph->session,
 					ph->username, pubkeyfile, privkeyfile, ph->passphrase) ) {
-				term_Print(ph->term,"\033[32mpublic key(RSA) authenticated\r\n");
+				term_Print(ph->term,
+							"\033[32mpublic key(RSA) authentication\r\n");
 				return 0;
 			}
 		}
@@ -404,6 +403,8 @@ int ssh_authentication(HOST *ph)
 			if (!libssh2_userauth_keyboard_interactive(ph->session, 
 														ph->username,
 														&kbd_callback) ) {
+				term_Print(ph->term,
+							"\033[32mkeyboard-interactive authentication\r\n");
 				return 0;
 			}
 	}
@@ -430,10 +431,11 @@ DWORD WINAPI ssh(void *pv)
 	if ( host_tcp(ph)==-1 ) goto TCP_Close;
 
 	ph->session = libssh2_session_init();
-	do {
-		rc = libssh2_session_handshake(ph->session, ph->sock);
-	} while ( rc==LIBSSH2_ERROR_EAGAIN ) ;
-	if ( rc!=0 ) {
+	if ( ph->session!=NULL ) {
+		while ( (rc=libssh2_session_handshake(ph->session, ph->sock))
+				==LIBSSH2_ERROR_EAGAIN );
+	}
+	if ( rc!=0 || ph->session==NULL ) {
 		term_Error(ph->term, "session failure");
 		goto Session_Close;
 	}
@@ -479,7 +481,7 @@ DWORD WINAPI ssh(void *pv)
 
 	ph->status=CONNECTED;
 	term_Title(ph->term, ph->hostname);
-	while ( libssh2_channel_eof(ph->channel) == 0 ) {
+	while ( libssh2_channel_eof(ph->channel)==0 ) {
 		char buf[32768];
 		if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 			int cch=libssh2_channel_read(ph->channel, buf, 32768);
@@ -502,12 +504,18 @@ DWORD WINAPI ssh(void *pv)
 
 Channel_Close:
 	if ( ph->channel!=NULL ) {
-		libssh2_channel_close(ph->channel);
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
+			libssh2_channel_close(ph->channel);
+			ReleaseMutex(ph->mtx);
+		}
 		ph->channel = NULL;
 	}
 Session_Close:
 	if ( ph->session!=NULL ) {
-		libssh2_session_free(ph->session);
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
+			libssh2_session_free(ph->session);
+			ReleaseMutex(ph->mtx);
+		}
 		ph->session = NULL;
 	}
 	closesocket(ph->sock);
@@ -560,9 +568,11 @@ int scp_read_one(HOST *ph, const char *rpath, const char *lpath)
 		if ( (fsize-total) < amount) {
 			amount = (int)(fsize-total);
 		}
-		WaitForSingleObject(ph->mtx, INFINITE);
-		int rc = libssh2_channel_read(scp_channel, mem, amount);
-		ReleaseMutex(ph->mtx);
+		int rc = 0;
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+			rc = libssh2_channel_read(scp_channel, mem, amount);
+			ReleaseMutex(ph->mtx);
+		}
 		if ( rc==0 ) continue;
 		if ( rc>0) {
 			int nwrite = fwrite(mem, 1, rc, fp);
@@ -589,10 +599,11 @@ int scp_read_one(HOST *ph, const char *rpath, const char *lpath)
 	if ( total==fsize ) print_total(ph->term, start, total);
 	
 Close:
-	WaitForSingleObject(ph->mtx, INFINITE);
-	libssh2_channel_close(scp_channel);
-	libssh2_channel_free(scp_channel);
-	ReleaseMutex(ph->mtx);
+	if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+		libssh2_channel_close(scp_channel);
+		libssh2_channel_free(scp_channel);
+		ReleaseMutex(ph->mtx);
+	}
 	return 0;
 }
 int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
@@ -609,11 +620,12 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 
 	int err_no = 0;
 	do {
-		WaitForSingleObject(ph->mtx, INFINITE);
-		scp_channel = libssh2_scp_send(ph->session, rpath,
-					fileinfo.st_mode&0777, (unsigned long)fileinfo.st_size);
-		if ( !scp_channel ) err_no = libssh2_session_last_errno(ph->session);
-		ReleaseMutex(ph->mtx);
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+			scp_channel = libssh2_scp_send(ph->session, rpath,
+						fileinfo.st_mode&0777, (unsigned long)fileinfo.st_size);
+			if ( !scp_channel ) err_no = libssh2_session_last_errno(ph->session);
+			ReleaseMutex(ph->mtx);
+		}
 		if ( !scp_channel ) {
 			if ( err_no!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<0 ) {
 				term_Print(ph->term, "\033[31mcouldn't create remote file");
@@ -630,11 +642,12 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 	int blocks=0;
 	while ( (nread=fread(mem, 1, sizeof(mem), fp)) >0 ) {
 		char *ptr = mem;
-		int rc;
+		int rc = 0;
 		while ( nread>0 ) {
-			WaitForSingleObject(ph->mtx, INFINITE);
-			rc = libssh2_channel_write(scp_channel, ptr, nread);
-			ReleaseMutex(ph->mtx);
+			if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+				rc = libssh2_channel_write(scp_channel, ptr, nread);
+				ReleaseMutex(ph->mtx);
+			}
 			if ( rc>0 ) {
 				ptr += rc;
 				nread -= rc;
@@ -661,24 +674,28 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 
 	int rc;
 	do {
-		WaitForSingleObject(ph->mtx, INFINITE);
-		rc = libssh2_channel_send_eof(scp_channel);
-		ReleaseMutex(ph->mtx);
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+			rc = libssh2_channel_send_eof(scp_channel);
+			ReleaseMutex(ph->mtx);
+		}
 	} while (rc==LIBSSH2_ERROR_EAGAIN);
 	do {
-		WaitForSingleObject(ph->mtx, INFINITE);
-		rc = libssh2_channel_wait_eof(scp_channel);
-		ReleaseMutex(ph->mtx);
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+			rc = libssh2_channel_wait_eof(scp_channel);
+			ReleaseMutex(ph->mtx);
+		}
 	} while (rc==LIBSSH2_ERROR_EAGAIN);
 	do {
-		WaitForSingleObject(ph->mtx, INFINITE);
-		rc = libssh2_channel_wait_closed(scp_channel);
-		ReleaseMutex(ph->mtx);
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+			rc = libssh2_channel_wait_closed(scp_channel);
+			ReleaseMutex(ph->mtx);
+		}
 	} while (rc==LIBSSH2_ERROR_EAGAIN);
-	WaitForSingleObject(ph->mtx, INFINITE);
-	libssh2_channel_close(scp_channel);
-	libssh2_channel_free(scp_channel);
-	ReleaseMutex(ph->mtx);
+	if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+		libssh2_channel_close(scp_channel);
+		libssh2_channel_free(scp_channel);
+		ReleaseMutex(ph->mtx);
+	}
 	return 0;
 }
 void scp_read(HOST *ph, char *lpath, char *rfiles)
@@ -687,8 +704,6 @@ void scp_read(HOST *ph, char *lpath, char *rfiles)
 	strncpy(lfile, lpath, 1024);
 	lfile[1024] = 0;
 
-	if ( ph->bSCP ) return;		//prevent two scp operations at the same time
-	ph->bSCP = TRUE;
 	struct _stat statbuf;
 	if ( stat_utf8(lpath, &statbuf)!=-1 ) {
 		if ( (statbuf.st_mode & S_IFMT) == S_IFDIR ) 
@@ -708,7 +723,6 @@ void scp_read(HOST *ph, char *lpath, char *rfiles)
 		p = p1;
 		*ldir = 0;
 	}
-	ph->bSCP = FALSE;
 }
 void scp_write(HOST *ph, char *lpath, char *rpath)
 {
@@ -716,8 +730,6 @@ void scp_write(HOST *ph, char *lpath, char *rpath)
 	struct dirent *dp;
 	struct _stat statbuf;
 
-	if ( ph->bSCP ) return;		//prevent two scp operations at the same time
-	ph->bSCP = TRUE;
 	if ( stat_utf8(lpath, &statbuf)!=-1 ) {	//lpath exist
 		char rfile[4096];
 		strncpy(rfile, rpath, 1024);
@@ -760,7 +772,6 @@ void scp_write(HOST *ph, char *lpath, char *rpath)
 			term_Print(ph->term, "\r\n\033[31mscp: %s/%s no mathcing file",
 												ldir, lpattern);
 	}
-	ph->bSCP = FALSE;
 }
 
 struct Tunnel *tun_add(HOST *ph, int tun_sock,
@@ -840,17 +851,20 @@ DWORD WINAPI tun_worker(void *pv)
 			int len = recv(tun_sock, buff, sizeof(buff), 0);
 			if ( len<=0 ) break;
 			for ( int wr=0, i=0; wr<len; wr+=i ) {
-				WaitForSingleObject(ph->mtx, INFINITE);
-				i = libssh2_channel_write(tun_channel, buff+wr, len-wr);
-				ReleaseMutex(ph->mtx);
+				if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+					i = libssh2_channel_write(tun_channel, buff+wr, len-wr);
+					ReleaseMutex(ph->mtx);
+				}
 				if ( i==LIBSSH2_ERROR_EAGAIN ){ i=0; continue; }
 				if ( i<=0 ) goto shutdown;
 			}
 		}
+		int len = 0;
 		if ( FD_ISSET(ph->sock, &fds) ) while ( TRUE ) {
-			WaitForSingleObject(ph->mtx, INFINITE);
-			int len = libssh2_channel_read(tun_channel, buff, sizeof(buff));
-			ReleaseMutex(ph->mtx);
+			if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+				len = libssh2_channel_read(tun_channel, buff, sizeof(buff));
+				ReleaseMutex(ph->mtx);
+			}
 			if ( len==LIBSSH2_ERROR_EAGAIN ) break;
 			if ( len<=0 ) goto shutdown;
 			for ( int wr=0, i=0; wr<len; wr+=i ) {
@@ -860,10 +874,11 @@ DWORD WINAPI tun_worker(void *pv)
 		}
 	}
 shutdown:
-	WaitForSingleObject(ph->mtx, INFINITE);
-	libssh2_channel_close(tun_channel);
-	libssh2_channel_free(tun_channel);
-	ReleaseMutex(ph->mtx);
+	if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+		libssh2_channel_close(tun_channel);
+		libssh2_channel_free(tun_channel);
+		ReleaseMutex(ph->mtx);
+	}
 	closesocket(tun_sock);
 	tun_del(ph, tun_sock);
 	return 0;
@@ -922,11 +937,12 @@ DWORD WINAPI tun_local(void *pv)
 		client_port = ntohs(sin.sin_port);
 		do {
 			int rc = 0;
-			WaitForSingleObject(ph->mtx, INFINITE);
-			tun_channel = libssh2_channel_direct_tcpip_ex(ph->session,
-									dhost, dport, client_host, client_port);
-			if (!tun_channel) rc = libssh2_session_last_errno(ph->session);
-			ReleaseMutex(ph->mtx);
+			if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+				tun_channel = libssh2_channel_direct_tcpip_ex(ph->session,
+										dhost, dport, client_host, client_port);
+				if (!tun_channel) rc = libssh2_session_last_errno(ph->session);
+				ReleaseMutex(ph->mtx);
+			}
 			if ( !tun_channel ) {
 				if ( rc!=LIBSSH2_ERROR_EAGAIN || ssh_wait_socket(ph)<0 ) {
 					term_Print(ph->term, "\033[31mCouldn't tunnel, is it supported?\r\n");
@@ -1014,7 +1030,8 @@ void sftp_cd(HOST *ph, char *path)
 }
 void sftp_ls(HOST *ph, char *path, int ll)
 {
-	WaitForSingleObject(ph->mtx, INFINITE);
+	if ( WaitForSingleObject(ph->mtx, INFINITE)!=0 ) return;
+
 	LIBSSH2_SFTP_HANDLE *sftp_handle = libssh2_sftp_opendir(ph->sftp, path);
 	char *pattern = NULL;
 	if ( sftp_handle==NULL ) {
@@ -1205,7 +1222,7 @@ void sftp_get(HOST *ph, char *src, char *dst)
 	LIBSSH2_SFTP_ATTRIBUTES attrs;
 	LIBSSH2_SFTP_HANDLE *sftp_handle;
 
-	WaitForSingleObject(ph->mtx, INFINITE);
+	if ( WaitForSingleObject(ph->mtx, INFINITE)!=0 ) return;
 	if ( strchr(src,'*')==NULL && strchr(src, '?')==NULL ) {
 		char lfile[1024];
 		strcpy(lfile, *dst?dst:".");
@@ -1251,7 +1268,7 @@ void sftp_put(HOST *ph, char *src, char *dst)
 	struct dirent *dp;
 	struct _stat statbuf;
 
-	WaitForSingleObject(ph->mtx, INFINITE);
+	if ( WaitForSingleObject(ph->mtx, INFINITE)!=0 ) return;
 	if ( stat_utf8(src, &statbuf)!=-1 ) {
 		char rfile[1024];
 		strcpy(rfile, *dst?dst:".");

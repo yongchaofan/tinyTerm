@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.h 5996 2020-08-23 12:05:10 $"
+// "$Id: tiny.h 5703 2020-08-31 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -56,7 +56,6 @@ typedef struct tagHOST {
 	char keys[256];
 	int cursor;
 	BOOL bReturn, bPassword, bGets;
-	BOOL bSCP;						//scp in progress
 
 	HANDLE mtx;						//ssh2 reading/writing mutex
 	LIBSSH2_SESSION *session;
@@ -96,7 +95,6 @@ typedef struct tagTERM {
 	char *tl1text;
 	int tl1len;
 
-	BOOL save_edit;
 	int escape_idx;
 	char escape_code[32];
 	char tabstops[256];
@@ -153,7 +151,6 @@ void sftp_Close(HOST *ph);
 void host_callback( void *term, char *buf, int len);
 BOOL term_Construct(TERM *pt);
 void term_Destruct(TERM *pt);
-void term_Clear(TERM *pt);
 void term_Size(TERM *pt, int x, int y);
 void term_Title(TERM *pt, char *title);
 void term_Error(TERM *pt, char *error);
@@ -182,7 +179,6 @@ int term_Tun(TERM *pt, char *cmd, char **preply);
 int term_Cmd(TERM *pt, char *cmd, char **preply);
 
 /****************tiny.c****************/
-BOOL isUTF8c(char c);	//check if a byte is a UTF8 continuation byte
 int utf8_to_wchar(const char *buf, int cnt, WCHAR *wbuf, int wcnt);
 int wchar_to_utf8(WCHAR *wbuf, int wcnt, char *buf, int cnt);
 int stat_utf8(const char *fn, struct _stat *buffer);
@@ -192,10 +188,8 @@ void cmd_Disp_utf8(char *buf);
 void ftpd_quit();
 void tftpd_quit();
 void tiny_Beep();
-void wnd_Size();				//resize window when font or term size changes
-void tiny_Redraw_Line(int line);//redraw cursor line only
-void tiny_Redraw_Term();		//redraw whole term window
+void wnd_Size();		//resize window when font or term size changes
+void tiny_Redraw();		//redraw term window
 void tiny_Title(char *buf);
 BOOL tiny_Scroll(BOOL bShowScroll, int cy, int sy);//return if scrollbar is shown
-BOOL tiny_Edit(BOOL e);			//return BOOL to indicate if status changed
 char *tiny_Gets(char *prompt, BOOL bEcho);
