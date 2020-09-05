@@ -1,5 +1,5 @@
 //
-// "$Id: term.c 37055 2020-08-04 15:05:10 $"
+// "$Id: term.c 36942 2020-08-28 15:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -18,20 +18,45 @@
 // https://github.com/yongchaofan/tinyTerm/issues/new
 //
 #include "tiny.h"
-#include <windows.h>
+#define isUTF8c(x) (((x)&0xc0)==0x80)
 
 const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt);
 const unsigned char *telnet_Options(TERM *pt, const unsigned char *p, int cnt);
-
+void term_Clear(TERM *pt)
+{
+	memset(pt->buff, 0, BUFFERSIZE);
+	memset(pt->attr, 0, BUFFERSIZE);
+	memset(pt->line, 0, MAXLINES*sizeof(int));
+	pt->c_attr = 7;
+	pt->cursor_y = pt->cursor_x = 0;
+	pt->screen_y = 0;
+	pt->sel_left = pt->sel_right = 0;
+	pt->roll_top = 0;
+	pt->roll_bot = pt->size_y-1;
+	pt->bAlterScreen = FALSE;
+	pt->bAppCursor = FALSE;
+	pt->bBracket = FALSE;
+	pt->bGraphic = FALSE;
+	pt->bEscape = FALSE;
+	pt->bInsert = FALSE;
+	pt->bTitle = FALSE;
+	pt->bOriginMode = FALSE;
+	pt->bWraparound = TRUE;
+	pt->bCursor = TRUE;
+	pt->bPrompt = TRUE;
+	pt->escape_idx = 0;
+	pt->xmlIndent = 0;
+	pt->xmlPreviousIsOpen = TRUE;
+	memset(pt->tabstops, 0, 256);
+	for ( int i=0; i<256; i+=8 ) pt->tabstops[i]=1;
+}
 BOOL term_Construct(TERM *pt)
 {
 	pt->size_x=80;
 	pt->size_y=25;
-	pt->roll_top = 0;
-	pt->roll_bot = pt->size_y-1;
 	pt->bLogging=FALSE;
 	pt->bEcho=FALSE;
-	pt->title_idx = 0;
+	pt->title_idx=0;
 	strcpy(pt->sPrompt, "> ");
 	pt->iPrompt=2;
 	pt->iTimeOut=30;
@@ -55,33 +80,6 @@ void term_Destruct(TERM *pt)
 	free(pt->attr);
 	free(pt->line);
 }
-void term_Clear(TERM *pt)
-{
-	memset(pt->buff, 0, BUFFERSIZE);
-	memset(pt->attr, 0, BUFFERSIZE);
-	memset(pt->line, 0, MAXLINES*sizeof(int));
-	pt->c_attr = 7;
-	pt->cursor_y = pt->cursor_x = 0;
-	pt->screen_y = 0;
-	pt->sel_left = pt->sel_right = 0;
-	pt->bAlterScreen = FALSE;
-	pt->bAppCursor = FALSE;
-	pt->bBracket = FALSE;
-	pt->bGraphic = FALSE;
-	pt->bEscape = FALSE;
-	pt->bInsert = FALSE;
-	pt->bTitle = FALSE;
-	pt->bOriginMode = FALSE;
-	pt->bWraparound = TRUE;
-	pt->bCursor = TRUE;
-	pt->bPrompt = TRUE;
-	pt->save_edit = FALSE;
-	pt->escape_idx = 0;
-	pt->xmlIndent = 0;
-	pt->xmlPreviousIsOpen = TRUE;
-	memset(pt->tabstops, 0, 256);
-	for ( int i=0; i<256; i+=8 ) pt->tabstops[i]=1;
-}
 void term_Size(TERM *pt, int x, int y)
 {
 	pt->size_x = x;
@@ -92,7 +90,7 @@ void term_Size(TERM *pt, int x, int y)
 		pt->screen_y = max(0, pt->cursor_y-pt->size_y+1);
 	}
 	host_Send_Size(pt->host, pt->size_x, pt->size_y);
-	tiny_Redraw_Term( );
+	tiny_Redraw();
 }
 void term_nextLine(TERM *pt)
 {
@@ -242,7 +240,7 @@ void term_Parse(TERM *pt, const char *buf, int len)
 		if ( strncmp(p, pt->sPrompt, pt->iPrompt)==0 ) pt->bPrompt=TRUE;
 		pt->tl1len = pt->buff+pt->cursor_x - pt->tl1text;
 	}
-	tiny_Redraw_Term();
+	tiny_Redraw();
 	ReleaseMutex(pt->mtx);
 }
 BOOL term_Echo(TERM *pt)
@@ -339,7 +337,7 @@ void term_Mouse(TERM *pt, int evt, int x, int y)
 			term_Send(pt, pt->buff+pt->sel_left, pt->sel_right-pt->sel_left);
 		break;
 	}
-	tiny_Redraw_Term();
+	tiny_Redraw();
 }
 void term_Print(TERM *pt, const char *fmt, ...)
 {
@@ -966,7 +964,6 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 					if ( n0==2004 ) pt->bBracket = TRUE;
 					if ( n0==1049 ) { 	//?1049h alternate screen,
 						pt->bAlterScreen = TRUE;
-						pt->save_edit = tiny_Edit(FALSE);
 						screen_clear(pt, 2);
 					}
 				}
@@ -989,7 +986,6 @@ const unsigned char *vt100_Escape(TERM *pt, const unsigned char *sz, int cnt)
 					if ( n0==2004 ) pt->bBracket = FALSE;
 					if ( n0==1049 ) { 	//?1049l exit alternate screen,
 						pt->bAlterScreen = FALSE;
-						if (pt->save_edit ) tiny_Edit(TRUE);
 						pt->cursor_y = pt->screen_y;
 						pt->cursor_x = pt->line[pt->cursor_y];
 						for ( int i=1; i<=pt->size_y+1; i++ )
