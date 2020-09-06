@@ -3,10 +3,10 @@
 tinyTerm started as a simple telnet client used to work with telecom transport equipment through command line interface(TL1). Over time  it has grown to a full function terminal emulator supporting serial, telnet, ssh, sftp and netconf connections with xterm emulation,  plus unique features like: **command autocompletion**, **scp integration**, **batch automation**, and **scripting**. 
 
 Windows 10 user should install from Microsoft Store, users on older versions of Windows, or prefer portable apps download exe files.
-<h4>Stable release: <a href="https://github.com/yongchaofan/tinyTerm/releases">1.9.6</a></h4>
+<h4>Stable release: <a href="https://github.com/yongchaofan/tinyTerm/releases">1.9.7</a></h4>
 <h4>Download: <a href="https://www.microsoft.com/store/apps/9NXGN9LJTL05">Microsoft Store</a>
-32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.6/tinyTerm.exe">tinyTerm.exe</a>
-64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.6/tinyTerm64.exe">tinyTerm64.exe</a></h4>
+32-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.7/tinyTerm.exe">tinyTerm.exe</a>
+64-bit: <a href="https://github.com/yongchaofan/tinyTerm/releases/download/1.9.7/tinyTerm64.exe">tinyTerm64.exe</a></h4>
 <h4>License: <a href="https://github.com/yongchaofan/tinyTerm/blob/master/LICENSE">GPL 3.0</a></h4> written in C with Win32 API and [libssh2](http://libssh2.org)
 <video width="560" height="412" controls>
 	<source src="tinyTerm.mp4" type="video/mp4">
