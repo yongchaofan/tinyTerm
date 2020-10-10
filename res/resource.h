@@ -1,5 +1,5 @@
 //
-// "$Id: resource.h 1352 2019-05-10 21:05:10 $"
+// "$Id: resource.h 1459 2020-10-10 21:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -45,6 +45,7 @@
 #define IDMENU_MAIN	5130
 #define IDACCEL_MAIN 5131
 #define IDD_CONNECT 5132
+#define IDD_SCRIPT  5133
 #define IDCONNECT	40001
 #define IDSTATIC	40002
 #define IDPROTO		40003
@@ -52,3 +53,6 @@
 #define IDHOST		40005
 #define IDSTATIC1	40006
 #define IDSTATIC2	40007
+#define IDSTATIC3   40008
+#define IDPAUSE     40011
+#define IDQUIT      40012
