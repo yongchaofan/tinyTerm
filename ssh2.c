@@ -1,5 +1,5 @@
 //
-// "$Id: ssh2.c 41206 2020-08-23 12:05:10 $"
+// "$Id: ssh2.c 41206 2020-09-15 12:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -416,7 +416,7 @@ const char *IETF_HELLO="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
 </capabilities></hello>]]>]]>";
 DWORD WINAPI ssh(void *pv)
 {
-	int rc;
+	int rc=0;
 	HOST *ph = (HOST *)pv;
 	char port[256];
 	strcpy( port, ph->cmdline+4);
@@ -569,7 +569,7 @@ int scp_read_one(HOST *ph, const char *rpath, const char *lpath)
 			amount = (int)(fsize-total);
 		}
 		int rc = 0;
-		if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 			rc = libssh2_channel_read(scp_channel, mem, amount);
 			ReleaseMutex(ph->mtx);
 		}
@@ -599,7 +599,7 @@ int scp_read_one(HOST *ph, const char *rpath, const char *lpath)
 	if ( total==fsize ) print_total(ph->term, start, total);
 	
 Close:
-	if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+	if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 		libssh2_channel_close(scp_channel);
 		libssh2_channel_free(scp_channel);
 		ReleaseMutex(ph->mtx);
@@ -620,7 +620,7 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 
 	int err_no = 0;
 	do {
-		if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 			scp_channel = libssh2_scp_send(ph->session, rpath,
 						fileinfo.st_mode&0777, (unsigned long)fileinfo.st_size);
 			if ( !scp_channel ) err_no = libssh2_session_last_errno(ph->session);
@@ -644,7 +644,7 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 		char *ptr = mem;
 		int rc = 0;
 		while ( nread>0 ) {
-			if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+			if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 				rc = libssh2_channel_write(scp_channel, ptr, nread);
 				ReleaseMutex(ph->mtx);
 			}
@@ -674,24 +674,24 @@ int scp_write_one(HOST *ph, const char *lpath, const char *rpath)
 
 	int rc;
 	do {
-		if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 			rc = libssh2_channel_send_eof(scp_channel);
 			ReleaseMutex(ph->mtx);
 		}
 	} while (rc==LIBSSH2_ERROR_EAGAIN);
 	do {
-		if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 			rc = libssh2_channel_wait_eof(scp_channel);
 			ReleaseMutex(ph->mtx);
 		}
 	} while (rc==LIBSSH2_ERROR_EAGAIN);
 	do {
-		if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+		if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 			rc = libssh2_channel_wait_closed(scp_channel);
 			ReleaseMutex(ph->mtx);
 		}
 	} while (rc==LIBSSH2_ERROR_EAGAIN);
-	if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+	if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 		libssh2_channel_close(scp_channel);
 		libssh2_channel_free(scp_channel);
 		ReleaseMutex(ph->mtx);
@@ -851,7 +851,7 @@ DWORD WINAPI tun_worker(void *pv)
 			int len = recv(tun_sock, buff, sizeof(buff), 0);
 			if ( len<=0 ) break;
 			for ( int wr=0, i=0; wr<len; wr+=i ) {
-				if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+				if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 					i = libssh2_channel_write(tun_channel, buff+wr, len-wr);
 					ReleaseMutex(ph->mtx);
 				}
@@ -861,7 +861,7 @@ DWORD WINAPI tun_worker(void *pv)
 		}
 		int len = 0;
 		if ( FD_ISSET(ph->sock, &fds) ) while ( TRUE ) {
-			if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+			if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 				len = libssh2_channel_read(tun_channel, buff, sizeof(buff));
 				ReleaseMutex(ph->mtx);
 			}
@@ -874,7 +874,7 @@ DWORD WINAPI tun_worker(void *pv)
 		}
 	}
 shutdown:
-	if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+	if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 		libssh2_channel_close(tun_channel);
 		libssh2_channel_free(tun_channel);
 		ReleaseMutex(ph->mtx);
@@ -931,13 +931,13 @@ DWORD WINAPI tun_local(void *pv)
 	tun_add( ph, listensock, NULL, shost, sport, dhost, dport);
 
 	int tun_sock;
-	LIBSSH2_CHANNEL *tun_channel;
+	LIBSSH2_CHANNEL *tun_channel=NULL;
 	while ((tun_sock=accept(listensock,(struct sockaddr*)&sin,&sinlen))!=-1) {
 		client_host = inet_ntoa(sin.sin_addr);
 		client_port = ntohs(sin.sin_port);
 		do {
 			int rc = 0;
-			if ( WaitForSingleObject(ph->mtx, INFINITE)==0 ) {
+			if ( WaitForSingleObject(ph->mtx, INFINITE)==WAIT_OBJECT_0 ) {
 				tun_channel = libssh2_channel_direct_tcpip_ex(ph->session,
 										dhost, dport, client_host, client_port);
 				if (!tun_channel) rc = libssh2_session_last_errno(ph->session);
@@ -1030,7 +1030,7 @@ void sftp_cd(HOST *ph, char *path)
 }
 void sftp_ls(HOST *ph, char *path, int ll)
 {
-	if ( WaitForSingleObject(ph->mtx, INFINITE)!=0 ) return;
+	if ( WaitForSingleObject(ph->mtx, INFINITE)!=WAIT_OBJECT_0 ) return;
 
 	LIBSSH2_SFTP_HANDLE *sftp_handle = libssh2_sftp_opendir(ph->sftp, path);
 	char *pattern = NULL;
@@ -1222,7 +1222,7 @@ void sftp_get(HOST *ph, char *src, char *dst)
 	LIBSSH2_SFTP_ATTRIBUTES attrs;
 	LIBSSH2_SFTP_HANDLE *sftp_handle;
 
-	if ( WaitForSingleObject(ph->mtx, INFINITE)!=0 ) return;
+	if ( WaitForSingleObject(ph->mtx, INFINITE)!=WAIT_OBJECT_0 ) return;
 	if ( strchr(src,'*')==NULL && strchr(src, '?')==NULL ) {
 		char lfile[1024];
 		strcpy(lfile, *dst?dst:".");
@@ -1268,7 +1268,7 @@ void sftp_put(HOST *ph, char *src, char *dst)
 	struct dirent *dp;
 	struct _stat statbuf;
 
-	if ( WaitForSingleObject(ph->mtx, INFINITE)!=0 ) return;
+	if ( WaitForSingleObject(ph->mtx, INFINITE)!=WAIT_OBJECT_0 ) return;
 	if ( stat_utf8(src, &statbuf)!=-1 ) {
 		char rfile[1024];
 		strcpy(rfile, *dst?dst:".");
