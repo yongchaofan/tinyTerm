@@ -1,5 +1,5 @@
 //
-// "$Id: tiny.c 36410 2020-08-31 815:35:10 $"
+// "$Id: tiny.c 37717 2020-10-09 21:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
@@ -42,7 +42,7 @@ const char WELCOME[]="\r\n\n\
 \t    * drag and drop to send files via scp or xmodem\r\n\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\r\n\n\n\
 \thttps://yongchaofan.github.io/tinyTerm\r\n\n\
-\tVerision 1.9.7 ©2018-2020 Yongchao Fan\r\n\n";
+\tVerision 1.9.8 ©2018-2020 Yongchao Fan\r\n\n";
 
 const COLORREF COLORS[16] = {
 	RGB(0,0,0),		RGB(192,0,0),	RGB(0,192,0),	RGB(192,192,0),
@@ -53,6 +53,7 @@ const COLORREF COLORS[16] = {
 static HINSTANCE hInst;
 static HBRUSH dwBkBrush;
 static HWND hwndTerm, hwndCmd;
+static HWND hwndScriptDlg=NULL;	//script control dialog window
 static RECT termRect, wndRect;
 static HFONT hTermFont;
 static HMENU hMainMenu, hMenu[4];
@@ -314,18 +315,19 @@ void tiny_Title(char *buf)
 {
 	utf8_to_wchar(buf, -1, wndTitle+50, 200);
 	SetWindowText(hwndTerm, wndTitle);
+	MENUITEMINFOA menuitem = { sizeof(MENUITEMINFOA) };
+	GetMenuItemInfoA(hMenu[0], ID_CONNECT, FALSE, &menuitem);
 	if ( ph->status==IDLE )
 	{
 		if ( bLocalEdit ) term_Disp(pt, TINYTERM);
-		menu_Enable(ID_CONNECT, TRUE);
-		menu_Enable(ID_DISCONN, FALSE);
-		menu_Check(ID_ECHO, pt->bEcho);
+		menuitem.dwTypeData = "Connect...";
 	}
 	else {
-		menu_Enable(ID_CONNECT, FALSE);
-		menu_Enable(ID_DISCONN, TRUE);
-		menu_Check(ID_ECHO, pt->bEcho);
+		menuitem.dwTypeData = "Disonnect";
 	}
+	menuitem.fMask = MIIM_TYPE | MIIM_DATA;
+	SetMenuItemInfoA(hMenu[0], ID_CONNECT, FALSE, &menuitem);
+	menu_Check(ID_ECHO, pt->bEcho);
 }
 BOOL tiny_Scroll(BOOL bShowScroll, int cy, int sy)
 {
@@ -592,6 +594,49 @@ BOOL CALLBACK ConnectProc(HWND hwndDlg, UINT message,
 	}
 	return FALSE;
 }
+BOOL CALLBACK ScriptDlgProc(HWND hwndDlg, UINT msg, WPARAM wParam, LPARAM lParam) 
+{ 
+HWND hwndBtn;
+    switch (msg) 
+    { 
+        case WM_INITDIALOG: 
+            return TRUE; 
+ 
+        case WM_COMMAND: 
+            switch (LOWORD(wParam)) 
+            { 
+                case IDPAUSE: 
+					hwndBtn = GetDlgItem(hwndDlg, IDPAUSE);
+					bScriptPause = !bScriptPause;
+					SetWindowText(hwndBtn, bScriptPause? L"Resume":L"Pause");
+                    return TRUE; 
+ 
+                case IDQUIT: 
+					bScriptRun = bScriptPause = FALSE;
+                    DestroyWindow(hwndScriptDlg); 
+                    hwndScriptDlg = NULL; 
+                    return TRUE; 
+            } 
+    } 
+    return FALSE; 
+} 
+void show_script_dialog()
+{
+	if (bScriptRun && !IsWindow(hwndScriptDlg)) { 
+        hwndScriptDlg = CreateDialog( hInst, 
+            						MAKEINTRESOURCE(IDD_SCRIPT), 
+                                    hwndTerm, 
+                                    (DLGPROC)ScriptDlgProc); 
+    	ShowWindow(hwndScriptDlg, SW_SHOW); 
+    } 
+}
+void hide_script_dialog()
+{
+	if ( IsWindow(hwndScriptDlg) ) {
+		DestroyWindow(hwndScriptDlg);
+		hwndScriptDlg = NULL;
+	}
+}
 BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 {
 	switch ( LOWORD(wParam) ) {
@@ -605,9 +650,8 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		if ( ph->status==IDLE )
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_CONNECT), 
 							hwndTerm, (DLGPROC)ConnectProc);
-		break;
-	case ID_DISCONN:
-		if ( ph->status!=IDLE ) host_Close(ph);
+		else
+			host_Close(ph);
 		break;
 	case ID_LOGG:
 		if ( !pt->bLogging ) {
@@ -724,13 +768,11 @@ BOOL menu_Command( WPARAM wParam, LPARAM lParam )
 		}
 		break;
 	}
-	case ID_PAUSE: 
-		while ( bScriptRun && IDOK==MessageBox(hwndTerm, 
-				(bScriptPause=!bScriptPause)?
-				L"OK to resume, Cancel to quit":L"OK to pause, Cancel to Quit",
-				bScriptPause?L"Task Paused":L"Task Running",
-				MB_OKCANCEL|MB_TOPMOST) );
-		bScriptRun = bScriptPause = FALSE;
+	case ID_PAUSE:
+		show_script_dialog();
+		break;
+	case ID_QUIT:
+		hide_script_dialog();
 		break;
 	case ID_TERM:
 		menu_Popup(TTERM);
@@ -1039,6 +1081,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	MSG msg;
 	while ( GetMessage(&msg, NULL, 0, 0) )
 	{
+		if ( IsWindow(hwndScriptDlg) && IsDialogMessage(hwndScriptDlg, &msg) ) 
+			continue;
 		if (!TranslateAccelerator(hwndTerm, haccel,  &msg))
 		{
 			TranslateMessage(&msg);
@@ -1156,7 +1200,8 @@ DWORD WINAPI uploader(void *files)	//upload files through scp or sftp
 		term_Disp(pt, "\n");
 
 	bScriptRun=TRUE; bScriptPause = FALSE;
-	menu_Enable(ID_PAUSE, TRUE);
+	PostMessage(hwndTerm, WM_COMMAND, ID_PAUSE, 0);
+
 	char *p1=(char *)files, *p;
 	while ( bScriptRun && (p=p1)!=NULL ) {
 		if ( bScriptPause ) { Sleep(100); continue; }
@@ -1168,8 +1213,8 @@ DWORD WINAPI uploader(void *files)	//upload files through scp or sftp
 		else
 			sftp_put(ph, p, ph->realpath);
 	}
-	menu_Enable(ID_PAUSE, FALSE);
 	bScriptRun = bScriptPause = FALSE;
+	PostMessage(hwndTerm, WM_COMMAND, ID_QUIT, 0);
 
 	term_Send(pt, "\r", 1);
 	free((char *)files);
@@ -1211,7 +1256,7 @@ DWORD WINAPI scripter(void *cmds)
 	char *p0=(char *)cmds, *p1;
 	int iLoopCnt = -1, iWaitCnt = 0;
 	bScriptRun=TRUE; bScriptPause = FALSE;
-	menu_Enable(ID_PAUSE, TRUE);
+	PostMessage(hwndTerm, WM_COMMAND, ID_PAUSE, 0);
 	while ( bScriptRun && p0!=NULL )
 	{
 		if ( iWaitCnt>0 ) {
@@ -1251,9 +1296,9 @@ DWORD WINAPI scripter(void *cmds)
 		}
 		p0 = p1;
 	}
-	menu_Enable(ID_PAUSE, FALSE);
 	if ( iWaitCnt>0 ) cmd_Disp(L"");
 	bScriptRun = bScriptPause = FALSE;
+	PostMessage(hwndTerm, WM_COMMAND, ID_QUIT, 0);
 
 	free((char *)cmds);
 	return 0;
