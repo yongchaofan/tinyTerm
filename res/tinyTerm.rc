@@ -1,11 +1,11 @@
 //
-// "$Id: tinyTerm.rc 3088 2020-10-09 19:05:10 $"
+// "$Id: tinyTerm.rc 3088 2021-09-01 19:05:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // tinyTerm.rc is the resource file defining dialog, icon and menus.
 //
-// Copyright 2018-2020 by Yongchao Fan.
+// Copyright 2018-2021 by Yongchao Fan.
 //
 // This library is free software distributed under GNU GPL 3.0,
 // see the license at:
@@ -89,8 +89,8 @@ CAPTION "Script Control"
 	PUSHBUTTON	"Quit", 	IDQUIT,  70, 8, 50, 16, 0, WS_EX_LEFT
 }
 1 VERSIONINFO
-	FILEVERSION		1,9,8,0
-	PRODUCTVERSION	1,9,8,0
+	FILEVERSION		1,9,9,0
+	PRODUCTVERSION	1,9,9,0
 	FILEOS			VOS__WINDOWS32
 	FILETYPE		VFT_APP
 	FILESUBTYPE		VFT2_UNKNOWN
@@ -102,9 +102,9 @@ CAPTION "Script Control"
 		BLOCK "040904B0"
 		{
 			VALUE "FileDescription", "Tiny Terminal Emulator"
-			VALUE "LegalCopyright", "©2018-2020 Yongchao Fan"
+			VALUE "LegalCopyright", "©2018-2021 Yongchao Fan"
 			VALUE "ProductName", "tinyTerm"
-			VALUE "ProductVersion", "1.9.8.0"
+			VALUE "ProductVersion", "1.9.9.0"
 		}
 	}
 	BLOCK "VarFileInfo"
