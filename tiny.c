@@ -1,11 +1,11 @@
 //
-// "$Id: tiny.c 37717 2020-10-09 21:35:10 $"
+// "$Id: tiny.c 37717 2021-09-01 21:35:10 $"
 //
 // tinyTerm -- A minimal serail/telnet/ssh/sftp terminal emulator
 //
 // tiny.c is the GUI implementation using WIN32 API.
 //
-// Copyright 2018-2020 by Yongchao Fan.
+// Copyright 2018-2021 by Yongchao Fan.
 //
 // This library is free software distributed under GNU GPL 3.0,
 // see the license at:
@@ -42,7 +42,7 @@ const char WELCOME[]="\r\n\n\
 \t    * drag and drop to send files via scp or xmodem\r\n\n\
 \t    * scripting interface at xmlhttp://127.0.0.1:%d\r\n\n\n\
 \thttps://yongchaofan.github.io/tinyTerm\r\n\n\
-\tVerision 1.9.8 ©2018-2020 Yongchao Fan\r\n\n";
+\tVerision 1.9.9 ©2018-2021 Yongchao Fan\r\n\n";
 
 const COLORREF COLORS[16] = {
 	RGB(0,0,0),		RGB(192,0,0),	RGB(0,192,0),	RGB(192,192,0),
